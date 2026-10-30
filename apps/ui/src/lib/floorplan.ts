@@ -17,7 +17,12 @@ export type Wall = {
 
 export type Room = { name: string; floor: FloorKind; rect: Rect; size?: string };
 
-export type Fixture = { rect: Rect; height: number; color: number };
+export type Fixture = { rect: Rect; height: number; color: number; y?: number; solid?: boolean };
+
+// Leaf drawn in its open position, hinge first, as the swing arcs on the plan show.
+export type Door = [hingeX: number, hingeY: number, endX: number, endY: number];
+
+export type Column = { x: number; y: number; r: number };
 
 export const rooms: Room[] = [
 	{ name: 'Bedroom 1', floor: 'wood', rect: [48, 35, 388, 285], size: `13'3" x 10'0"` },
@@ -108,7 +113,45 @@ export const fixtures: Fixture[] = [
 	{ rect: [780, 430, 835, 545], height: 1.6, color: 0xf2f2f2 },
 	{ rect: [715, 300, 770, 375], height: 3, color: 0xdcdcdc },
 	{ rect: [775, 300, 830, 375], height: 3, color: 0xdcdcdc },
+	{ rect: [400, 45, 430, 95], height: 7, color: 0xc9a77c },
+	{ rect: [470, 55, 500, 85], height: 0.3, y: 3, color: 0xffffff },
+	{ rect: [535, 55, 565, 85], height: 0.3, y: 3, color: 0xffffff },
+	{ rect: [605, 45, 640, 70], height: 2.6, color: 0xffffff },
+	{ rect: [608, 70, 637, 105], height: 1.4, color: 0xffffff },
+	{ rect: [663, 60, 667, 180], height: 7, color: 0x9fd0e8, solid: true },
+	{ rect: [665, 45, 735, 60], height: 0.4, y: 6.5, color: 0xb0b0b0 },
+	{ rect: [298, 315, 348, 340], height: 0.1, y: 3, color: 0x222222 },
+	{ rect: [205, 395, 245, 450], height: 0.05, y: 3, color: 0x111111 },
+	{ rect: [340, 452, 372, 470], height: 0.6, y: 1.5, color: 0x333333 },
+	{ rect: [345, 530, 370, 545], height: 2.5, color: 0x333333 },
+	{ rect: [385, 530, 410, 545], height: 2.5, color: 0x333333 },
+	{ rect: [435, 530, 460, 545], height: 2.5, color: 0x333333 },
+	{ rect: [660, 403, 690, 420], height: 0.3, y: 3, color: 0xffffff },
+	{ rect: [725, 390, 755, 410], height: 2.6, color: 0xffffff },
+	{ rect: [728, 410, 752, 445], height: 1.4, color: 0xffffff },
+	{ rect: [780, 390, 835, 425], height: 7, color: 0xc9a77c },
+	{ rect: [590, 300, 635, 380], height: 7, color: 0xd8c8a8 },
+	{ rect: [55, 300, 185, 305], height: 0.15, y: 5.5, color: 0xd8c8a8 },
+	{ rect: [70, 450, 165, 490], height: 0.15, y: 5.5, color: 0xd8c8a8 },
+	{ rect: [700, 600, 840, 605], height: 0.15, y: 5.5, color: 0xd8c8a8 },
+	{ rect: [650, 300, 705, 380], height: 0.15, y: 5.5, color: 0xd8c8a8 },
 ];
+
+export const doors: Door[] = [
+	[392, 105, 468, 105],
+	[392, 205, 468, 205],
+	[150, 287, 150, 365],
+	[180, 540, 100, 540],
+	[585, 480, 657, 480],
+	[595, 650, 595, 722],
+	[700, 648, 700, 720],
+	[760, 137, 815, 192],
+	[865, 205, 812, 190],
+	[620, 180, 665, 135],
+];
+
+// The filled circle in the living room is a structural column (visible in living-room-island-corner-windows.jpg).
+export const columns: Column[] = [{ x: 308, y: 860, r: 27 }];
 
 export const footprint: Rect = [40, 25, 910, 925];
 

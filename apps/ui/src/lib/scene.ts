@@ -1,6 +1,7 @@
 import {
 	AmbientLight,
 	BoxGeometry,
+	CylinderGeometry,
 	Color,
 	DirectionalLight,
 	Group,
@@ -16,7 +17,19 @@ import {
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
 import { CSS2DObject, CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
-import { CEILING_FT, fixtures, footprint, ft, rooms, walls, type FloorKind, type Rect, type Wall } from './floorplan';
+import {
+	CEILING_FT,
+	columns,
+	doors,
+	fixtures,
+	footprint,
+	ft,
+	rooms,
+	walls,
+	type FloorKind,
+	type Rect,
+	type Wall,
+} from './floorplan';
 
 export type Mode = 'orbit' | 'walk';
 
@@ -130,8 +143,31 @@ export function createViewer(container: HTMLElement, onMode: (mode: Mode) => voi
 	});
 
 	for (const f of fixtures) {
-		const mesh = addBox(wallGroup, f.rect, 0, f.height, new MeshStandardMaterial({ color: f.color, roughness: 0.6 }));
-		cutawayWalls.push({ mesh, fullHeight: f.height, y: 0, glass: false });
+		const y = f.y ?? 0;
+		const mesh = addBox(wallGroup, f.rect, y, f.height, new MeshStandardMaterial({ color: f.color, roughness: 0.6 }));
+		cutawayWalls.push({ mesh, fullHeight: f.height, y, glass: false });
+		if (f.solid || (y === 0 && f.height > 1)) {
+			const [x1, z1, x2, z2] = f.rect.map(ft) as Rect;
+			colliders.push({ x1, z1, x2, z2 });
+		}
+	}
+
+	const doorMat = new MeshStandardMaterial({ color: 0xfafaf7, roughness: 0.7 });
+	for (const [hx, hy, ex, ey] of doors) {
+		const length = ft(Math.hypot(ex - hx, ey - hy));
+		const mesh = new Mesh(new BoxGeometry(length, 7, 0.15), doorMat);
+		mesh.position.set(ft((hx + ex) / 2), 3.5, ft((hy + ey) / 2));
+		mesh.rotation.y = -Math.atan2(ey - hy, ex - hx);
+		wallGroup.add(mesh);
+		cutawayWalls.push({ mesh, fullHeight: 7, y: 0, glass: false });
+	}
+
+	for (const c of columns) {
+		const mesh = new Mesh(new CylinderGeometry(ft(c.r), ft(c.r), CEILING_FT, 32), plaster);
+		mesh.position.set(ft(c.x), CEILING_FT / 2, ft(c.y));
+		wallGroup.add(mesh);
+		cutawayWalls.push({ mesh, fullHeight: CEILING_FT, y: 0, glass: false });
+		colliders.push({ x1: ft(c.x - c.r), z1: ft(c.y - c.r), x2: ft(c.x + c.r), z2: ft(c.y + c.r) });
 	}
 
 	const ceilingMat = new MeshStandardMaterial({ color: 0xffffff, roughness: 1 });
@@ -147,7 +183,7 @@ export function createViewer(container: HTMLElement, onMode: (mode: Mode) => voi
 		const low = mode === 'orbit' && cutaway;
 		for (const w of cutawayWalls) {
 			const target = low ? Math.min(w.fullHeight, CUTAWAY_FT) : w.fullHeight;
-			w.mesh.visible = !(low && w.lintel);
+			w.mesh.visible = !(low && w.y >= CUTAWAY_FT);
 			const scale = target / w.fullHeight;
 			w.mesh.scale.y = scale;
 			w.mesh.position.y = w.y + (w.fullHeight * scale) / 2;
