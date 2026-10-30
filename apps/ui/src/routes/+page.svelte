@@ -4,15 +4,21 @@
 
 	let container: HTMLDivElement;
 	let mode = $state<Mode>('orbit');
-	let cutaway = $state(true);
-	let viewer: ReturnType<typeof createViewer>;
+	const OPTIONS_KEY = 'viewer-options';
+	const saved = JSON.parse(localStorage.getItem(OPTIONS_KEY) ?? '{}');
+	let cutaway = $state<boolean>(saved.cutaway ?? true);
+	let labels = $state<boolean>(saved.labels ?? false);
+	let viewer = $state<ReturnType<typeof createViewer>>();
 
 	onMount(() => {
-		viewer = createViewer(container, next => (mode = next));
-		return () => viewer.dispose();
+		const v = createViewer(container, next => (mode = next));
+		viewer = v;
+		return () => v.dispose();
 	});
 
 	$effect(() => viewer?.setCutaway(cutaway));
+	$effect(() => viewer?.setLabels(labels));
+	$effect(() => localStorage.setItem(OPTIONS_KEY, JSON.stringify({ cutaway, labels })));
 </script>
 
 <svelte:head>
@@ -24,11 +30,12 @@
 <header class="hud">
 	<h1>84 East Ave #2209 <span>Vesper B4 · 1,176 sqft</span></h1>
 	<div class="actions">
-		<button type="button" class="primary" onclick={() => viewer.setMode(mode === 'orbit' ? 'walk' : 'orbit')}>
+		<button type="button" class="primary" onclick={() => viewer?.setMode(mode === 'orbit' ? 'walk' : 'orbit')}>
 			{mode === 'orbit' ? 'Walk inside' : 'Back to overview'}
 		</button>
 		{#if mode === 'orbit'}
 			<label><input type="checkbox" bind:checked={cutaway} /> Cutaway walls</label>
+			<label><input type="checkbox" bind:checked={labels} /> Room labels</label>
 		{/if}
 	</div>
 	<p class="help">

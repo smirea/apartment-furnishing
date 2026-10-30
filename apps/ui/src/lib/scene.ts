@@ -178,6 +178,7 @@ export function createViewer(container: HTMLElement, onMode: (mode: Mode) => voi
 
 	let mode: Mode = 'orbit';
 	let cutaway = true;
+	let labels = false;
 
 	function applyHeights() {
 		const low = mode === 'orbit' && cutaway;
@@ -189,7 +190,7 @@ export function createViewer(container: HTMLElement, onMode: (mode: Mode) => voi
 			w.mesh.position.y = w.y + (w.fullHeight * scale) / 2;
 		}
 		ceilingGroup.visible = mode === 'walk';
-		labelGroup.visible = mode === 'orbit';
+		labelGroup.visible = mode === 'orbit' && labels;
 	}
 
 	function setMode(next: Mode) {
@@ -206,6 +207,11 @@ export function createViewer(container: HTMLElement, onMode: (mode: Mode) => voi
 		}
 		applyHeights();
 		onMode(next);
+	}
+
+	function setLabels(value: boolean) {
+		labels = value;
+		applyHeights();
 	}
 
 	function setCutaway(value: boolean) {
@@ -276,6 +282,7 @@ export function createViewer(container: HTMLElement, onMode: (mode: Mode) => voi
 	return {
 		setMode,
 		setCutaway,
+		setLabels,
 		dispose() {
 			renderer.setAnimationLoop(null);
 			observer.disconnect();
