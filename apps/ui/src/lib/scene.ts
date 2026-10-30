@@ -1,3 +1,4 @@
+import { items, type Facing } from './items';
 import {
 	AmbientLight,
 	BoxGeometry,
@@ -168,6 +169,21 @@ export function createViewer(container: HTMLElement, onMode: (mode: Mode) => voi
 		wallGroup.add(mesh);
 		cutawayWalls.push({ mesh, fullHeight: CEILING_FT, y: 0, glass: false });
 		colliders.push({ x1: ft(c.x - c.r), z1: ft(c.y - c.r), x2: ft(c.x + c.r), z2: ft(c.y + c.r) });
+	}
+
+	const facingAngle: Record<Facing, number> = { south: 0, east: Math.PI / 2, north: Math.PI, west: -Math.PI / 2 };
+	const screenMat = new MeshStandardMaterial({ color: 0x05070a, roughness: 0.15, metalness: 0.4 });
+	for (const item of items) {
+		const { width, height, depth } = item.size;
+		const body = new MeshStandardMaterial({ color: item.color, roughness: 0.5 });
+		// BoxGeometry material order is +x, -x, +y, -y, +z, -z; +z is the front before rotation.
+		const faces = [body, body, body, body, item.screen ? screenMat : body, body];
+		const mesh = new Mesh(new BoxGeometry(width / 12, height / 12, depth / 12), faces);
+		const y = (item.elevationIn ?? 0) / 12;
+		mesh.position.set(ft(item.at[0]), y + height / 24, ft(item.at[1]));
+		mesh.rotation.y = facingAngle[item.facing];
+		mesh.name = item.name;
+		wallGroup.add(mesh);
 	}
 
 	const ceilingMat = new MeshStandardMaterial({ color: 0xffffff, roughness: 1 });
