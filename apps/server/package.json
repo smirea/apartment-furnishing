@@ -1,0 +1,19 @@
+{
+	"name": "@repo/server",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts",
+		"./package.json": "./package.json"
+	},
+	"scripts": {
+		"build": "bun build src/index.ts --target bun --outdir dist",
+		"dev": "bun --env-file=../../.env --env-file=../../.env.local --watch src/index.ts",
+		"start": "bun --env-file=../../.env --env-file=../../.env.local src/index.ts",
+		"typecheck": "bun check"
+	},
+	"dependencies": {
+		"@repo/shared": "workspace:*",
+		"es-toolkit": "^1.52.0"
+	}
+}

@@ -1,0 +1,24 @@
+{
+	"compilerOptions": {
+		"allowImportingTsExtensions": true,
+		"lib": ["ESNext", "DOM"],
+		"module": "Preserve",
+		"moduleDetection": "force",
+		"moduleResolution": "bundler",
+		"noEmit": true,
+		"noFallthroughCasesInSwitch": true,
+		"noImplicitOverride": true,
+		"noPropertyAccessFromIndexSignature": false,
+		"noUnusedLocals": false,
+		"noUnusedParameters": false,
+		"paths": {
+			"@repo/shared": ["./packages/shared/src/index.ts"],
+			"@repo/shared/*": ["./packages/shared/src/*"]
+		},
+		"skipLibCheck": true,
+		"strict": true,
+		"target": "ESNext",
+		"types": ["bun"],
+		"verbatimModuleSyntax": true
+	}
+}

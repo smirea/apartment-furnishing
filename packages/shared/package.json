@@ -1,0 +1,14 @@
+{
+	"name": "@repo/shared",
+	"private": true,
+	"type": "module",
+	"exports": {
+		".": "./src/index.ts",
+		"./env": "./src/env.ts",
+		"./package.json": "./package.json"
+	},
+	"dependencies": {
+		"es-toolkit": "^1.52.0",
+		"zod": "^4.6.6"
+	}
+}

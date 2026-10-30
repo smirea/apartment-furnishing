@@ -1,0 +1,40 @@
+{
+	"name": "apartment-furnishing",
+	"private": true,
+	"workspaces": [
+		"apps/*",
+		"packages/*"
+	],
+	"type": "module",
+	"scripts": {
+		"build": "bun --filter @repo/ui build && bun --filter @repo/server build",
+		"dev": "concurrently --raw -k -s first \"bun --filter @repo/server dev\" \"bun --filter @repo/ui dev --host 127.0.0.1\"",
+		"format": "oxfmt --write .",
+		"lint": "oxlint --fix && oxfmt --write .",
+		"lint:ci": "oxlint && oxfmt --check .",
+		"env:generate": "env-manager gen --local",
+		"postinstall": "lefthook install",
+		"server:dev": "bun --filter @repo/server dev",
+		"server:start": "bun --filter @repo/server start",
+		"server:typecheck": "bun --filter @repo/server typecheck",
+		"start": "bun --filter @repo/server start",
+		"test": "bun test --pass-with-no-tests",
+		"typecheck": "bun --filter @repo/ui check && bun --filter @repo/server typecheck",
+		"ui:build": "bun --filter @repo/ui build",
+		"ui:check": "bun --filter @repo/ui check",
+		"ui:dev": "bun --filter @repo/ui dev --host 127.0.0.1",
+		"ui:preview": "bun --filter @repo/ui preview"
+	},
+	"devDependencies": {
+		"@types/bun": "^1.4.4",
+		"@types/node": "^26.6.5",
+		"@typescript/native": "npm:typescript@^7.0.2",
+		"concurrently": "^10.0.6",
+		"env-manager": "github:smirea/env-manager#1b0393e4423946c0be7c6156d69974314cedb294",
+		"lefthook": "^2.2.1",
+		"oxfmt": "^0.72.0",
+		"oxlint": "^1.87.0",
+		"typescript": "^6.0.3"
+	},
+	"packageManager": "bun@1.4.4"
+}
