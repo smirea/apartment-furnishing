@@ -1,111 +1,91 @@
 <script lang="ts">
-	import { createQuery } from '@tanstack/svelte-query';
+	import { onMount } from 'svelte';
+	import { createViewer, type Mode } from '../lib/scene';
 
-	type Theme = 'dark' | 'light';
-	type Status = { ok: boolean; now: string };
+	let container: HTMLDivElement;
+	let mode = $state<Mode>('orbit');
+	let cutaway = $state(true);
+	let viewer: ReturnType<typeof createViewer>;
 
-	let theme = $state<Theme>('dark');
-	const status = createQuery(() => ({
-		queryKey: ['status'],
-		queryFn: fetchStatus,
-	}));
-
-	$effect(() => {
-		if (typeof document === 'undefined') return;
-		document.documentElement.dataset.theme = theme;
+	onMount(() => {
+		viewer = createViewer(container, next => (mode = next));
+		return () => viewer.dispose();
 	});
 
-	async function fetchStatus(): Promise<Status> {
-		const response = await fetch('/api/status');
-		if (!response.ok) throw new Error(await response.text());
-		return response.json();
-	}
+	$effect(() => viewer?.setCutaway(cutaway));
 </script>
 
 <svelte:head>
-	<title>Svelte App</title>
+	<title>84 East Ave #2209</title>
 </svelte:head>
 
-<main class="app">
-	<section class="shell">
-		<div class="intro">
-			<p class="eyebrow">SvelteKit + Bun</p>
-			<h1>Start here.</h1>
-			<p class="lede">A tiny Svelte route, Tailwind v4 theme tokens, and a Bun API server are wired together.</p>
-		</div>
+<div class="viewer" bind:this={container}></div>
 
-		<div class="actions">
-			<button type="button" class="primary" onclick={() => (theme = theme === 'dark' ? 'light' : 'dark')}>
-				{theme === 'dark' ? 'Light' : 'Dark'} theme
-			</button>
-			<button type="button" onclick={() => void status.refetch()}> Ping server </button>
-		</div>
-
-		<div class="status">
-			<p class="eyebrow">API</p>
-			{#if status.isError}
-				<p class="error">{status.error.message}</p>
-			{:else if status.isPending}
-				<p class="muted">Checking server...</p>
-			{:else if status.data}
-				<p>Server is online.</p>
-				<p class="muted">{status.data.now}</p>
-			{/if}
-		</div>
-	</section>
-</main>
+<header class="hud">
+	<h1>84 East Ave #2209 <span>Vesper B4 · 1,176 sqft</span></h1>
+	<div class="actions">
+		<button type="button" class="primary" onclick={() => viewer.setMode(mode === 'orbit' ? 'walk' : 'orbit')}>
+			{mode === 'orbit' ? 'Walk inside' : 'Back to overview'}
+		</button>
+		{#if mode === 'orbit'}
+			<label><input type="checkbox" bind:checked={cutaway} /> Cutaway walls</label>
+		{/if}
+	</div>
+	<p class="help">
+		{#if mode === 'orbit'}
+			Drag to rotate, right-drag to pan, scroll to zoom.
+		{:else}
+			WASD or arrows to move, mouse to look, Shift to run, Esc to exit.
+		{/if}
+	</p>
+</header>
 
 <style>
-	.app {
-		min-height: 100vh;
+	.viewer {
+		position: fixed;
+		inset: 0;
 		background: var(--app-bg);
-		color: var(--app-text);
 	}
 
-	.shell {
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-		gap: 2rem;
-		width: min(100%, 48rem);
-		min-height: 100vh;
-		margin: 0 auto;
-		padding: 3rem 1.5rem;
-	}
-
-	.intro {
+	.hud {
+		position: fixed;
+		top: 1rem;
+		left: 1rem;
 		display: grid;
-		gap: 1rem;
-	}
-
-	.eyebrow {
-		margin: 0;
-		color: var(--app-muted);
-		font-size: 0.875rem;
-		font-weight: 600;
+		gap: 0.75rem;
+		max-width: 22rem;
+		padding: 1rem;
+		border: 1px solid var(--app-border);
+		border-radius: 0.5rem;
+		background: color-mix(in srgb, var(--app-panel) 88%, transparent);
+		color: var(--app-panel-text);
 	}
 
 	h1 {
 		margin: 0;
-		color: var(--app-text);
-		font-size: clamp(3rem, 8vw, 5rem);
+		font-size: 1.05rem;
 		font-weight: 650;
-		letter-spacing: 0;
-		line-height: 1;
 	}
 
-	.lede {
-		max-width: 40rem;
-		margin: 0;
+	h1 span {
+		display: block;
 		color: var(--app-muted);
-		font-size: 1.125rem;
-		line-height: 1.7;
+		font-size: 0.8rem;
+		font-weight: 500;
 	}
 
 	.actions {
 		display: flex;
 		flex-wrap: wrap;
+		align-items: center;
 		gap: 0.75rem;
+		font-size: 0.875rem;
+	}
+
+	.help {
+		margin: 0;
+		color: var(--app-muted);
+		font-size: 0.8rem;
 	}
 
 	button {
@@ -118,38 +98,26 @@
 		cursor: pointer;
 	}
 
-	button:hover {
-		border-color: var(--app-accent);
-	}
-
 	button.primary {
 		border-color: var(--app-accent);
 		background: var(--app-accent);
 		color: var(--app-accent-ink);
 	}
 
-	.status {
-		border: 1px solid var(--app-border);
-		border-radius: 0.5rem;
-		background: var(--app-panel);
-		color: var(--app-panel-text);
-		padding: 1rem;
+	:global(.room-label) {
+		display: grid;
+		justify-items: center;
+		padding: 0.15rem 0.4rem;
+		border-radius: 0.25rem;
+		background: rgb(0 0 0 / 0.55);
+		color: #fff;
+		font-size: 0.7rem;
+		font-weight: 600;
+		white-space: nowrap;
 	}
 
-	.status p {
-		margin: 0.5rem 0 0;
-	}
-
-	.status .eyebrow {
-		margin-top: 0;
-	}
-
-	.muted {
-		color: var(--app-muted);
-		font-size: 0.875rem;
-	}
-
-	.error {
-		color: var(--app-error);
+	:global(.room-label small) {
+		font-weight: 400;
+		opacity: 0.75;
 	}
 </style>
