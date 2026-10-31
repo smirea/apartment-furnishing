@@ -42,3 +42,19 @@ Everything lives in [`listing/photos`](listing/photos). Zillow's original 1536px
 - [`building/`](listing/photos/building): amenities. Sky lounge, gym, rooftop pool and terraces, dog run, co-working room, entrance.
 
 Names were assigned by looking at each image, so a couple are best guesses (`bedroom-empty-hardwood-corner` and `bedroom-empty-tall-window-highway-view` could be either bedroom).
+
+## Adding furniture
+
+```sh
+bun run import <product-url> [more urls...]
+```
+
+Works with Amazon and Walmart links (and most product pages). For each link it:
+
+1. Captures the page with a headless [Camoufox](https://camoufox.com) browser (`scripts/fetch-pages.py`, run through `uv`). Walmart's bot check blocks headless Chrome, Playwright and agent-browser, but lets Camoufox through.
+2. Has the `grok` CLI turn the capture into structured product info: name, brand, price, dimensions in inches, weight, summary, highlights, image and 3D model URLs.
+3. Downloads the image and any GLB model into `apps/ui/static/items/<id>/` and writes `apps/ui/src/lib/catalog/<id>.json`.
+
+Walmart products with "View in 3D" come with a real GLB model. Items without one render as a box at their listed size.
+
+To put an item in the apartment, add a placement with its id to `apps/ui/src/lib/items.ts`. Click any placed item to see its card.

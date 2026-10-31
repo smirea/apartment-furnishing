@@ -1,30 +1,53 @@
+// Product data is written by `bun scripts/import-item.ts <url>` into ./catalog/<id>.json.
+// This file only decides where catalog items go in the apartment.
 export type Facing = 'north' | 'south' | 'east' | 'west';
 
-export type Item = {
-	name: string;
+export type CatalogItem = {
+	id: string;
 	url: string;
-	price?: number;
-	// Real-world size in inches; width runs side to side as seen from the front.
-	size: { width: number; height: number; depth: number };
-	// Plan pixel coordinates (see floorplan.ts) of the item's footprint center.
-	at: [x: number, y: number];
-	elevationIn?: number;
-	facing: Facing;
-	color: number;
-	screen?: boolean;
+	importedAt: string;
+	name: string;
+	brand: string | null;
+	price: number | null;
+	currency: string;
+	category: string;
+	// Inches; width runs side to side as seen from the front.
+	dimensions: { width: number; height: number; depth: number } | null;
+	dimensionsNote: string | null;
+	weightLb: number | null;
+	summary: string;
+	highlights: string[];
+	image: string | null;
+	model: string | null;
 };
 
-export const items: Item[] = [
+export type Placement = {
+	id: string;
+	// Plan pixel coordinates (see floorplan.ts) of the item's footprint center.
+	at: [x: number, y: number];
+	facing: Facing;
+	elevationIn?: number;
+	// GLB node names to drop, e.g. a TV stand when wall mounting.
+	removeNodes?: string[];
+};
+
+export const catalog: Record<string, CatalogItem> = Object.fromEntries(
+	Object.values(import.meta.glob<CatalogItem>('./catalog/*.json', { eager: true, import: 'default' })).map(item => [
+		item.id,
+		item,
+	]),
+);
+
+export const placements: Placement[] = [
+	// On the solid living/bedroom-2 wall where the floor plan draws a media console.
 	{
-		name: 'Samsung 85" M70HB Mini LED TV',
-		url: 'https://www.walmart.com/ip/18182363041',
-		price: 997.99,
-		// Walmart lists height and depth but no width; 74.6" is the 85" 16:9 panel plus bezel.
-		size: { width: 74.6, height: 42.7, depth: 3 },
+		id: 'samsung-85-m70hb-mini-led-4k-smart-tv',
 		at: [570, 765],
-		elevationIn: 30,
 		facing: 'west',
-		color: 0x1a1a1a,
-		screen: true,
+		elevationIn: 30,
+		removeNodes: ['StandEntity'],
 	},
+	{ id: 'recline-flow-linen-chenille-barrel-swivel-accent-chair', at: [410, 660], facing: 'east' },
 ];
+
+for (const p of placements) if (!catalog[p.id]) throw new Error(`Placement references unknown catalog item "${p.id}"`);

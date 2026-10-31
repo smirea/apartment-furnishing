@@ -1,7 +1,10 @@
-import { items, type Facing } from './items';
+import { catalog, placements, type CatalogItem, type Facing } from './items';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {
 	AmbientLight,
+	Box3,
 	BoxGeometry,
+	BoxHelper,
 	CylinderGeometry,
 	Color,
 	DirectionalLight,
@@ -11,7 +14,9 @@ import {
 	Object3D,
 	MeshStandardMaterial,
 	PerspectiveCamera,
+	Raycaster,
 	Scene,
+	Vector2,
 	Vector3,
 	WebGLRenderer,
 } from 'three';
@@ -43,7 +48,11 @@ const floorColors: Record<FloorKind, number> = { wood: 0xc9a672, tile: 0xe6e6e2,
 
 type Box = { x1: number; z1: number; x2: number; z2: number };
 
-export function createViewer(container: HTMLElement, onMode: (mode: Mode) => void) {
+export function createViewer(
+	container: HTMLElement,
+	onMode: (mode: Mode) => void,
+	onSelect: (itemId: string | null) => void,
+) {
 	const renderer = new WebGLRenderer({ antialias: true });
 	renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 	container.append(renderer.domElement);
@@ -172,19 +181,67 @@ export function createViewer(container: HTMLElement, onMode: (mode: Mode) => voi
 	}
 
 	const facingAngle: Record<Facing, number> = { south: 0, east: Math.PI / 2, north: Math.PI, west: -Math.PI / 2 };
-	const screenMat = new MeshStandardMaterial({ color: 0x05070a, roughness: 0.15, metalness: 0.4 });
-	for (const item of items) {
-		const { width, height, depth } = item.size;
-		const body = new MeshStandardMaterial({ color: item.color, roughness: 0.5 });
-		// BoxGeometry material order is +x, -x, +y, -y, +z, -z; +z is the front before rotation.
-		const faces = [body, body, body, body, item.screen ? screenMat : body, body];
-		const mesh = new Mesh(new BoxGeometry(width / 12, height / 12, depth / 12), faces);
-		const y = (item.elevationIn ?? 0) / 12;
-		mesh.position.set(ft(item.at[0]), y + height / 24, ft(item.at[1]));
-		mesh.rotation.y = facingAngle[item.facing];
-		mesh.name = item.name;
-		wallGroup.add(mesh);
+	const itemGroup = new Group();
+	scene.add(itemGroup);
+	const gltf = new GLTFLoader();
+	const fallbackMat = new MeshStandardMaterial({ color: 0x8a8f98, roughness: 0.6 });
+
+	async function buildItem(item: CatalogItem, removeNodes: string[] = []): Promise<Object3D> {
+		const dims = item.dimensions;
+		if (item.model) {
+			const model = (await gltf.loadAsync(item.model)).scene;
+			for (const name of removeNodes) model.getObjectByName(name)?.removeFromParent();
+			const size = new Box3().setFromObject(model).getSize(new Vector3());
+			// Uniform scale keeps the model's proportions; listed width wins, otherwise assume glTF meters.
+			model.scale.setScalar(dims ? dims.width / 12 / size.x : 3.28084);
+			return model;
+		}
+		const { width, height, depth } = dims ?? { width: 24, height: 24, depth: 24 };
+		return new Mesh(new BoxGeometry(width / 12, height / 12, depth / 12), fallbackMat);
 	}
+
+	for (const placement of placements) {
+		const item = catalog[placement.id]!;
+		void buildItem(item, placement.removeNodes).then(object => {
+			const root = new Group();
+			root.add(object);
+			root.rotation.y = facingAngle[placement.facing];
+			const box = new Box3().setFromObject(root);
+			const center = box.getCenter(new Vector3());
+			root.position.set(
+				ft(placement.at[0]) - center.x,
+				(placement.elevationIn ?? 0) / 12 - box.min.y,
+				ft(placement.at[1]) - center.z,
+			);
+			root.userData.itemId = item.id;
+			itemGroup.add(root);
+		});
+	}
+
+	let selection: BoxHelper | null = null;
+	function select(root: Object3D | null) {
+		selection?.removeFromParent();
+		selection = root ? new BoxHelper(root, 0x5eead4) : null;
+		if (selection) scene.add(selection);
+		onSelect(root ? (root.userData.itemId as string) : null);
+	}
+
+	const raycaster = new Raycaster();
+	const pointer = new Vector2();
+	let downAt: [number, number] | null = null;
+	renderer.domElement.addEventListener('pointerdown', e => (downAt = [e.clientX, e.clientY]));
+	renderer.domElement.addEventListener('pointerup', e => {
+		if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 4) return;
+		if (mode === 'walk' && !look.isLocked) return;
+		const rect = renderer.domElement.getBoundingClientRect();
+		if (mode === 'walk') pointer.set(0, 0);
+		else pointer.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+		raycaster.setFromCamera(pointer, camera);
+		const hit = raycaster.intersectObjects([...itemGroup.children, wallGroup], true)[0];
+		let root: Object3D | null = hit?.object ?? null;
+		while (root && root.parent !== itemGroup) root = root.parent;
+		select(root);
+	});
 
 	const ceilingMat = new MeshStandardMaterial({ color: 0xffffff, roughness: 1 });
 	for (const room of rooms) {
