@@ -1,0 +1,11 @@
+[
+	{
+		"key": "tv-living-room",
+		"itemId": "samsung-85-m70hb-mini-led-4k-smart-tv",
+		"x": 22.98,
+		"z": 30.85,
+		"rotationDeg": -90,
+		"elevationIn": 30,
+		"removeNodes": ["StandEntity"]
+	}
+]

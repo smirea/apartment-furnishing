@@ -45,16 +45,12 @@ Names were assigned by looking at each image, so a couple are best guesses (`bed
 
 ## Adding furniture
 
-```sh
-bun run import <product-url> [more urls...]
-```
-
-Works with Amazon and Walmart links (and most product pages). For each link it:
+Paste an Amazon or Walmart link into the **Import** box in the app (or run `bun run import <url> [...]`). For each link the server:
 
 1. Captures the page with a headless [Camoufox](https://camoufox.com) browser (`scripts/fetch-pages.py`, run through `uv`). Walmart's bot check blocks headless Chrome, Playwright and agent-browser, but lets Camoufox through.
 2. Has the `grok` CLI turn the capture into structured product info: name, brand, price, dimensions in inches, weight, summary, highlights, image and 3D model URLs.
-3. Downloads the image and any GLB model into `apps/ui/static/items/<id>/` and writes `apps/ui/src/lib/catalog/<id>.json`.
+3. Downloads the image and any GLB model into `data/items/<id>/` and writes `data/catalog/<id>.json`. Re-importing the same product updates its entry.
+
+New imports drop into the living room. Drag items to move them, use the card (or R / Shift+R / Delete) to rotate, set height off the floor, duplicate or remove. Placements save to `data/placements.json`.
 
 Walmart products with "View in 3D" come with a real GLB model. Items without one render as a box at their listed size.
-
-To put an item in the apartment, add a placement with its id to `apps/ui/src/lib/items.ts`. Click any placed item to see its card.

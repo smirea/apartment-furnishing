@@ -1,4 +1,4 @@
-import { catalog, placements, type CatalogItem, type Facing } from './items';
+import type { CatalogItem, Placement } from '@repo/shared/items';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {
 	AmbientLight,
@@ -14,6 +14,7 @@ import {
 	Object3D,
 	MeshStandardMaterial,
 	PerspectiveCamera,
+	Plane,
 	Raycaster,
 	Scene,
 	Vector2,
@@ -51,7 +52,8 @@ type Box = { x1: number; z1: number; x2: number; z2: number };
 export function createViewer(
 	container: HTMLElement,
 	onMode: (mode: Mode) => void,
-	onSelect: (itemId: string | null) => void,
+	onSelect: (key: string | null) => void,
+	onMove: (key: string, x: number, z: number) => void,
 ) {
 	const renderer = new WebGLRenderer({ antialias: true });
 	renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -180,67 +182,126 @@ export function createViewer(
 		colliders.push({ x1: ft(c.x - c.r), z1: ft(c.y - c.r), x2: ft(c.x + c.r), z2: ft(c.y + c.r) });
 	}
 
-	const facingAngle: Record<Facing, number> = { south: 0, east: Math.PI / 2, north: Math.PI, west: -Math.PI / 2 };
 	const itemGroup = new Group();
 	scene.add(itemGroup);
 	const gltf = new GLTFLoader();
 	const fallbackMat = new MeshStandardMaterial({ color: 0x8a8f98, roughness: 0.6 });
+	const roots = new Map<string, Group>();
+	const signature = (p: Placement) => `${p.itemId}|${(p.removeNodes ?? []).join(',')}`;
 
 	async function buildItem(item: CatalogItem, removeNodes: string[] = []): Promise<Object3D> {
 		const dims = item.dimensions;
+		let object: Object3D;
 		if (item.model) {
-			const model = (await gltf.loadAsync(item.model)).scene;
-			for (const name of removeNodes) model.getObjectByName(name)?.removeFromParent();
-			const size = new Box3().setFromObject(model).getSize(new Vector3());
+			object = (await gltf.loadAsync(item.model)).scene;
+			for (const name of removeNodes) object.getObjectByName(name)?.removeFromParent();
+			const size = new Box3().setFromObject(object).getSize(new Vector3());
 			// Uniform scale keeps the model's proportions; listed width wins, otherwise assume glTF meters.
-			model.scale.setScalar(dims ? dims.width / 12 / size.x : 3.28084);
-			return model;
+			object.scale.setScalar(dims ? dims.width / 12 / size.x : 3.28084);
+		} else {
+			const { width, height, depth } = dims ?? { width: 24, height: 24, depth: 24 };
+			object = new Mesh(new BoxGeometry(width / 12, height / 12, depth / 12), fallbackMat);
 		}
-		const { width, height, depth } = dims ?? { width: 24, height: 24, depth: 24 };
-		return new Mesh(new BoxGeometry(width / 12, height / 12, depth / 12), fallbackMat);
+		// Re-center so the root's origin is the footprint center at floor level; rotation then spins in place.
+		const box = new Box3().setFromObject(object);
+		const center = box.getCenter(new Vector3());
+		object.position.sub(new Vector3(center.x, box.min.y, center.z));
+		return object;
 	}
 
-	for (const placement of placements) {
-		const item = catalog[placement.id]!;
-		void buildItem(item, placement.removeNodes).then(object => {
-			const root = new Group();
-			root.add(object);
-			root.rotation.y = facingAngle[placement.facing];
-			const box = new Box3().setFromObject(root);
-			const center = box.getCenter(new Vector3());
-			root.position.set(
-				ft(placement.at[0]) - center.x,
-				(placement.elevationIn ?? 0) / 12 - box.min.y,
-				ft(placement.at[1]) - center.z,
-			);
-			root.userData.itemId = item.id;
-			itemGroup.add(root);
-		});
+	function placeRoot(root: Group, p: Placement) {
+		root.position.set(p.x, p.elevationIn / 12, p.z);
+		root.rotation.y = (p.rotationDeg * Math.PI) / 180;
 	}
 
-	let selection: BoxHelper | null = null;
-	function select(root: Object3D | null) {
-		selection?.removeFromParent();
-		selection = root ? new BoxHelper(root, 0x5eead4) : null;
-		if (selection) scene.add(selection);
-		onSelect(root ? (root.userData.itemId as string) : null);
+	function setPlacements(placements: Placement[], catalog: Record<string, CatalogItem>) {
+		const keys = new Set(placements.map(p => p.key));
+		for (const [key, root] of roots) {
+			if (keys.has(key)) continue;
+			root.removeFromParent();
+			roots.delete(key);
+			if (selectedKey === key) select(null);
+		}
+		for (const p of placements) {
+			const item = catalog[p.itemId];
+			if (!item) continue;
+			let root = roots.get(p.key);
+			if (root && root.userData.signature !== signature(p)) {
+				root.removeFromParent();
+				root = undefined;
+			}
+			if (!root) {
+				const fresh = new Group();
+				fresh.userData = { key: p.key, signature: signature(p) };
+				roots.set(p.key, fresh);
+				itemGroup.add(fresh);
+				void buildItem(item, p.removeNodes).then(object => fresh.add(object));
+				root = fresh;
+			}
+			if (root !== dragging?.root) placeRoot(root, p);
+		}
+	}
+
+	let selectedKey: string | null = null;
+	const selection = new BoxHelper(new Object3D(), 0x5eead4);
+	selection.visible = false;
+	scene.add(selection);
+	function select(key: string | null) {
+		selectedKey = key && roots.has(key) ? key : null;
+		selection.visible = !!selectedKey;
+		if (selectedKey) selection.setFromObject(roots.get(selectedKey)!);
+		onSelect(selectedKey);
 	}
 
 	const raycaster = new Raycaster();
 	const pointer = new Vector2();
+	const floor = new Plane(new Vector3(0, 1, 0), 0);
+	const floorHit = new Vector3();
 	let downAt: [number, number] | null = null;
-	renderer.domElement.addEventListener('pointerdown', e => (downAt = [e.clientX, e.clientY]));
-	renderer.domElement.addEventListener('pointerup', e => {
-		if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 4) return;
-		if (mode === 'walk' && !look.isLocked) return;
+	let dragging: { root: Group; offset: Vector3; moved: boolean } | null = null;
+
+	function pickItem(e: PointerEvent): Group | null {
 		const rect = renderer.domElement.getBoundingClientRect();
 		if (mode === 'walk') pointer.set(0, 0);
 		else pointer.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
 		raycaster.setFromCamera(pointer, camera);
 		const hit = raycaster.intersectObjects([...itemGroup.children, wallGroup], true)[0];
-		let root: Object3D | null = hit?.object ?? null;
-		while (root && root.parent !== itemGroup) root = root.parent;
-		select(root);
+		let node: Object3D | null = hit?.object ?? null;
+		while (node && node.parent !== itemGroup) node = node.parent;
+		return node as Group | null;
+	}
+
+	renderer.domElement.addEventListener('pointerdown', e => {
+		downAt = [e.clientX, e.clientY];
+		if (mode !== 'orbit' || e.button !== 0) return;
+		const root = pickItem(e);
+		if (!root || !raycaster.ray.intersectPlane(floor, floorHit)) return;
+		select(root.userData.key);
+		dragging = { root, offset: root.position.clone().sub(floorHit), moved: false };
+		orbit.enabled = false;
+		renderer.domElement.setPointerCapture(e.pointerId);
+	});
+	renderer.domElement.addEventListener('pointermove', e => {
+		if (!dragging) return;
+		const rect = renderer.domElement.getBoundingClientRect();
+		pointer.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+		raycaster.setFromCamera(pointer, camera);
+		if (!raycaster.ray.intersectPlane(floor, floorHit)) return;
+		dragging.root.position.x = floorHit.x + dragging.offset.x;
+		dragging.root.position.z = floorHit.z + dragging.offset.z;
+		dragging.moved = true;
+	});
+	renderer.domElement.addEventListener('pointerup', e => {
+		if (dragging) {
+			const { root, moved } = dragging;
+			dragging = null;
+			orbit.enabled = mode === 'orbit';
+			if (moved) onMove(root.userData.key, root.position.x, root.position.z);
+			return;
+		}
+		if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 4) return;
+		if (mode === 'walk' && !look.isLocked) return;
+		select(pickItem(e)?.userData.key ?? null);
 	});
 
 	const ceilingMat = new MeshStandardMaterial({ color: 0xffffff, roughness: 1 });
@@ -348,6 +409,7 @@ export function createViewer(
 		last = now;
 		if (mode === 'walk') step(dt);
 		else orbit.update();
+		if (selectedKey) selection.setFromObject(roots.get(selectedKey)!);
 		renderer.render(scene, camera);
 		labelRenderer.render(scene, camera);
 	});
@@ -356,6 +418,8 @@ export function createViewer(
 		setMode,
 		setCutaway,
 		setLabels,
+		setPlacements,
+		select,
 		dispose() {
 			renderer.setAnimationLoop(null);
 			observer.disconnect();
