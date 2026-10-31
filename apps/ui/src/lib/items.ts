@@ -47,7 +47,6 @@ export const placements: Placement[] = [
 		elevationIn: 30,
 		removeNodes: ['StandEntity'],
 	},
-	{ id: 'recline-flow-linen-chenille-barrel-swivel-accent-chair', at: [410, 660], facing: 'east' },
 ];
 
 for (const p of placements) if (!catalog[p.id]) throw new Error(`Placement references unknown catalog item "${p.id}"`);
