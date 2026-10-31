@@ -51,6 +51,8 @@ Paste an Amazon or Walmart link into the **Import** box in the app (or run `bun 
 2. Has the `grok` CLI turn the capture into structured product info: name, brand, price, dimensions in inches, weight, summary, highlights, image and 3D model URLs.
 3. Downloads the image and any GLB model into `data/items/<id>/` and writes `data/catalog/<id>.json`. Re-importing the same product updates its entry.
 
-New imports drop into the living room. Drag items to move them, use the card (or R / Shift+R / Delete) to rotate, set height off the floor, duplicate or remove. Placements save to `data/placements.json`.
+grok also decides how the item mounts (floor, wall, ceiling or on a surface), a default height, and which parts of the 3D model to drop for that mount (the TV's stand when wall mounted).
+
+New imports drop into the living room. Select an item for a move/rotate gizmo (T / R), or drag it to slide it across the floor. Items snap flush to walls; wall-mounted ones also turn to face out of the wall. Floor and surface items always rest on the floor, a counter or another item below them, and ceiling items hang from the ceiling. The card sets height off the floor, turns in 15°/90° steps, duplicates or removes (Delete). Placements save to `data/placements.json`.
 
 Walmart products with "View in 3D" come with a real GLB model. Items without one render as a box at their listed size.

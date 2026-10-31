@@ -46,6 +46,9 @@ const productSchema = {
 		'highlights',
 		'imageUrl',
 		'modelUrl',
+		'mount',
+		'defaultElevationIn',
+		'removeNodes',
 	],
 	properties: {
 		name: { type: 'string', description: 'Short product name a person would say, without retailer noise' },
@@ -72,6 +75,23 @@ const productSchema = {
 		summary: { type: 'string', description: 'One or two plain sentences' },
 		highlights: { type: 'array', items: { type: 'string' }, maxItems: 5 },
 		imageUrl: { type: ['string', 'null'], description: 'Main product photo URL, copied exactly from the input' },
+		mount: {
+			type: 'string',
+			enum: ['floor', 'wall', 'ceiling', 'surface'],
+			description:
+				'How this is normally placed in a home: floor (sofas, beds, floor lamps, TV stands), wall (wall-mounted TVs, art, mirrors, shelves), ceiling (pendants, fans), surface (table lamps, decor that sits on furniture). Large TVs default to wall.',
+		},
+		defaultElevationIn: {
+			type: 'number',
+			description:
+				'Typical height of the item bottom above the floor for that mount, in inches: 0 for floor, about 30 for an 85in wall TV, 0 for surface items (they sit on whatever is below)',
+		},
+		removeNodes: {
+			type: 'array',
+			items: { type: 'string' },
+			description:
+				"Names from the chosen 3D model's node list to remove for that mount, e.g. a stand node when wall mounted. Empty if none or no model.",
+		},
 		modelUrl: {
 			type: ['string', 'null'],
 			description: 'GLB 3D model URL, copied exactly from the input candidates, or null',
@@ -91,6 +111,9 @@ type Product = {
 	highlights: string[];
 	imageUrl: string | null;
 	modelUrl: string | null;
+	mount: 'floor' | 'wall' | 'ceiling' | 'surface';
+	defaultElevationIn: number;
+	removeNodes: string[];
 };
 
 type PageData = {
@@ -134,13 +157,31 @@ async function fetchPages(urls: string[]): Promise<PageData[]> {
 	return pages;
 }
 
+// glTF binary: 12-byte header, then a JSON chunk (length, type, data) describing the scene graph.
+async function glbNodeNames(url: string): Promise<string[]> {
+	try {
+		const res = await fetch(url, { headers: { 'user-agent': 'Mozilla/5.0' } });
+		if (!res.ok) return [];
+		const bytes = new Uint8Array(await res.arrayBuffer());
+		const length = new DataView(bytes.buffer).getUint32(12, true);
+		const gltf = JSON.parse(new TextDecoder().decode(bytes.subarray(20, 20 + length)));
+		return (gltf.nodes ?? []).map((n: { name?: string }) => n.name).filter(Boolean);
+	} catch {
+		return [];
+	}
+}
+
 async function parseWithGrok(page: PageData): Promise<Product> {
-	const prompt = `Extract product information from this retailer page capture. Use only facts in the input. If width/height/depth are not all listed but can be derived (for example a TV's width from its diagonal and 16:9 aspect), derive them and explain in dimensionsNote; otherwise use null. Convert sizes to inches and weight to pounds. Pick imageUrl from the image candidates and modelUrl from the 3D model candidates exactly as written.
+	const modelLines = await Promise.all(
+		page.models.slice(0, 3).map(async url => `${url} (nodes: ${(await glbNodeNames(url)).join(', ') || 'unknown'})`),
+	);
+	const prompt = `Extract product information from this retailer page capture. Use only facts in the input. If width/height/depth are not all listed but can be derived (for example a TV's width from its diagonal and 16:9 aspect), derive them and explain in dimensionsNote; otherwise use null. Convert sizes to inches and weight to pounds. Pick imageUrl from the image candidates and modelUrl from the 3D model candidates exactly as written. Decide how the item mounts in a home and which model nodes to drop for that mount.
 
 URL: ${page.url}
 Title: ${page.title}
 Image candidates: ${[page.ogImage, page.mainImage].filter(Boolean).join(' ') || 'none'}
-3D model candidates: ${page.models.join(' ') || 'none'}
+3D model candidates:
+${modelLines.join('\n') || 'none'}
 
 Spec pairs:
 ${page.specs.join('\n')}

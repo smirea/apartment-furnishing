@@ -1,4 +1,5 @@
 import type { CatalogItem, Placement } from '@repo/shared/items';
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {
 	AmbientLight,
@@ -44,6 +45,9 @@ const EYE_FT = 5.5;
 const PLAYER_RADIUS_FT = 0.9;
 const WALK_FT_PER_S = 6;
 const CUTAWAY_FT = 3.2;
+const SNAP_FT = 0.6;
+const WALL_MOUNT_SNAP_FT = 2;
+const DEG = Math.PI / 180;
 
 const floorColors: Record<FloorKind, number> = { wood: 0xc9a672, tile: 0xe6e6e2, concrete: 0x9a9a98 };
 
@@ -53,7 +57,7 @@ export function createViewer(
 	container: HTMLElement,
 	onMode: (mode: Mode) => void,
 	onSelect: (key: string | null) => void,
-	onMove: (key: string, x: number, z: number) => void,
+	onChange: (key: string, position: Placement['position'], rotation: Placement['rotation']) => void,
 ) {
 	const renderer = new WebGLRenderer({ antialias: true });
 	renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -87,6 +91,9 @@ export function createViewer(
 	const labelGroup = new Group();
 	scene.add(wallGroup, ceilingGroup, labelGroup);
 	const colliders: Box[] = [];
+	// Snap targets: wall faces for flush placement, fixture tops (counters, vanities) for surface items.
+	const wallBoxes: Box[] = [];
+	const surfaces: (Box & { top: number })[] = [];
 	const cutawayWalls: { mesh: Mesh; fullHeight: number; y: number; glass: boolean; lintel?: boolean }[] = [];
 
 	function addBox(parent: Object3D, rect: Rect, y: number, height: number, material: MeshStandardMaterial) {
@@ -137,6 +144,7 @@ export function createViewer(
 			if (solid) {
 				const [bx1, bz1, bx2, bz2] = rect.map(ft) as Rect;
 				colliders.push({ x1: bx1, z1: bz1, x2: bx2, z2: bz2 });
+				if (h >= 3) wallBoxes.push({ x1: bx1, z1: bz1, x2: bx2, z2: bz2 });
 			}
 		};
 
@@ -161,6 +169,10 @@ export function createViewer(
 		if (f.solid || (y === 0 && f.height > 1)) {
 			const [x1, z1, x2, z2] = f.rect.map(ft) as Rect;
 			colliders.push({ x1, z1, x2, z2 });
+		}
+		if (y === 0) {
+			const [x1, z1, x2, z2] = f.rect.map(ft) as Rect;
+			surfaces.push({ x1, z1, x2, z2, top: f.height });
 		}
 	}
 
@@ -187,14 +199,17 @@ export function createViewer(
 	const gltf = new GLTFLoader();
 	const fallbackMat = new MeshStandardMaterial({ color: 0x8a8f98, roughness: 0.6 });
 	const roots = new Map<string, Group>();
-	const signature = (p: Placement) => `${p.itemId}|${(p.removeNodes ?? []).join(',')}`;
+	// Newly added items settle (floor, wall, ceiling) once their model has loaded and has a size.
+	const snapOnLoad = new Set<string>();
+	let catalogById: Record<string, CatalogItem> = {};
+	const signature = (item: CatalogItem) => `${item.id}|${item.model}|${item.removeNodes.join(',')}`;
 
-	async function buildItem(item: CatalogItem, removeNodes: string[] = []): Promise<Object3D> {
+	async function buildItem(item: CatalogItem): Promise<Object3D> {
 		const dims = item.dimensions;
 		let object: Object3D;
 		if (item.model) {
 			object = (await gltf.loadAsync(item.model)).scene;
-			for (const name of removeNodes) object.getObjectByName(name)?.removeFromParent();
+			for (const name of item.removeNodes) object.getObjectByName(name)?.removeFromParent();
 			const size = new Box3().setFromObject(object).getSize(new Vector3());
 			// Uniform scale keeps the model's proportions; listed width wins, otherwise assume glTF meters.
 			object.scale.setScalar(dims ? dims.width / 12 / size.x : 3.28084);
@@ -202,7 +217,7 @@ export function createViewer(
 			const { width, height, depth } = dims ?? { width: 24, height: 24, depth: 24 };
 			object = new Mesh(new BoxGeometry(width / 12, height / 12, depth / 12), fallbackMat);
 		}
-		// Re-center so the root's origin is the footprint center at floor level; rotation then spins in place.
+		// Re-center so the root's origin is the footprint center at the item's bottom; rotation spins in place.
 		const box = new Box3().setFromObject(object);
 		const center = box.getCenter(new Vector3());
 		object.position.sub(new Vector3(center.x, box.min.y, center.z));
@@ -210,11 +225,14 @@ export function createViewer(
 	}
 
 	function placeRoot(root: Group, p: Placement) {
-		root.position.set(p.x, p.elevationIn / 12, p.z);
-		root.rotation.y = (p.rotationDeg * Math.PI) / 180;
+		root.position.set(...p.position);
+		root.rotation.set(p.rotation[0] * DEG, p.rotation[1] * DEG, p.rotation[2] * DEG);
 	}
 
+	const isBeingMoved = (root: Group) => dragging?.root === root || (transform.dragging && transform.object === root);
+
 	function setPlacements(placements: Placement[], catalog: Record<string, CatalogItem>) {
+		catalogById = catalog;
 		const keys = new Set(placements.map(p => p.key));
 		for (const [key, root] of roots) {
 			if (keys.has(key)) continue;
@@ -226,21 +244,113 @@ export function createViewer(
 			const item = catalog[p.itemId];
 			if (!item) continue;
 			let root = roots.get(p.key);
-			if (root && root.userData.signature !== signature(p)) {
+			if (root && root.userData.signature !== signature(item)) {
 				root.removeFromParent();
 				root = undefined;
 			}
 			if (!root) {
 				const fresh = new Group();
-				fresh.userData = { key: p.key, signature: signature(p) };
+				fresh.userData = { key: p.key, itemId: item.id, signature: signature(item) };
 				roots.set(p.key, fresh);
 				itemGroup.add(fresh);
-				void buildItem(item, p.removeNodes).then(object => fresh.add(object));
+				void buildItem(item).then(object => {
+					fresh.add(object);
+					if (snapOnLoad.delete(p.key)) commit(fresh);
+					if (selectedKey === p.key) selection.setFromObject(fresh);
+				});
 				root = fresh;
 			}
-			if (root !== dragging?.root) placeRoot(root, p);
+			if (!isBeingMoved(root)) placeRoot(root, p);
 		}
 	}
+
+	type WallHit = { wall: Box; shift: number; axis: 'x' | 'z'; normal: [x: number, z: number] };
+	// Shift that puts the item's box against the given face of a wall, measured from the box as it is now.
+	function flushShift(box: Box3, w: Box, normal: [number, number]) {
+		if (normal[0] === 1) return w.x2 - box.min.x;
+		if (normal[0] === -1) return w.x1 - box.max.x;
+		if (normal[1] === 1) return w.z2 - box.min.z;
+		return w.z1 - box.max.z;
+	}
+	function nearestWall(box: Box3, threshold: number): WallHit | null {
+		let best: WallHit | null = null;
+		const consider = (wall: Box, normal: [number, number]) => {
+			const shift = flushShift(box, wall, normal);
+			if (Math.abs(shift) < threshold && (!best || Math.abs(shift) < Math.abs(best.shift)))
+				best = { wall, shift, axis: normal[0] ? 'x' : 'z', normal };
+		};
+		for (const w of wallBoxes) {
+			if (box.min.z < w.z2 && box.max.z > w.z1) {
+				if (box.max.x > w.x2) consider(w, [1, 0]);
+				if (box.min.x < w.x1) consider(w, [-1, 0]);
+			}
+			if (box.min.x < w.x2 && box.max.x > w.x1) {
+				if (box.max.z > w.z2) consider(w, [0, 1]);
+				if (box.min.z < w.z1) consider(w, [0, -1]);
+			}
+		}
+		return best;
+	}
+
+	// Pull items flush to nearby walls (wall-mounted ones also turn to face out of the wall),
+	// then settle them onto the floor or the highest surface under their center.
+	function snap(root: Group) {
+		const mount = catalogById[root.userData.itemId]?.mount ?? 'floor';
+		root.updateMatrixWorld(true);
+		let box = new Box3().setFromObject(root);
+		if (box.isEmpty()) return;
+
+		const wall = nearestWall(box, mount === 'wall' ? WALL_MOUNT_SNAP_FT : SNAP_FT);
+		if (wall) {
+			if (mount === 'wall') {
+				root.rotation.set(0, Math.atan2(wall.normal[0], wall.normal[1]), 0);
+				root.updateMatrixWorld(true);
+				box = new Box3().setFromObject(root);
+			}
+			root.position[wall.axis] += flushShift(box, wall.wall, wall.normal);
+			root.updateMatrixWorld(true);
+			box = new Box3().setFromObject(root);
+		}
+
+		if (mount === 'ceiling') {
+			root.position.y += CEILING_FT - box.max.y;
+			return;
+		}
+		const center = box.getCenter(new Vector3());
+		const under = (b: Box) => center.x > b.x1 && center.x < b.x2 && center.z > b.z1 && center.z < b.z2;
+		const tops = [0, ...surfaces.filter(under).map(s => s.top)];
+		for (const other of roots.values()) {
+			if (other === root) continue;
+			const ob = new Box3().setFromObject(other);
+			if (!ob.isEmpty() && under({ x1: ob.min.x, z1: ob.min.z, x2: ob.max.x, z2: ob.max.z })) tops.push(ob.max.y);
+		}
+		const support = Math.max(...tops.filter(t => t <= box.min.y + SNAP_FT));
+		// Floor and surface items always rest on what is under them; wall items keep their height
+		// unless brought close to the floor or a surface.
+		if (mount !== 'wall' || box.min.y - support < SNAP_FT) root.position.y += support - box.min.y;
+	}
+
+	function commit(root: Group) {
+		snap(root);
+		const r = root.rotation;
+		const round = (n: number, step: number) => Math.round(n / step) * step;
+		onChange(
+			root.userData.key,
+			[round(root.position.x, 0.01), round(root.position.y, 0.01), round(root.position.z, 0.01)],
+			[round(r.x / DEG, 0.1), round(r.y / DEG, 0.1), round(r.z / DEG, 0.1)],
+		);
+	}
+
+	const transform = new TransformControls(camera, renderer.domElement);
+	transform.setSize(0.8);
+	scene.add(transform.getHelper());
+	transform.addEventListener('dragging-changed', e => {
+		orbit.enabled = !e.value && mode === 'orbit';
+		if (!e.value && transform.object) commit(transform.object as Group);
+	});
+	transform.addEventListener('objectChange', () => {
+		if (transform.object && transform.getMode() === 'translate') snap(transform.object as Group);
+	});
 
 	let selectedKey: string | null = null;
 	const selection = new BoxHelper(new Object3D(), 0x5eead4);
@@ -249,7 +359,10 @@ export function createViewer(
 	function select(key: string | null) {
 		selectedKey = key && roots.has(key) ? key : null;
 		selection.visible = !!selectedKey;
-		if (selectedKey) selection.setFromObject(roots.get(selectedKey)!);
+		if (selectedKey) {
+			selection.setFromObject(roots.get(selectedKey)!);
+			transform.attach(roots.get(selectedKey)!);
+		} else transform.detach();
 		onSelect(selectedKey);
 	}
 
@@ -260,22 +373,31 @@ export function createViewer(
 	let downAt: [number, number] | null = null;
 	let dragging: { root: Group; offset: Vector3; moved: boolean } | null = null;
 
-	function pickItem(e: PointerEvent): Group | null {
+	function setPointer(e: PointerEvent) {
 		const rect = renderer.domElement.getBoundingClientRect();
 		if (mode === 'walk') pointer.set(0, 0);
 		else pointer.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
 		raycaster.setFromCamera(pointer, camera);
+	}
+
+	function pickItem(e: PointerEvent): Group | null {
+		setPointer(e);
 		const hit = raycaster.intersectObjects([...itemGroup.children, wallGroup], true)[0];
 		let node: Object3D | null = hit?.object ?? null;
 		while (node && node.parent !== itemGroup) node = node.parent;
 		return node as Group | null;
 	}
 
+	const onGizmo = () => transform.dragging || transform.axis !== null;
+
+	// Dragging an item's body slides it along the floor plane; the gizmo handles precise axes.
 	renderer.domElement.addEventListener('pointerdown', e => {
 		downAt = [e.clientX, e.clientY];
-		if (mode !== 'orbit' || e.button !== 0) return;
+		if (mode !== 'orbit' || e.button !== 0 || onGizmo()) return;
 		const root = pickItem(e);
-		if (!root || !raycaster.ray.intersectPlane(floor, floorHit)) return;
+		if (!root) return;
+		floor.constant = -root.position.y;
+		if (!raycaster.ray.intersectPlane(floor, floorHit)) return;
 		select(root.userData.key);
 		dragging = { root, offset: root.position.clone().sub(floorHit), moved: false };
 		orbit.enabled = false;
@@ -283,12 +405,11 @@ export function createViewer(
 	});
 	renderer.domElement.addEventListener('pointermove', e => {
 		if (!dragging) return;
-		const rect = renderer.domElement.getBoundingClientRect();
-		pointer.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
-		raycaster.setFromCamera(pointer, camera);
+		setPointer(e);
 		if (!raycaster.ray.intersectPlane(floor, floorHit)) return;
 		dragging.root.position.x = floorHit.x + dragging.offset.x;
 		dragging.root.position.z = floorHit.z + dragging.offset.z;
+		snap(dragging.root);
 		dragging.moved = true;
 	});
 	renderer.domElement.addEventListener('pointerup', e => {
@@ -296,10 +417,10 @@ export function createViewer(
 			const { root, moved } = dragging;
 			dragging = null;
 			orbit.enabled = mode === 'orbit';
-			if (moved) onMove(root.userData.key, root.position.x, root.position.z);
+			if (moved) commit(root);
 			return;
 		}
-		if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 4) return;
+		if (onGizmo() || !downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 4) return;
 		if (mode === 'walk' && !look.isLocked) return;
 		select(pickItem(e)?.userData.key ?? null);
 	});
@@ -331,6 +452,7 @@ export function createViewer(
 		mode = next;
 		orbit.enabled = next === 'orbit';
 		if (next === 'walk') {
+			select(null);
 			camera.position.set(ft(380), EYE_FT, ft(780));
 			camera.lookAt(ft(380), EYE_FT, ft(400));
 			look.lock();
@@ -420,6 +542,8 @@ export function createViewer(
 		setLabels,
 		setPlacements,
 		select,
+		setGizmoMode: (m: 'translate' | 'rotate') => transform.setMode(m),
+		snapWhenLoaded: (key: string) => snapOnLoad.add(key),
 		dispose() {
 			renderer.setAnimationLoop(null);
 			observer.disconnect();

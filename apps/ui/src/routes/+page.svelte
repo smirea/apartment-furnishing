@@ -56,16 +56,28 @@
 
 	async function addToRoom(itemId: string) {
 		const key = crypto.randomUUID();
-		updatePlacements([...placements, { key, itemId, ...SPAWN, rotationDeg: 0, elevationIn: 0 }]);
+		const elevation = (catalog[itemId]?.defaultElevationIn ?? 0) / 12;
+		viewer?.snapWhenLoaded(key);
+		updatePlacements([...placements, { key, itemId, position: [SPAWN.x, elevation, SPAWN.z], rotation: [0, 0, 0] }]);
 		await tick();
 		viewer?.select(key);
 	}
 
 	function rotate(delta: number) {
 		if (!selectedPlacement) return;
-		const deg = ((((selectedPlacement.rotationDeg + delta + 180) % 360) + 360) % 360) - 180;
-		patchPlacement(selectedPlacement.key, { rotationDeg: deg });
+		const [rx, ry, rz] = selectedPlacement.rotation;
+		const deg = ((((ry + delta + 180) % 360) + 360) % 360) - 180;
+		patchPlacement(selectedPlacement.key, { rotation: [rx, deg, rz] });
 	}
+
+	let gizmo = $state<'translate' | 'rotate'>('translate');
+	$effect(() => viewer?.setGizmoMode(gizmo));
+	const mountLabel = {
+		floor: 'Stands on the floor',
+		wall: 'Wall-mounted',
+		ceiling: 'Hangs from the ceiling',
+		surface: 'Sits on a surface',
+	};
 
 	function removeSelected() {
 		if (!selectedKey) return;
@@ -86,7 +98,8 @@
 
 	function onKey(e: KeyboardEvent) {
 		if (!selectedKey || mode !== 'orbit' || (e.target as HTMLElement).closest('input, textarea')) return;
-		if (e.key === 'r' || e.key === 'R') rotate(e.shiftKey ? -90 : 90);
+		if (e.key === 't' || e.key === 'T') gizmo = 'translate';
+		else if (e.key === 'r' || e.key === 'R') gizmo = 'rotate';
 		else if (e.key === 'Delete' || e.key === 'Backspace') removeSelected();
 		else if (e.key === 'Escape') viewer?.select(null);
 	}
@@ -96,7 +109,7 @@
 			container,
 			next => (mode = next),
 			key => (selectedKey = key),
-			(key, x, z) => patchPlacement(key, { x: Math.round(x * 100) / 100, z: Math.round(z * 100) / 100 }),
+			(key, position, rotation) => patchPlacement(key, { position, rotation }),
 		);
 		viewer = v;
 		void api<Placement[]>('/api/placements').then(data => {
@@ -136,7 +149,8 @@
 		</div>
 		<p class="help">
 			{#if mode === 'orbit'}
-				Drag the room to rotate, right-drag to pan, scroll to zoom. Drag an item to move it; R rotates, Delete removes.
+				Drag the room to rotate, right-drag to pan, scroll to zoom. Drag an item to slide it, or use its gizmo (T move,
+				R rotate). Items snap to walls, floors and surfaces.
 			{:else}
 				WASD or arrows to move, mouse to look, click to inspect, Shift to run, Esc to exit.
 			{/if}
@@ -198,6 +212,7 @@
 		<p class="meta">
 			{#if money(selected)}<strong>{money(selected)}</strong>{/if}
 			{#if selected.brand}<span>{selected.brand}</span>{/if}
+			<span>{mountLabel[selected.mount]}</span>
 		</p>
 		{#if selected.dimensions}
 			<p class="dims">
@@ -211,7 +226,14 @@
 
 		<div class="controls">
 			<div class="row">
-				<span>Rotate</span>
+				<span>Gizmo</span>
+				<button type="button" class:active={gizmo === 'translate'} onclick={() => (gizmo = 'translate')}
+					>Move (T)</button
+				>
+				<button type="button" class:active={gizmo === 'rotate'} onclick={() => (gizmo = 'rotate')}>Rotate (R)</button>
+			</div>
+			<div class="row">
+				<span>Turn</span>
 				<button type="button" onclick={() => rotate(-90)}>↺ 90°</button>
 				<button type="button" onclick={() => rotate(-15)}>−15°</button>
 				<button type="button" onclick={() => rotate(15)}>+15°</button>
@@ -224,8 +246,11 @@
 					min="0"
 					max="100"
 					step="1"
-					value={selectedPlacement.elevationIn}
-					oninput={e => patchPlacement(selectedPlacement.key, { elevationIn: Number(e.currentTarget.value) || 0 })}
+					value={Math.round(selectedPlacement.position[1] * 12 * 10) / 10}
+					oninput={e => {
+						const [x, , z] = selectedPlacement.position;
+						patchPlacement(selectedPlacement.key, { position: [x, (Number(e.currentTarget.value) || 0) / 12, z] });
+					}}
 				/>
 				<span class="muted">in</span>
 			</label>
@@ -382,6 +407,11 @@
 
 	.controls button {
 		padding: 0.3rem 0.6rem;
+	}
+
+	button.active {
+		border-color: var(--app-accent);
+		color: var(--app-accent);
 	}
 
 	button.danger {

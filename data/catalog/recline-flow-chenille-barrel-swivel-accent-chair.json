@@ -1,8 +1,8 @@
 {
 	"id": "recline-flow-chenille-barrel-swivel-accent-chair",
 	"url": "https://www.amazon.com/dp/B0GCZNY285",
-	"importedAt": "2026-10-31T16:42:28.767Z",
-	"name": "Chenille Barrel Swivel Accent Chair",
+	"importedAt": "2026-10-31T16:50:01.073Z",
+	"name": "Swivel Accent Chair",
 	"brand": "Recline Flow",
 	"price": 479.99,
 	"currency": "USD",
@@ -14,14 +14,17 @@
 	},
 	"dimensionsNote": null,
 	"weightLb": null,
-	"summary": "Linen chenille barrel armchair with a 360° swivel base, solid wood frame, and high-density foam. It ships fully assembled and is rated to support up to 350 pounds.",
+	"summary": "Fully assembled barrel accent chair with a 360° swivel base, linen chenille upholstery, and a solid wood frame. High-density foam seating with a wood-supported back cushion, rated to support up to 350 lb.",
 	"highlights": [
 		"360° swivel base",
-		"Solid wood frame with sinuous springs and elastic webbing",
 		"Linen chenille upholstery with high-density foam",
+		"Solid wood frame, sinuous springs, and elastic webbing",
 		"Movable back cushion with a built-in wood support frame",
 		"Ships fully assembled; supports up to 350 lb"
 	],
+	"mount": "floor",
+	"defaultElevationIn": 0,
+	"removeNodes": [],
 	"image": "/api/assets/recline-flow-chenille-barrel-swivel-accent-chair/image.jpg",
 	"model": null
 }
