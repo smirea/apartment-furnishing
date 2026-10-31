@@ -5,7 +5,7 @@ import type { CatalogItem, Placement } from '@repo/shared/items';
 import { mkdir, readdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-const ROOT = join(import.meta.dir, '../../..');
+export const ROOT = join(import.meta.dir, '../../..');
 export const DATA_DIR = join(ROOT, 'data');
 const CATALOG_DIR = join(DATA_DIR, 'catalog');
 export const ASSET_DIR = join(DATA_DIR, 'items');
@@ -19,6 +19,12 @@ export async function listCatalog(): Promise<CatalogItem[]> {
 	const files = (await readdir(CATALOG_DIR)).filter(f => f.endsWith('.json'));
 	const items: CatalogItem[] = await Promise.all(files.map(f => Bun.file(join(CATALOG_DIR, f)).json()));
 	return items.sort((a, b) => b.importedAt.localeCompare(a.importedAt));
+}
+
+export const readItem = (id: string): Promise<CatalogItem> => Bun.file(join(CATALOG_DIR, `${id}.json`)).json();
+
+export async function saveItem(item: CatalogItem) {
+	await writeFile(join(CATALOG_DIR, `${item.id}.json`), JSON.stringify(item, null, '\t') + '\n');
 }
 
 export async function readPlacements(): Promise<Placement[]> {
@@ -269,9 +275,13 @@ export async function importProducts(urls: string[], log: (line: string) => void
 			image = `/api/assets/${id}/image.${ext}`;
 		}
 		let model: string | null = null;
+		let modelSource: CatalogItem['modelSource'] = null;
 		if (modelUrl) {
 			await download(modelUrl, join(dir, 'model.glb'));
 			model = `/api/assets/${id}/model.glb`;
+			modelSource = 'listing';
+		} else if (existing?.modelSource === 'generated') {
+			({ model, modelSource } = existing);
 		}
 
 		const item: CatalogItem = {
@@ -281,8 +291,9 @@ export async function importProducts(urls: string[], log: (line: string) => void
 			...product,
 			image,
 			model,
+			modelSource,
 		};
-		await writeFile(join(CATALOG_DIR, `${id}.json`), JSON.stringify(item, null, '\t') + '\n');
+		await saveItem(item);
 		log(
 			`  saved ${id}: ${product.price ?? '?'} ${product.currency}, dims ${JSON.stringify(product.dimensions)}, model ${model ? 'yes' : 'no'}`,
 		);

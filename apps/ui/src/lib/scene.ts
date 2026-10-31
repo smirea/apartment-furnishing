@@ -9,6 +9,7 @@ import {
 	CylinderGeometry,
 	Color,
 	DirectionalLight,
+	Euler,
 	Group,
 	HemisphereLight,
 	Mesh,
@@ -229,7 +230,7 @@ export function createViewer(
 		root.rotation.set(p.rotation[0] * DEG, p.rotation[1] * DEG, p.rotation[2] * DEG);
 	}
 
-	const isBeingMoved = (root: Group) => dragging?.root === root || (transform.dragging && transform.object === root);
+	const isBeingMoved = (root: Group) => dragging?.root === root || gizmos.some(g => g.dragging && g.object === root);
 
 	function setPlacements(placements: Placement[], catalog: Record<string, CatalogItem>) {
 		catalogById = catalog;
@@ -259,6 +260,7 @@ export function createViewer(
 					if (selectedKey === p.key) selection.setFromObject(fresh);
 				});
 				root = fresh;
+				if (selectedKey === p.key) select(p.key);
 			}
 			if (!isBeingMoved(root)) placeRoot(root, p);
 		}
@@ -324,7 +326,7 @@ export function createViewer(
 			const ob = new Box3().setFromObject(other);
 			if (!ob.isEmpty() && under({ x1: ob.min.x, z1: ob.min.z, x2: ob.max.x, z2: ob.max.z })) tops.push(ob.max.y);
 		}
-		const support = Math.max(...tops.filter(t => t <= box.min.y + SNAP_FT));
+		const support = Math.max(0, ...tops.filter(t => t <= box.min.y + SNAP_FT));
 		// Floor and surface items always rest on what is under them; wall items keep their height
 		// unless brought close to the floor or a surface.
 		if (mount !== 'wall' || box.min.y - support < SNAP_FT) root.position.y += support - box.min.y;
@@ -332,24 +334,36 @@ export function createViewer(
 
 	function commit(root: Group) {
 		snap(root);
-		const r = root.rotation;
+		// Items only turn about Y. Reading yaw in YXZ order avoids the gizmo's equivalent
+		// [180, y, 180] XYZ decomposition, which would make the card's turn buttons spin backwards.
+		const yaw = new Euler().setFromQuaternion(root.quaternion, 'YXZ').y;
 		const round = (n: number, step: number) => Math.round(n / step) * step;
 		onChange(
 			root.userData.key,
 			[round(root.position.x, 0.01), round(root.position.y, 0.01), round(root.position.z, 0.01)],
-			[round(r.x / DEG, 0.1), round(r.y / DEG, 0.1), round(r.z / DEG, 0.1)],
+			[0, round(yaw / DEG, 0.1), 0],
 		);
 	}
 
-	const transform = new TransformControls(camera, renderer.domElement);
-	transform.setSize(0.8);
-	scene.add(transform.getHelper());
-	transform.addEventListener('dragging-changed', e => {
-		orbit.enabled = !e.value && mode === 'orbit';
-		if (!e.value && transform.object) commit(transform.object as Group);
-	});
-	transform.addEventListener('objectChange', () => {
-		if (transform.object && transform.getMode() === 'translate') snap(transform.object as Group);
+	// Three move arrows and a single turn ring; plane handles and tilting are left out on purpose.
+	const move = new TransformControls(camera, renderer.domElement);
+	move.setSize(0.8);
+	move.showXY = move.showYZ = move.showXZ = false;
+	const turn = new TransformControls(camera, renderer.domElement);
+	turn.setMode('rotate');
+	turn.setSize(1.1);
+	turn.showX = turn.showZ = false;
+	turn.setRotationSnap(15 * DEG);
+	const gizmos = [move, turn];
+	for (const g of gizmos) {
+		scene.add(g.getHelper());
+		g.addEventListener('dragging-changed', e => {
+			orbit.enabled = !e.value && mode === 'orbit';
+			if (!e.value && g.object) commit(g.object as Group);
+		});
+	}
+	move.addEventListener('objectChange', () => {
+		if (move.object) snap(move.object as Group);
 	});
 
 	let selectedKey: string | null = null;
@@ -360,9 +374,13 @@ export function createViewer(
 		selectedKey = key && roots.has(key) ? key : null;
 		selection.visible = !!selectedKey;
 		if (selectedKey) {
-			selection.setFromObject(roots.get(selectedKey)!);
-			transform.attach(roots.get(selectedKey)!);
-		} else transform.detach();
+			const root = roots.get(selectedKey)!;
+			selection.setFromObject(root);
+			move.attach(root);
+			// Wall-mounted items take their facing from the wall they snap to.
+			if (catalogById[root.userData.itemId]?.mount === 'wall') turn.detach();
+			else turn.attach(root);
+		} else for (const g of gizmos) g.detach();
 		onSelect(selectedKey);
 	}
 
@@ -388,7 +406,7 @@ export function createViewer(
 		return node as Group | null;
 	}
 
-	const onGizmo = () => transform.dragging || transform.axis !== null;
+	const onGizmo = () => gizmos.some(g => g.dragging || g.axis !== null);
 
 	// Dragging an item's body slides it along the floor plane; the gizmo handles precise axes.
 	renderer.domElement.addEventListener('pointerdown', e => {
@@ -542,7 +560,6 @@ export function createViewer(
 		setLabels,
 		setPlacements,
 		select,
-		setGizmoMode: (m: 'translate' | 'rotate') => transform.setMode(m),
 		snapWhenLoaded: (key: string) => snapOnLoad.add(key),
 		dispose() {
 			renderer.setAnimationLoop(null);

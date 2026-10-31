@@ -23,7 +23,14 @@ export type CatalogItem = {
 	// Served by the API under /api/assets/<id>/.
 	image: string | null;
 	model: string | null;
+	// `generated` models are procedural approximations Codex builds from the product photo when the listing has none.
+	modelSource: 'listing' | 'generated' | null;
 };
+
+export type ModelJob = { state: 'running' } | { state: 'failed'; error: string };
+
+// What GET /api/catalog returns: the stored item plus any in-flight model generation.
+export type CatalogEntry = CatalogItem & { modelJob: ModelJob | null };
 
 // One copy of a catalog item in the apartment. World units are feet, +x east, +z south,
 // y is the height of the item's bottom. The model's front is +z before rotation.

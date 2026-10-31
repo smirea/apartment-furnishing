@@ -26,5 +26,6 @@
 	"defaultElevationIn": 30,
 	"removeNodes": ["StandEntity"],
 	"image": "/api/assets/samsung-85-m70hb-mini-led-4k-smart-tv/image.jpeg",
-	"model": "/api/assets/samsung-85-m70hb-mini-led-4k-smart-tv/model.glb"
+	"model": "/api/assets/samsung-85-m70hb-mini-led-4k-smart-tv/model.glb",
+	"modelSource": "listing"
 }

@@ -1,7 +1,10 @@
-import type { Placement } from '@repo/shared/items';
+import type { CatalogEntry, Placement } from '@repo/shared/items';
 import { join, normalize } from 'node:path';
-import { ASSET_DIR, importProducts, listCatalog, readPlacements, writePlacements } from './catalog';
+import { ASSET_DIR, importProducts, listCatalog, readItem, readPlacements, writePlacements } from './catalog';
+import { modelJobs, startModelJob } from './generate-model';
 import { config } from './config';
+
+const isVec3 = (v: unknown) => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
 
 const uiBuildPath = new URL('../../ui/build/', import.meta.url);
 
@@ -12,13 +15,27 @@ const server = Bun.serve({
 	port: config.port,
 	routes: {
 		'/api/status': Response.json({ ok: true, now: new Date().toISOString() }),
-		'/api/catalog': { GET: async () => Response.json(await listCatalog()) },
+		'/api/catalog': {
+			GET: async () =>
+				Response.json(
+					(await listCatalog()).map((item): CatalogEntry => ({ ...item, modelJob: modelJobs.get(item.id) ?? null })),
+				),
+		},
+		'/api/catalog/:id/model': {
+			POST: async request => {
+				const item = await readItem(request.params.id).catch(() => null);
+				if (!item) return Response.json({ error: 'Unknown item' }, { status: 404 });
+				startModelJob(item);
+				return Response.json({ ok: true });
+			},
+		},
 		'/api/catalog/import': {
 			POST: async request => {
 				const { url } = (await request.json()) as { url?: string };
 				if (!url || !/^https?:\/\//.test(url)) return Response.json({ error: 'Paste a product URL' }, { status: 400 });
 				try {
 					const [item] = await importProducts([url], console.log);
+					if (!item!.model) startModelJob(item!);
 					return Response.json(item);
 				} catch (error) {
 					console.error(error);
@@ -30,7 +47,8 @@ const server = Bun.serve({
 			GET: async () => Response.json(await readPlacements()),
 			PUT: async request => {
 				const placements = (await request.json()) as Placement[];
-				if (!Array.isArray(placements)) return Response.json({ error: 'Expected an array' }, { status: 400 });
+				if (!Array.isArray(placements) || !placements.every(p => isVec3(p.position) && isVec3(p.rotation)))
+					return Response.json({ error: 'Expected placements with finite positions and rotations' }, { status: 400 });
 				await writePlacements(placements);
 				return Response.json(placements);
 			},

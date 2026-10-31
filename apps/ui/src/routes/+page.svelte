@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { CatalogItem, Placement } from '@repo/shared/items';
+	import type { CatalogEntry, CatalogItem, Placement } from '@repo/shared/items';
 	import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { onMount, tick } from 'svelte';
 	import { createViewer, type Mode } from '../lib/scene';
@@ -26,7 +26,8 @@
 	const queryClient = useQueryClient();
 	const catalogQuery = createQuery(() => ({
 		queryKey: ['catalog'],
-		queryFn: () => api<CatalogItem[]>('/api/catalog'),
+		queryFn: () => api<CatalogEntry[]>('/api/catalog'),
+		refetchInterval: query => (query.state.data?.some(item => item.modelJob?.state === 'running') ? 3000 : false),
 	}));
 	const catalogList = $derived(catalogQuery.data ?? []);
 	const catalog = $derived(Object.fromEntries(catalogList.map(item => [item.id, item])));
@@ -70,8 +71,6 @@
 		patchPlacement(selectedPlacement.key, { rotation: [rx, deg, rz] });
 	}
 
-	let gizmo = $state<'translate' | 'rotate'>('translate');
-	$effect(() => viewer?.setGizmoMode(gizmo));
 	const mountLabel = {
 		floor: 'Stands on the floor',
 		wall: 'Wall-mounted',
@@ -96,11 +95,14 @@
 		},
 	}));
 
+	const generateMutation = createMutation(() => ({
+		mutationFn: (id: string) => api(`/api/catalog/${id}/model`, { method: 'POST' }),
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: ['catalog'] }),
+	}));
+
 	function onKey(e: KeyboardEvent) {
 		if (!selectedKey || mode !== 'orbit' || (e.target as HTMLElement).closest('input, textarea')) return;
-		if (e.key === 't' || e.key === 'T') gizmo = 'translate';
-		else if (e.key === 'r' || e.key === 'R') gizmo = 'rotate';
-		else if (e.key === 'Delete' || e.key === 'Backspace') removeSelected();
+		if (e.key === 'Delete' || e.key === 'Backspace') removeSelected();
 		else if (e.key === 'Escape') viewer?.select(null);
 	}
 
@@ -149,8 +151,8 @@
 		</div>
 		<p class="help">
 			{#if mode === 'orbit'}
-				Drag the room to rotate, right-drag to pan, scroll to zoom. Drag an item to slide it, or use its gizmo (T move,
-				R rotate). Items snap to walls, floors and surfaces.
+				Drag the room to rotate, right-drag to pan, scroll to zoom. Drag an item to slide it, use its arrows to move it
+				along one axis and its ring to turn it. Items snap to walls, floors and surfaces.
 			{:else}
 				WASD or arrows to move, mouse to look, click to inspect, Shift to run, Esc to exit.
 			{/if}
@@ -189,7 +191,9 @@
 						<div>
 							<strong>{item.name}</strong>
 							<span class="muted">
-								{money(item) ?? ''}{#if item.model}
+								{money(item) ?? ''}{#if item.modelJob?.state === 'running'}
+									· building 3D…{:else if item.modelSource === 'generated'}
+									· AI 3D{:else if item.model}
 									· 3D{/if}{#if placedCount(item.id)}
 									· {placedCount(item.id)} placed{/if}
 							</span>
@@ -226,13 +230,6 @@
 
 		<div class="controls">
 			<div class="row">
-				<span>Gizmo</span>
-				<button type="button" class:active={gizmo === 'translate'} onclick={() => (gizmo = 'translate')}
-					>Move (T)</button
-				>
-				<button type="button" class:active={gizmo === 'rotate'} onclick={() => (gizmo = 'rotate')}>Rotate (R)</button>
-			</div>
-			<div class="row">
 				<span>Turn</span>
 				<button type="button" onclick={() => rotate(-90)}>↺ 90°</button>
 				<button type="button" onclick={() => rotate(-15)}>−15°</button>
@@ -259,6 +256,26 @@
 				<button type="button" class="danger" onclick={removeSelected}>Remove from room</button>
 			</div>
 		</div>
+
+		<p class="model-status">
+			{#if selected.modelJob?.state === 'running'}
+				<span class="muted">Codex is building a 3D model from the photo (1–3 min). Shown as a box until then.</span>
+			{:else}
+				{#if selected.modelJob?.state === 'failed'}<span class="error"
+						>Model generation failed: {selected.modelJob.error}</span
+					>
+				{:else if selected.modelSource === 'listing'}<span class="muted">3D model from the listing.</span>
+				{:else if selected.modelSource === 'generated'}<span class="muted"
+						>3D model approximated by Codex from the photo.</span
+					>
+				{:else}<span class="muted">The listing has no 3D model.</span>{/if}
+				{#if selected.modelSource !== 'listing'}
+					<button type="button" onclick={() => generateMutation.mutate(selected.id)}>
+						{selected.modelSource === 'generated' ? 'Regenerate' : 'Generate'} 3D model
+					</button>
+				{/if}
+			{/if}
+		</p>
 
 		<p>{selected.summary}</p>
 		{#if selected.highlights.length}
@@ -376,6 +393,13 @@
 		padding: 0.3rem 0.7rem;
 	}
 
+	.card .model-status {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px;
+	}
+
 	.muted {
 		margin: 0;
 		color: var(--app-muted);
@@ -407,11 +431,6 @@
 
 	.controls button {
 		padding: 0.3rem 0.6rem;
-	}
-
-	button.active {
-		border-color: var(--app-accent);
-		color: var(--app-accent);
 	}
 
 	button.danger {

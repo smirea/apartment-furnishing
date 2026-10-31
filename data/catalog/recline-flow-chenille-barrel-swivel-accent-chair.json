@@ -26,5 +26,6 @@
 	"defaultElevationIn": 0,
 	"removeNodes": [],
 	"image": "/api/assets/recline-flow-chenille-barrel-swivel-accent-chair/image.jpg",
-	"model": null
+	"model": "/api/assets/recline-flow-chenille-barrel-swivel-accent-chair/model.glb?v=1793480973876",
+	"modelSource": "generated"
 }
