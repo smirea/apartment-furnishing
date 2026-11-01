@@ -1,8 +1,14 @@
 [
 	{
-		"key": "tv-living-room",
-		"itemId": "samsung-85-m70hb-mini-led-4k-smart-tv",
-		"position": [22.92, 2.5, 30.85],
+		"key": "c0b94027-0b4a-4fda-a6e8-8aefd0100b11",
+		"itemId": "tcl-98-inch-qm7l-sqd-mini-led-qled-4k-tv",
+		"position": [22.42, 2.0300000000000002, 31.34],
 		"rotation": [0, -90, 0]
+	},
+	{
+		"key": "2210ac08-69fb-429f-a537-91eba53f90d8",
+		"itemId": "sha-cerlin-king-size-velvet-bed-frame-with-adjustable-headbo",
+		"position": [9.08, 0, 5.23],
+		"rotation": [0, 0, 0]
 	}
 ]

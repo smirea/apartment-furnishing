@@ -1,0 +1,31 @@
+{
+	"id": "sha-cerlin-king-size-velvet-bed-frame-with-adjustable-headbo",
+	"url": "https://www.amazon.com/SHA-CERLIN-Velvet-Adjustable-Headboard/dp/B0GMGSX6NR",
+	"importedAt": "2026-11-01T19:23:58.558Z",
+	"name": "King Size Velvet Bed Frame with Adjustable Headboard",
+	"brand": "SHA CERLIN",
+	"price": 149.39,
+	"currency": "USD",
+	"category": "bed",
+	"dimensions": {
+		"width": 78,
+		"height": 45.5,
+		"depth": 82
+	},
+	"dimensionsNote": "Amazon lists 82\"L x 78\"W x 45.5\"H. Width is the listed W (side to side across the headboard); depth is the listed L (head to foot); height is the listed H.",
+	"weightLb": null,
+	"summary": "White king-size velvet platform bed with an adjustable vertical-channel tufted headboard and wood slats, so no box spring is needed.",
+	"highlights": [
+		"Adjustable upholstered headboard with vertical channel tufting",
+		"Soft white velvet upholstery",
+		"Wood slat support, no box spring needed",
+		"Under-bed clearance for robotic vacuums",
+		"Squeak resistant, with a listed storage function"
+	],
+	"mount": "floor",
+	"defaultElevationIn": 0,
+	"removeNodes": [],
+	"image": "/api/assets/sha-cerlin-king-size-velvet-bed-frame-with-adjustable-headbo/image.jpg",
+	"model": "/api/assets/sha-cerlin-king-size-velvet-bed-frame-with-adjustable-headbo/model.glb?v=1793561121966",
+	"modelSource": "generated"
+}

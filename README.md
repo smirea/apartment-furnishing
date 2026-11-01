@@ -23,13 +23,13 @@ Listing data and photos were captured on 2026-10-30; the listing may have change
 
 ### Room dimensions (from the floor plan, approximate)
 
-| Room                | Size                                              |
-| ------------------- | ------------------------------------------------- |
-| Living room         | 16'5" x 15'6"                                     |
-| Kitchen             | 11'7" x 7'10" (with island)                       |
-| Bedroom 1 (primary) | 13'3" x 10'0", walk-in closet, double-vanity bath |
-| Bedroom 2           | 10'8" x 10'2", closet                             |
-| Balcony             | 5'1" x 17'2"                                      |
+| Room                | Size                                                                                                |
+| ------------------- | --------------------------------------------------------------------------------------------------- |
+| Living room         | 16'5" x 15'6"                                                                                       |
+| Kitchen             | 11'7" x 7'10" (with island)                                                                         |
+| Bedroom 1 (primary) | 13'3" x 10'0", walk-in closet, double-vanity bath. My bedroom, behind the kitchen, one north window |
+| Bedroom 2           | 10'8" x 10'2", closet. Office / guest room, behind the living-room TV wall                          |
+| Balcony             | 5'1" x 17'2"                                                                                        |
 
 The builder's floor plan notes that dimensions are approximate and not to scale.
 

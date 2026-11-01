@@ -25,7 +25,7 @@ export type Door = [hingeX: number, hingeY: number, endX: number, endY: number];
 export type Column = { x: number; y: number; r: number };
 
 export const rooms: Room[] = [
-	{ name: 'Bedroom 1', floor: 'wood', rect: [48, 35, 388, 285], size: `13'3" x 10'0"` },
+	{ name: 'Bedroom', floor: 'wood', rect: [48, 35, 388, 285], size: `13'3" x 10'0"` },
 	{ name: 'Primary closet', floor: 'wood', rect: [48, 285, 190, 490] },
 	{ name: 'Bath 1', floor: 'tile', rect: [388, 35, 740, 188] },
 	{ name: 'Mech.', floor: 'concrete', rect: [745, 35, 905, 135] },
@@ -37,7 +37,7 @@ export const rooms: Room[] = [
 	{ name: 'Laundry / pantry', floor: 'tile', rect: [583, 290, 850, 385] },
 	{ name: 'Bath 2', floor: 'tile', rect: [583, 385, 850, 548] },
 	{ name: 'Closet 2', floor: 'wood', rect: [690, 555, 850, 648] },
-	{ name: 'Bedroom 2', floor: 'wood', rect: [583, 648, 850, 905], size: `10'8" x 10'2"` },
+	{ name: 'Office / guest', floor: 'wood', rect: [583, 648, 850, 905], size: `10'8" x 10'2"` },
 	{ name: 'Balcony', floor: 'concrete', rect: [55, 495, 180, 900], size: `5'1" x 17'2"` },
 ];
 

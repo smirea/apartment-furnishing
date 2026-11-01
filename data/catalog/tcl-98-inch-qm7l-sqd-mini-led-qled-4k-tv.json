@@ -1,0 +1,31 @@
+{
+	"id": "tcl-98-inch-qm7l-sqd-mini-led-qled-4k-tv",
+	"url": "https://www.amazon.com/TCL-SQD-Mini-LED-98QM7L-Brightness-Television/dp/B0GPSLXN6W",
+	"importedAt": "2026-10-31T22:32:54.694Z",
+	"name": "TCL 98 Inch QM7L SQD-Mini LED QLED 4K TV",
+	"brand": "TCL",
+	"price": 2497.99,
+	"currency": "USD",
+	"category": "tv",
+	"dimensions": {
+		"width": 85.8,
+		"height": 48,
+		"depth": 16.5
+	},
+	"dimensionsNote": "Width 85.8 in and depth 16.5 in are the listed product dimensions. Listed height 50.6 in includes the stand. Without-stand height is derived from the 98 in diagonal and 16:9 aspect (98 × 9 / √337 ≈ 48.0 in viewable height); panel thickness separate from the stand is not listed, so depth stays the listed 16.5 in stand depth.",
+	"weightLb": null,
+	"summary": "TCL 98-inch QM7L Series 4K SQD-Mini LED QLED Google TV (98QM7L) with a 144Hz panel, Dolby Vision IQ, HDR10, and Dolby Atmos audio by Bang & Olufsen.",
+	"highlights": [
+		"98-inch 4K SQD-Mini LED QLED, native 144Hz",
+		"Up to 2,100 local dimming zones and 3,000 peak nits",
+		"Dolby Vision IQ, HDR10, and HDR10+ Adaptive",
+		"Dolby Atmos with Audio by Bang & Olufsen",
+		"Google TV with Gemini, VRR and ALLM"
+	],
+	"mount": "wall",
+	"defaultElevationIn": 27,
+	"removeNodes": [],
+	"image": "/api/assets/tcl-98-inch-qm7l-sqd-mini-led-qled-4k-tv/image.jpg",
+	"model": "/api/assets/tcl-98-inch-qm7l-sqd-mini-led-qled-4k-tv/model.glb?v=1793486043595",
+	"modelSource": "generated"
+}
