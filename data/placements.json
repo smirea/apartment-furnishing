@@ -10,5 +10,17 @@
 		"itemId": "sha-cerlin-king-size-velvet-bed-frame-with-adjustable-headbo",
 		"position": [8.67, 0, 5.32],
 		"rotation": [0, 0, 0]
+	},
+	{
+		"key": "34cd66e4-5caa-4aa6-8a2e-09e392dde899",
+		"itemId": "keiki-king-size-platform-bed-frame",
+		"position": [15.5, 0, 28],
+		"rotation": [0, 0, 0]
+	},
+	{
+		"key": "1eea3040-7f33-49d0-96db-a3ff81c57b7c",
+		"itemId": "amerlife-5-seater-power-reclining-sectional",
+		"position": [15.5, 0, 28],
+		"rotation": [0, 0, 0]
 	}
 ]

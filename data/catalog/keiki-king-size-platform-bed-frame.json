@@ -1,0 +1,31 @@
+{
+	"id": "keiki-king-size-platform-bed-frame",
+	"url": "https://www.amazon.com/KEIKI-Platform-Vertical-Headboard-Footboard/dp/B0H75Q1D5L",
+	"importedAt": "2026-11-02T21:59:16.243Z",
+	"name": "KEIKI King Platform Bed with Fluted Headboard",
+	"brand": "KEIKI",
+	"price": 569,
+	"currency": "USD",
+	"category": "bed",
+	"dimensions": {
+		"width": 92.5,
+		"height": 39.4,
+		"depth": 90.8
+	},
+	"dimensionsNote": "The gallery dimension diagram gives 92.5 in overall width, 39.37 in height, and 90.74 in depth, agreeing with the correct size on record after rounding. The diagram also gives a 7.87 in platform face height and 76.3 by 80.11 in mattress opening; closed side-drawer divisions are estimated from the product description because the photos do not clearly show their seams.",
+	"weightLb": null,
+	"summary": "Walnut king platform bed with a vertical fluted headboard and footboard, a wood-slat base, and built-in side storage drawers. The selected King size is $569, needs no box spring, and is listed for up to 1,100 lb.",
+	"highlights": [
+		"King (U.S. Standard), walnut finish, low-profile Japandi-style platform",
+		"Vertical fluted headboard and footboard",
+		"No box spring required; reinforced wood slat base",
+		"Built-in side storage drawers",
+		"Listed materials iron and synthetic wood; 1,100 lb capacity; assembly required, 2 packages"
+	],
+	"mount": "floor",
+	"defaultElevationIn": 0,
+	"removeNodes": [],
+	"image": "/api/assets/keiki-king-size-platform-bed-frame/image.jpg",
+	"model": "/api/assets/keiki-king-size-platform-bed-frame/model.glb?v=1793657138125",
+	"modelSource": "generated"
+}

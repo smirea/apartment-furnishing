@@ -178,30 +178,44 @@
 					{importMutation.isPending ? 'Importing…' : 'Import'}
 				</button>
 			</form>
-			{#if importMutation.isPending}
-				<p class="muted">Reading the page and downloading the model. This takes about a minute.</p>
-			{:else if importMutation.isError}
+			{#if importMutation.isError}
 				<p class="error">{importMutation.error.message}</p>
 			{/if}
 
 			<ul>
+				{#if importMutation.isPending}
+					<li>
+						<span class="thumb"></span>
+						<div>
+							<strong>{new URL(importMutation.variables).hostname.replace('www.', '')} link</strong>
+							<span class="status busy">Importing · reading the page (about a minute)</span>
+						</div>
+					</li>
+				{/if}
 				{#each catalogList as item (item.id)}
 					<li>
 						{#if item.image}<img src={item.image} alt="" />{:else}<span class="thumb"></span>{/if}
 						<div>
 							<strong>{item.name}</strong>
+							{#if item.modelJob?.state === 'running'}
+								<span class="status busy">Building 3D model · 2–5 min</span>
+							{:else if item.modelJob?.state === 'failed'}
+								<span class="status failed" title={item.modelJob.error}>3D model failed · select it to retry</span>
+							{/if}
 							<span class="muted">
-								{money(item) ?? ''}{#if item.modelJob?.state === 'running'}
-									· building 3D…{:else if item.modelSource === 'generated'}
+								{money(item) ?? ''}{#if item.modelSource === 'generated'}
 									· AI 3D{:else if item.model}
-									· 3D{/if}{#if placedCount(item.id)}
+									· 3D{:else if !item.modelJob}
+									· no 3D{/if}{#if placedCount(item.id)}
 									· {placedCount(item.id)} placed{/if}
 							</span>
 						</div>
 						<button type="button" onclick={() => addToRoom(item.id)}>Add</button>
 					</li>
 				{:else}
-					<li class="muted">{catalogQuery.isPending ? 'Loading…' : 'No items yet. Paste a link above.'}</li>
+					<li class="muted">
+						{catalogQuery.isPending ? 'Loading…' : importMutation.isPending ? '' : 'No items yet. Paste a link above.'}
+					</li>
 				{/each}
 			</ul>
 		</section>
@@ -259,14 +273,16 @@
 
 		<p class="model-status">
 			{#if selected.modelJob?.state === 'running'}
-				<span class="muted">Codex is building a 3D model from the photo (1–3 min). Shown as a box until then.</span>
+				<span class="status busy"
+					>Codex is building a 3D model from the listing photos (2–5 min). Shown as a box until then.</span
+				>
 			{:else}
 				{#if selected.modelJob?.state === 'failed'}<span class="error"
 						>Model generation failed: {selected.modelJob.error}</span
 					>
 				{:else if selected.modelSource === 'listing'}<span class="muted">3D model from the listing.</span>
 				{:else if selected.modelSource === 'generated'}<span class="muted"
-						>3D model approximated by Codex from the photo.</span
+						>3D model approximated by Codex from the listing photos.</span
 					>
 				{:else}<span class="muted">The listing has no 3D model.</span>{/if}
 				{#if selected.modelSource !== 'listing'}
@@ -398,6 +414,38 @@
 		flex-wrap: wrap;
 		align-items: center;
 		gap: 8px;
+	}
+
+	.status {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.4rem;
+		font-weight: 600;
+	}
+
+	.status.busy {
+		color: var(--app-accent);
+	}
+
+	.status.busy::before {
+		content: '';
+		flex: none;
+		width: 0.7rem;
+		height: 0.7rem;
+		border: 2px solid currentColor;
+		border-right-color: transparent;
+		border-radius: 50%;
+		animation: spin 0.8s linear infinite;
+	}
+
+	.status.failed {
+		color: var(--app-error);
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(1turn);
+		}
 	}
 
 	.muted {

@@ -1,12 +1,14 @@
-// Listings without a 3D model get a procedural one: Codex looks at the product photo and writes a
-// trimesh script (kept as model.py next to the GLB so it can be tweaked and re-run).
+// Listings without a 3D model get a procedural one: Codex studies the listing photos (including dimension
+// diagrams), works out the real size, and writes a trimesh script (kept as model.py next to the GLB).
 import type { CatalogItem, ModelJob } from '@repo/shared/items';
 import { copyFile, mkdtemp, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { ASSET_DIR, ROOT, readItem, saveItem } from './catalog';
+import { basename, extname, join } from 'node:path';
+import { ASSET_DIR, GALLERY_DIR, ROOT, readItem, saveItem } from './catalog';
 
-const PROMPT = await Bun.file(join(import.meta.dir, 'model-prompt.md')).text();
+// Read per job so prompt edits apply without restarting the server.
+const PROMPT_FILE = Bun.file(join(import.meta.dir, 'model-prompt.md'));
+if (!(await PROMPT_FILE.exists())) throw new Error(`missing ${PROMPT_FILE.name}`);
 // Shared so each run doesn't re-download numpy/trimesh; Codex's sandbox only gets write access to it.
 const UV_CACHE = join(ROOT, '.cache/uv');
 
@@ -14,25 +16,50 @@ if (!Bun.which('codex')) throw new Error('codex CLI not found on PATH');
 
 export const modelJobs = new Map<string, ModelJob>();
 
-function prompt(item: CatalogItem) {
+async function prompt(item: CatalogItem, photos: string[]) {
 	const d = item.dimensions;
 	const size = d
-		? `${d.width} in wide (left to right, seen from the front) × ${d.height} in tall × ${d.depth} in deep`
-		: 'not listed; estimate a typical size for this product from the photo';
-	return PROMPT.replace('{{name}}', item.name)
+		? `${d.width} in wide (left to right, seen from the front) × ${d.height} in tall × ${d.depth} in deep${item.dimensionsNote ? `. ${item.dimensionsNote}` : ''}`
+		: 'not listed; estimate it from the photos';
+	return (await PROMPT_FILE.text())
+		.replace('{{name}}', item.name)
 		.replace('{{category}}', item.category)
 		.replace('{{size}}', size)
-		.replace('{{summary}}', item.summary);
+		.replace('{{summary}}', item.summary)
+		.replace('{{photos}}', photos.map((p, i) => `${i + 1}. ${p}`).join('\n'));
+}
+
+async function readDimensions(path: string): Promise<Pick<CatalogItem, 'dimensions' | 'dimensionsNote'>> {
+	const raw = await Bun.file(path)
+		.json()
+		.catch(() => null);
+	const sizes = [raw?.width, raw?.height, raw?.depth];
+	if (!sizes.every(n => typeof n === 'number' && n > 0 && n < 1000) || typeof raw.note !== 'string')
+		throw new Error(`codex wrote no valid dimensions.json: ${JSON.stringify(raw)}`);
+	const [width, height, depth] = sizes.map(n => Math.round(n * 10) / 10) as [number, number, number];
+	return { dimensions: { width, height, depth }, dimensionsNote: raw.note };
+}
+
+// Main photo first: it shows the colorway being bought, the gallery may include others.
+async function collectPhotos(dir: string, work: string): Promise<string[]> {
+	const main = (await readdir(dir)).find(f => f.startsWith('image.'));
+	const gallery = (await readdir(join(dir, GALLERY_DIR)).catch(() => [])).sort();
+	const sources = [...(main ? [join(dir, main)] : []), ...gallery.map(f => join(dir, GALLERY_DIR, f))];
+	if (!sources.length) throw new Error(`${dir} has no product photos to model from`);
+	return Promise.all(
+		sources.map(async (src, i) => {
+			const name = i === 0 ? `main${extname(src)}` : `gallery-${basename(src)}`;
+			await copyFile(src, join(work, name));
+			return name;
+		}),
+	);
 }
 
 export async function generateModel(item: CatalogItem, log: (line: string) => void = () => {}): Promise<CatalogItem> {
 	const dir = join(ASSET_DIR, item.id);
-	const photo = (await readdir(dir)).find(f => f.startsWith('image.'));
-	if (!photo) throw new Error(`${item.id} has no product photo to model from`);
-
 	const work = await mkdtemp(join(tmpdir(), `model-${item.id}-`));
-	await copyFile(join(dir, photo), join(work, photo));
-	log(`codex: modeling ${item.id} in ${work}`);
+	const photos = await collectPhotos(dir, work);
+	log(`codex: modeling ${item.id} from ${photos.length} photo(s) in ${work}`);
 	const proc = Bun.spawn(
 		[
 			'codex',
@@ -48,13 +75,13 @@ export async function generateModel(item: CatalogItem, log: (line: string) => vo
 			'-C',
 			work,
 			'-i',
-			join(work, photo),
+			...photos.map(p => join(work, p)),
 			'-o',
 			join(work, 'last-message.txt'),
 			'-',
 		],
 		{
-			stdin: new Blob([prompt(item)]),
+			stdin: new Blob([await prompt(item, photos)]),
 			stdout: 'pipe',
 			stderr: 'pipe',
 			env: { ...process.env, UV_CACHE_DIR: UV_CACHE },
@@ -69,16 +96,18 @@ export async function generateModel(item: CatalogItem, log: (line: string) => vo
 	if (code !== 0 || !(await glb.exists())) {
 		throw new Error(`codex exited ${code} without model.glb: ${(err || out).slice(-1500)}`);
 	}
+	const size = await readDimensions(join(work, 'dimensions.json'));
 	await copyFile(join(work, 'model.glb'), join(dir, 'model.glb'));
 	await copyFile(join(work, 'build.py'), join(dir, 'model.py'));
 	const updated: CatalogItem = {
 		...(await readItem(item.id)),
+		...size,
 		// Cache-busting version: the path stays the same across regenerations.
 		model: `/api/assets/${item.id}/model.glb?v=${Date.now()}`,
 		modelSource: 'generated',
 	};
 	await saveItem(updated);
-	log(`codex: ${item.id} done (${work})`);
+	log(`codex: ${item.id} done, ${JSON.stringify(size)} (${work})`);
 	return updated;
 }
 

@@ -28,6 +28,22 @@ EXTRACT = r"""() => {
 		.map((u) => (u.startsWith('http') ? u : u.includes('asset-ingested/') ? 'https://3d.walmartimages.com/' + u.slice(u.indexOf('asset-ingested/')) : null))
 		.filter(Boolean);
 	const specs = uniq((html.match(/"name":"[^"]{1,60}","value":"[^"]{1,120}"/g) ?? []).map(unescape)).slice(0, 150);
+	// Full-size gallery photos, which include the dimension diagrams the spec table often gets wrong.
+	const gallery = () => {
+		const at = html.indexOf("'colorImages'");
+		if (at !== -1) {
+			const start = html.indexOf("parseJSON('", at) + 11;
+			const images = JSON.parse(html.slice(start, html.indexOf("')", start)).replace(/\\'/g, "'"));
+			return images.map((i) => i.hiRes ?? i.large).filter(Boolean);
+		}
+		const next = document.getElementById('__NEXT_DATA__');
+		if (next) return JSON.parse(next.textContent).props.pageProps.initialData.data.product.imageInfo.allImages.map((i) => i.url);
+		return [];
+	};
+	let images = [];
+	try {
+		images = uniq(gallery());
+	} catch {}
 	const jsonLd = [...document.querySelectorAll('script[type="application/ld+json"]')].map((s) => s.textContent).join('\n').slice(0, 15000);
 	return {
 		url: location.href,
@@ -35,6 +51,7 @@ EXTRACT = r"""() => {
 		ogImage: meta('og:image'),
 		mainImage: document.querySelector('#landingImage, [data-testid="hero-image"] img, main img')?.src ?? null,
 		models: uniq(models),
+		images: images.slice(0, 12),
 		specs,
 		jsonLd,
 		text: document.body.innerText.replace(/\n{3,}/g, '\n\n').slice(0, 40000),

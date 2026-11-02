@@ -1,14 +1,15 @@
 // Product import pipeline shared by the API (POST /api/catalog/import) and scripts/import-item.ts.
 // Captures each page with a headless Camoufox browser, has the grok CLI turn it into
-// structured product info, downloads the image and any 3D model, and writes data/catalog/<id>.json.
+// structured product info, downloads the photos and any 3D model, and writes data/catalog/<id>.json.
 import type { CatalogItem, Placement } from '@repo/shared/items';
-import { mkdir, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 export const ROOT = join(import.meta.dir, '../../..');
 export const DATA_DIR = join(ROOT, 'data');
 const CATALOG_DIR = join(DATA_DIR, 'catalog');
 export const ASSET_DIR = join(DATA_DIR, 'items');
+export const GALLERY_DIR = 'gallery';
 const PLACEMENTS_FILE = join(DATA_DIR, 'placements.json');
 const GROK_MODEL = 'grok-4.7-build-fast';
 
@@ -71,11 +72,12 @@ const productSchema = {
 			required: ['width', 'height', 'depth'],
 			properties: { width: { type: 'number' }, height: { type: 'number' }, depth: { type: 'number' } },
 			description:
-				'Assembled size in inches as placed in a room (for TVs: without stand). Width is side to side seen from the front.',
+				'Overall assembled size in inches as placed in a room (for TVs: without stand). Width is side to side seen from the front. For sectionals and L-shapes this is the whole footprint.',
 		},
 		dimensionsNote: {
 			type: ['string', 'null'],
-			description: 'Say which values were derived rather than listed, and how',
+			description:
+				'Say which values were derived rather than listed, and how. Retail spec tables often give the seat depth or one module as the product depth; flag values that look implausible for the product.',
 		},
 		weightLb: { type: ['number', 'null'] },
 		summary: { type: 'string', description: 'One or two plain sentences' },
@@ -128,6 +130,7 @@ type PageData = {
 	ogImage: string | null;
 	mainImage: string | null;
 	models: string[];
+	images: string[];
 	specs: string[];
 	jsonLd: string;
 	text: string;
@@ -238,6 +241,8 @@ async function download(url: string, path: string) {
 	await Bun.write(path, res);
 }
 
+const extension = (url: string) => url.match(/\.(png|webp|jpe?g)/i)?.[1] ?? 'jpg';
+
 const slug = (s: string) =>
 	s
 		.toLowerCase()
@@ -270,10 +275,17 @@ export async function importProducts(urls: string[], log: (line: string) => void
 
 		let image: string | null = null;
 		if (imageUrl) {
-			const ext = imageUrl.match(/\.(png|webp|jpe?g)/i)?.[1] ?? 'jpg';
+			const ext = extension(imageUrl);
 			await download(imageUrl, join(dir, `image.${ext}`));
 			image = `/api/assets/${id}/image.${ext}`;
 		}
+		await rm(join(dir, GALLERY_DIR), { recursive: true, force: true });
+		await mkdir(join(dir, GALLERY_DIR));
+		await Promise.all(
+			page.images.map((url, i) =>
+				download(url, join(dir, GALLERY_DIR, `${String(i + 1).padStart(2, '0')}.${extension(url)}`)),
+			),
+		);
 		let model: string | null = null;
 		let modelSource: CatalogItem['modelSource'] = null;
 		if (modelUrl) {
@@ -282,6 +294,8 @@ export async function importProducts(urls: string[], log: (line: string) => void
 			modelSource = 'listing';
 		} else if (existing?.modelSource === 'generated') {
 			({ model, modelSource } = existing);
+			// The generated model was sized from the photos, which beat the spec table it was read from.
+			({ dimensions: product.dimensions, dimensionsNote: product.dimensionsNote } = existing);
 		}
 
 		const item: CatalogItem = {
@@ -295,7 +309,7 @@ export async function importProducts(urls: string[], log: (line: string) => void
 		};
 		await saveItem(item);
 		log(
-			`  saved ${id}: ${product.price ?? '?'} ${product.currency}, dims ${JSON.stringify(product.dimensions)}, model ${model ? 'yes' : 'no'}`,
+			`  saved ${id}: ${product.price ?? '?'} ${product.currency}, dims ${JSON.stringify(product.dimensions)}, ${page.images.length} photo(s), model ${model ? 'yes' : 'no'}`,
 		);
 		imported.push(item);
 	}
