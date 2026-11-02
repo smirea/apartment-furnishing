@@ -2,8 +2,7 @@
 // conversion; usdzip's --arkitAsset mode then packages the extracted textures the way RealityKit expects.
 import type { CatalogItem } from '@repo/shared/items';
 import { mkdtemp, rename, rm, stat } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { ASSET_DIR } from './catalog';
 
 for (const bin of ['usdextract', 'usdzip']) if (!Bun.which(bin)) throw new Error(`${bin} not found on PATH`);
@@ -16,11 +15,12 @@ async function run(cmd: string[]) {
 }
 
 async function convert(glb: string, usdz: string) {
-	const work = await mkdtemp(join(tmpdir(), 'usdz-'));
+	// Staged beside the item so the final rename never crosses volumes.
+	const work = await mkdtemp(join(usdz, '../.usdz-'));
 	try {
 		await run(['usdextract', glb, '-o', work]);
 		const staged = join(work, 'model.usdz');
-		await run(['usdzip', '--arkitAsset', join(work, 'model.usdc'), staged]);
+		await run(['usdzip', '--arkitAsset', join(work, `${basename(glb, '.glb')}.usdc`), staged]);
 		await rename(staged, usdz);
 		return usdz;
 	} finally {

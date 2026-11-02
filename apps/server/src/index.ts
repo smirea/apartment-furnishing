@@ -57,11 +57,22 @@ const server = Bun.serve({
 				const placements = (await request.json()) as Placement[];
 				if (!Array.isArray(placements) || !placements.every(p => isVec3(p.position) && isVec3(p.rotation)))
 					return Response.json({ error: 'Expected placements with finite positions and rotations' }, { status: 400 });
-				// Fixed key order keeps the tracked placements.json diff clean whichever client wrote it.
-				await writePlacements(
-					placements.map(({ key, itemId, position, rotation }) => ({ key, itemId, position, rotation })),
-				);
+				await writePlacements(placements);
 				return Response.json(placements);
+			},
+		},
+		// One item at a time, so a move from the AR app can't overwrite other items the web plan changed meanwhile.
+		'/api/placements/:key': {
+			PUT: async request => {
+				const { position, rotation } = (await request.json()) as Partial<Placement>;
+				if (!isVec3(position) || !isVec3(rotation))
+					return Response.json({ error: 'Expected a finite position and rotation' }, { status: 400 });
+				const placements = await readPlacements();
+				const placement = placements.find(p => p.key === request.params.key);
+				if (!placement) return Response.json({ error: 'Unknown placement' }, { status: 404 });
+				Object.assign(placement, { position, rotation });
+				await writePlacements(placements);
+				return Response.json(placement);
 			},
 		},
 		'/api/assets/*': async request => {

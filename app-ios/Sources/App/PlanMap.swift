@@ -40,8 +40,7 @@ struct PlanMap: View {
     }
 
     private func snap(_ point: SIMD2<Float>) -> SIMD2<Float> {
-        let corners = plan.walls.flatMap { w in [SIMD2(w.rect[0], w.rect[1]), SIMD2(w.rect[2], w.rect[1]), SIMD2(w.rect[0], w.rect[3]), SIMD2(w.rect[2], w.rect[3])] }
-        let nearest = corners.min { simd_distance($0, point) < simd_distance($1, point) }
+        let nearest = plan.corners.min { simd_distance($0, point) < simd_distance($1, point) }
         return nearest.flatMap { simd_distance($0, point) < 1.5 ? $0 : nil } ?? point
     }
 
@@ -72,5 +71,28 @@ struct PlanMap: View {
             let a = point([r[0], r[1]]), b = point([r[2], r[3]])
             return CGRect(x: a.x, y: a.y, width: b.x - a.x, height: b.y - a.y)
         }
+    }
+}
+
+extension Plan {
+    // Corners of the walls' combined outline. Wall runs meet at their centerlines, so the inside corner of an L or T
+    // junction is where one run's face crosses the other's, not a corner of either rectangle. Candidates are every
+    // face crossing between two runs; those strictly inside a wall are dropped.
+    var corners: [SIMD2<Float>] {
+        let rects = walls.map(\.rect)
+        let touches = { (p: SIMD2<Float>, r: [Float]) in p.x >= r[0] && p.x <= r[2] && p.y >= r[1] && p.y <= r[3] }
+        let inside = { (p: SIMD2<Float>, r: [Float]) in p.x > r[0] && p.x < r[2] && p.y > r[1] && p.y < r[3] }
+        var result: [SIMD2<Float>] = []
+        for a in rects {
+            for b in rects {
+                for x in [a[0], a[2]] {
+                    for z in [b[1], b[3]] {
+                        let p = SIMD2(x, z)
+                        if touches(p, a), touches(p, b), !rects.contains(where: { inside(p, $0) }) { result.append(p) }
+                    }
+                }
+            }
+        }
+        return result
     }
 }

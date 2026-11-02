@@ -37,8 +37,12 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
     @ObservationIgnored private var placements: [Placement] = []
     @ObservationIgnored private var placed: [String: PlacedItem] = [:]
     @ObservationIgnored private var templates: [String: Task<Entity, Never>] = [:]
-    // Placements the user is dragging or that are still saving; polls leave them alone.
-    @ObservationIgnored private var moving: Set<String> = []
+    // Gestures and saves in flight per placement; polls leave those placements alone. A count, because a rotation can
+    // outlive the translation that started with it, and a new drag can start before the last one saved.
+    @ObservationIgnored private var moving: [String: Int] = [:]
+    // Bumped when a save lands, so a poll that left before it can't put the old position back.
+    @ObservationIgnored private var saves = 0
+    @ObservationIgnored private var tracking = false
     @ObservationIgnored private var syncTask: Task<Void, Never>?
 
     private struct PlacedItem {
@@ -69,7 +73,7 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
             let loaded = try await plan
             self.plan = loaded
             buildOutline(loaded)
-            self.catalog = Dictionary(uniqueKeysWithValues: try await catalog.map { ($0.id, $0) })
+            self.catalog = Dictionary(try await catalog.map { ($0.id, $0) }) { a, _ in a }
             apply(try await placements)
         } catch {
             phase = .failed("Can't reach \(API.baseURL.absoluteString): \(error.localizedDescription)")
@@ -84,7 +88,7 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
         #endif
     }
 
-    private func runSession() {
+    private func runSession(map: ARWorldMap? = WorldMapStore.load()) {
         let config = ARWorldTrackingConfiguration()
         config.planeDetection = [.horizontal]
         config.environmentTexturing = .automatic
@@ -95,7 +99,6 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
         if ARWorldTrackingConfiguration.supportsFrameSemantics(.personSegmentationWithDepth) {
             config.frameSemantics.insert(.personSegmentationWithDepth)
         }
-        let map = WorldMapStore.load()
         config.initialWorldMap = map
         view.session.run(config, options: [.resetTracking, .removeExistingAnchors])
         phase = map == nil ? .aligning(AlignmentDraft()) : .relocalizing
@@ -119,8 +122,16 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
 
     // MARK: Alignment
 
+    // A fresh session, so a saved map that hasn't relocalized yet can't bring the old alignment back later.
     func realign() {
+        #if targetEnvironment(simulator)
         phase = .aligning(AlignmentDraft())
+        #else
+        planAnchor?.removeFromParent()
+        planAnchor = nil
+        marker?.removeFromParent()
+        runSession(map: nil)
+        #endif
     }
 
     func pick(_ point: SIMD2<Float>) {
@@ -150,9 +161,6 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
             return
         }
         marker?.removeFromParent()
-        for anchor in view.session.currentFrame?.anchors ?? [] where anchor.name == Self.anchorName {
-            view.session.remove(anchor: anchor)
-        }
         view.session.add(anchor: ARAnchor(name: Self.anchorName, transform: alignment.transform))
         note = alignment.check
         phase = .placed
@@ -170,6 +178,7 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
     // ARKit refuses to snapshot a map until it has seen enough of the room, so right after aligning this retries.
     func saveWorldMap(attempts: Int) async {
         #if !targetEnvironment(simulator)
+        guard tracking else { return }
         for attempt in 1...attempts {
             do {
                 let data: Data = try await withCheckedThrowingContinuation { continuation in
@@ -182,9 +191,10 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
                 }
                 try WorldMapStore.write(data)
                 return
-            } catch {
-                if attempt == attempts { note = "Couldn't save the alignment: \(error.localizedDescription)" }
+            } catch where attempt < attempts {
                 try? await Task.sleep(for: .seconds(2))
+            } catch {
+                note = "Couldn't save the alignment: \(error.localizedDescription)"
             }
         }
         #endif
@@ -195,6 +205,18 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
         guard let id = ids.last else { return }
         MainActor.assumeIsolated { attach(to: id) }
     }
+
+    // Placed means the anchor is in and tracking is normal: a restored map can hand back its anchors before ARKit has
+    // relocalized, and after an interruption the world can be offset until it relocalizes again.
+    nonisolated func session(_ session: ARSession, cameraDidChangeTrackingState camera: ARCamera) {
+        let normal = camera.trackingState == .normal
+        MainActor.assumeIsolated {
+            tracking = normal
+            if normal, phase == .relocalizing, planAnchor != nil { phase = .placed }
+        }
+    }
+
+    nonisolated func sessionShouldAttemptRelocalization(_ session: ARSession) -> Bool { true }
 
     nonisolated func session(_ session: ARSession, didFailWithError error: Error) {
         let message = error.localizedDescription
@@ -207,7 +229,7 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
         anchor.addChild(planRoot)
         view.scene.addAnchor(anchor)
         planAnchor = anchor
-        if phase == .relocalizing { phase = .placed }
+        if phase == .relocalizing, tracking { phase = .placed }
     }
 
     // MARK: Items
@@ -218,8 +240,10 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
             try? await Task.sleep(for: .seconds(1))
             tick += 1
             do {
-                if tick.isMultiple(of: 5) { catalog = Dictionary(uniqueKeysWithValues: try await API.catalog().map { ($0.id, $0) }) }
-                apply(try await API.placements())
+                if tick.isMultiple(of: 5) { catalog = Dictionary(try await API.catalog().map { ($0.id, $0) }) { a, _ in a } }
+                let generation = saves
+                let incoming = try await API.placements()
+                if generation == saves { apply(incoming) }
                 if note?.hasPrefix("Server") == true { note = nil }
             } catch {
                 note = "Server unreachable: \(error.localizedDescription)"
@@ -228,15 +252,15 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
     }
 
     private func apply(_ incoming: [Placement]) {
-        let local = Dictionary(uniqueKeysWithValues: placements.map { ($0.key, $0) })
-        placements = incoming.map { moving.contains($0.key) ? local[$0.key] ?? $0 : $0 }
+        let local = Dictionary(placements.map { ($0.key, $0) }) { a, _ in a }
+        placements = incoming.map { moving[$0.key] != nil ? local[$0.key] ?? $0 : $0 }
         let keys = Set(placements.map(\.key))
         for (key, item) in placed where !keys.contains(key) { remove(key, item) }
         for placement in placements {
             guard let item = catalog[placement.itemId] else { continue }
             if let existing = placed[placement.key], existing.signature != item.signature { remove(placement.key, existing) }
             if placed[placement.key] == nil { add(placement, item) }
-            if !moving.contains(placement.key) { placed[placement.key]?.entity.transform = placement.transform }
+            if moving[placement.key] == nil { placed[placement.key]?.entity.transform = placement.transform }
         }
     }
 
@@ -288,7 +312,7 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
         try FileManager.default.moveItem(at: download, to: file)
         let model = try await Entity(contentsOf: file)
         try? FileManager.default.removeItem(at: file)
-        for name in item.removeNodes { model.findEntity(named: name)?.removeFromParent() }
+        for name in item.removeNodes { (model.findEntity(named: name) ?? model.findEntity(named: usdName(name)))?.removeFromParent() }
         let size = model.visualBounds(relativeTo: model).extents
         let scale = item.dimensions.map { $0.width / 12 / size.x } ?? 1 / metersPerFoot
         model.scale = SIMD3(repeating: scale)
@@ -320,7 +344,7 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
         guard let index = placements.firstIndex(where: { $0.key == key }) else { return }
         switch recognizer.state {
         case .began:
-            moving.insert(key)
+            moving[key, default: 0] += 1
         case .ended, .cancelled:
             var placement = placements[index]
             entity.position.y = Float(placement.position[1])
@@ -329,14 +353,14 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
             placement.position = [round(entity.position.x), placement.position[1], round(entity.position.z)]
             placement.rotation[1] = round(2 * atan2(q.imag.y, q.real) * 180 / .pi)
             placements[index] = placement
-            let snapshot = placements
             Task {
                 do {
-                    _ = try await API.save(snapshot)
+                    try await API.save(placement)
                 } catch {
                     note = "Couldn't save the move: \(error.localizedDescription)"
                 }
-                moving.remove(key)
+                saves += 1
+                moving[key] = moving[key].flatMap { $0 > 1 ? $0 - 1 : nil }
             }
         default:
             break
@@ -376,4 +400,12 @@ extension Placement {
         let rotation = simd_quatf(angle: r[0], axis: [1, 0, 0]) * simd_quatf(angle: r[1], axis: [0, 1, 0]) * simd_quatf(angle: r[2], axis: [0, 0, 1])
         return Transform(scale: .one, rotation: rotation, translation: SIMD3(position.map { Float($0) }))
     }
+}
+
+// USD prim names can't start with a digit or hold punctuation, so the GLB-to-USDZ conversion renames such nodes:
+// `18182363041_TV` becomes `_8182363041_TV`.
+private func usdName(_ name: String) -> String {
+    var characters = name.map { $0.isLetter || $0.isNumber || $0 == "_" ? $0 : "_" }
+    if characters.first?.isNumber == true { characters[0] = "_" }
+    return String(characters)
 }

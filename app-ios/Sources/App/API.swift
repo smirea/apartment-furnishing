@@ -39,11 +39,11 @@ enum API {
     static func catalog() async throws -> [CatalogItem] { try await get("api/catalog") }
     static func placements() async throws -> [Placement] { try await get("api/placements") }
 
-    static func save(_ placements: [Placement]) async throws -> [Placement] {
-        var request = URLRequest(url: baseURL.appending(path: "api/placements"), timeoutInterval: 5)
+    static func save(_ placement: Placement) async throws {
+        var request = URLRequest(url: baseURL.appending(path: "api/placements/\(placement.key)"), timeoutInterval: 5)
         request.httpMethod = "PUT"
-        request.httpBody = try JSONEncoder().encode(placements)
-        return try await send(request)
+        request.httpBody = try JSONEncoder().encode(placement)
+        let _: Placement = try await send(request)
     }
 
     // The GLB's `?v=` cache buster carries over, so a regenerated model gets a fresh URL.
