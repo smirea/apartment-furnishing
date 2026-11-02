@@ -94,8 +94,8 @@ export const walls: Wall[] = [
 	{ line: [583, 641, 583, 925] },
 
 	{ line: [180, 495, 180, 905], glass: true, gaps: [[540, 620]] },
-	{ line: [180, 905, 483, 905], glass: true },
-	{ line: [483, 905, 732, 905], thickness: 24 },
+	{ line: [180, 905, 469, 905], glass: true },
+	{ line: [469, 905, 732, 905], thickness: 24 },
 	{ line: [732, 905, 827, 905], glass: true },
 	{ line: [827, 905, 864, 905], thickness: 24 },
 

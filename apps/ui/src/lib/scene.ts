@@ -33,6 +33,7 @@ import {
 	fixtures,
 	footprint,
 	ft,
+	PX_PER_FT,
 	rooms,
 	walls,
 	type FloorKind,
@@ -46,6 +47,9 @@ const EYE_FT = 5.5;
 const PLAYER_RADIUS_FT = 0.9;
 const WALK_FT_PER_S = 6;
 const CUTAWAY_FT = 3.2;
+// Mullion spacing taped on the living-room south glass.
+const WINDOW_BAY_IN = 48;
+const FRAME_IN = 2;
 const SNAP_FT = 0.6;
 const WALL_MOUNT_SNAP_FT = 2;
 const DEG = Math.PI / 180;
@@ -123,10 +127,12 @@ export function createViewer(
 	const glassMat = new MeshStandardMaterial({
 		color: 0x9fd0e8,
 		transparent: true,
-		opacity: 0.25,
+		opacity: 0.35,
 		roughness: 0.1,
 		depthWrite: false,
 	});
+	const frameMat = new MeshStandardMaterial({ color: 0x2f3438, roughness: 0.5 });
+	const inchPx = PX_PER_FT / 12;
 
 	function buildWall({ line, thickness = 10, gaps = [], glass = false, height = CEILING_FT }: Wall) {
 		const [x1, y1, x2, y2] = line;
@@ -149,13 +155,34 @@ export function createViewer(
 			}
 		};
 
+		const frame = (a: number, b: number, y: number, h: number) => {
+			const depth = half + inchPx;
+			const rect: Rect = horizontal ? [a, fixed - depth, b, fixed + depth] : [fixed - depth, a, fixed + depth, b];
+			const mesh = addBox(wallGroup, rect, y, h, frameMat);
+			cutawayWalls.push({ mesh, fullHeight: h, y, glass: false });
+		};
+		// Full-height glass reads as a window: sill, head and evenly spaced mullions. Railings stay plain glass.
+		const windowFrames = (a: number, b: number) => {
+			if (!glass || height < CEILING_FT || b - a < 1) return;
+			const bar = FRAME_IN * inchPx;
+			const bays = Math.max(1, Math.round((b - a) / (WINDOW_BAY_IN * inchPx)));
+			for (let i = 0; i <= bays; i++) {
+				const c = a + ((b - a) * i) / bays;
+				frame(Math.max(a, c - bar / 2), Math.min(b, c + bar / 2), 0, height);
+			}
+			frame(a, b, 0, FRAME_IN / 12);
+			frame(a, b, height - FRAME_IN / 12, FRAME_IN / 12);
+		};
+
 		let cursor = start;
 		for (const [from, to] of sorted) {
 			span(cursor, from, 0, height, glass ? glassMat : plaster, true);
+			windowFrames(cursor, from);
 			span(from, to, 7, height - 7, plaster, false);
 			cursor = to;
 		}
 		span(cursor, end, 0, height, glass ? glassMat : plaster, true);
+		windowFrames(cursor, end);
 	}
 
 	walls.forEach(wall => {
