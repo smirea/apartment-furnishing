@@ -20,3 +20,4 @@ build
 
 # other
 .DS_Store
+data/items/*/model.usdz

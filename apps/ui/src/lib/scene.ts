@@ -39,7 +39,7 @@ import {
 	type FloorKind,
 	type Rect,
 	type Wall,
-} from './floorplan';
+} from '@repo/shared/floorplan';
 
 export type Mode = 'orbit' | 'walk';
 

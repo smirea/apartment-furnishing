@@ -2,6 +2,8 @@ import type { CatalogEntry, Placement } from '@repo/shared/items';
 import { join, normalize } from 'node:path';
 import { ASSET_DIR, importProducts, listCatalog, readItem, readPlacements, writePlacements } from './catalog';
 import { modelJobs, startModelJob } from './generate-model';
+import { planGeometry } from '@repo/shared/plan';
+import { usdzPath } from './usdz';
 import { config } from './config';
 
 const isVec3 = (v: unknown) => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
@@ -43,13 +45,22 @@ const server = Bun.serve({
 				}
 			},
 		},
+		'/api/plan': Response.json(planGeometry()),
+		'/api/catalog/:id/model.usdz': async request => {
+			const item = await readItem(request.params.id).catch(() => null);
+			const path = item && (await usdzPath(item));
+			return path ? new Response(Bun.file(path)) : Response.json({ error: 'No model' }, { status: 404 });
+		},
 		'/api/placements': {
 			GET: async () => Response.json(await readPlacements()),
 			PUT: async request => {
 				const placements = (await request.json()) as Placement[];
 				if (!Array.isArray(placements) || !placements.every(p => isVec3(p.position) && isVec3(p.rotation)))
 					return Response.json({ error: 'Expected placements with finite positions and rotations' }, { status: 400 });
-				await writePlacements(placements);
+				// Fixed key order keeps the tracked placements.json diff clean whichever client wrote it.
+				await writePlacements(
+					placements.map(({ key, itemId, position, rotation }) => ({ key, itemId, position, rotation })),
+				);
 				return Response.json(placements);
 			},
 		},
