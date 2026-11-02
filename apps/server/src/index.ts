@@ -1,12 +1,13 @@
 import type { CatalogEntry, Placement } from '@repo/shared/items';
 import { join, normalize } from 'node:path';
-import { ASSET_DIR, importProducts, listCatalog, readItem, readPlacements, writePlacements } from './catalog';
+import { ASSET_DIR, importProducts, listCatalog, readItem, readPlacements, updatePlacements } from './catalog';
 import { modelJobs, startModelJob } from './generate-model';
 import { planGeometry } from '@repo/shared/plan';
 import { usdzPath } from './usdz';
 import { config } from './config';
 
-const isVec3 = (v: unknown) => Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
+const isVec3 = (v: unknown): v is [number, number, number] =>
+	Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
 
 const uiBuildPath = new URL('../../ui/build/', import.meta.url);
 
@@ -51,28 +52,31 @@ const server = Bun.serve({
 			const path = item && (await usdzPath(item));
 			return path ? new Response(Bun.file(path)) : Response.json({ error: 'No model' }, { status: 404 });
 		},
-		'/api/placements': {
-			GET: async () => Response.json(await readPlacements()),
-			PUT: async request => {
-				const placements = (await request.json()) as Placement[];
-				if (!Array.isArray(placements) || !placements.every(p => isVec3(p.position) && isVec3(p.rotation)))
-					return Response.json({ error: 'Expected placements with finite positions and rotations' }, { status: 400 });
-				await writePlacements(placements);
-				return Response.json(placements);
-			},
-		},
-		// One item at a time, so a move from the AR app can't overwrite other items the web plan changed meanwhile.
+		'/api/placements': { GET: async () => Response.json(await readPlacements()) },
+		// Clients save only the items they changed, so a client holding an older copy of the rest can't revert edits
+		// another client (the web plan or the AR app) made meanwhile.
 		'/api/placements/:key': {
 			PUT: async request => {
-				const { position, rotation } = (await request.json()) as Partial<Placement>;
+				const { key } = request.params;
+				const { itemId, position, rotation } = (await request.json()) as Partial<Placement>;
 				if (!isVec3(position) || !isVec3(rotation))
 					return Response.json({ error: 'Expected a finite position and rotation' }, { status: 400 });
-				const placements = await readPlacements();
-				const placement = placements.find(p => p.key === request.params.key);
-				if (!placement) return Response.json({ error: 'Unknown placement' }, { status: 404 });
-				Object.assign(placement, { position, rotation });
-				await writePlacements(placements);
-				return Response.json(placement);
+				let saved: Placement | undefined;
+				await updatePlacements(placements => {
+					const existing = placements.find(p => p.key === key);
+					if (existing) {
+						saved = { ...existing, position, rotation };
+						return placements.map(p => (p.key === key ? saved! : p));
+					}
+					if (!itemId) return placements;
+					saved = { key, itemId, position, rotation };
+					return [...placements, saved];
+				});
+				return saved ? Response.json(saved) : Response.json({ error: 'Unknown placement' }, { status: 404 });
+			},
+			DELETE: async request => {
+				await updatePlacements(placements => placements.filter(p => p.key !== request.params.key));
+				return Response.json({ ok: true });
 			},
 		},
 		'/api/assets/*': async request => {

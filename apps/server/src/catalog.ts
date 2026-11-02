@@ -33,8 +33,20 @@ export async function readPlacements(): Promise<Placement[]> {
 	return (await file.exists()) ? file.json() : [];
 }
 
-export async function writePlacements(placements: Placement[]) {
-	await writeFile(PLACEMENTS_FILE, JSON.stringify(placements, null, '\t') + '\n');
+let placementWrites: Promise<unknown> = Promise.resolve();
+
+// Every client edits single items, so each change is a read-modify-write of the whole file. Chaining them keeps two
+// overlapping edits from both reading the same snapshot and one silently dropping the other.
+export function updatePlacements(change: (placements: Placement[]) => Placement[]): Promise<Placement[]> {
+	const write = placementWrites
+		.catch(() => {})
+		.then(async () => {
+			const updated = change(await readPlacements());
+			await writeFile(PLACEMENTS_FILE, JSON.stringify(updated, null, '\t') + '\n');
+			return updated;
+		});
+	placementWrites = write;
+	return write;
 }
 
 const productSchema = {
