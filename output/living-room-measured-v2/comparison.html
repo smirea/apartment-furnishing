@@ -1,0 +1,174 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<style>
+			:root {
+				font-family: var(--font-sans, system-ui);
+				color: var(--foreground, #222);
+			}
+			* {
+				box-sizing: border-box;
+			}
+			body {
+				margin: 0;
+			}
+			.intro {
+				color: var(--muted-foreground, #777);
+				font-size: 14px;
+				line-height: 1.5;
+				margin: 0 0 18px;
+			}
+			.grid {
+				display: grid;
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+				gap: 20px;
+			}
+			figure {
+				margin: 0;
+			}
+			img {
+				display: block;
+				width: 100%;
+				height: auto;
+				border-radius: var(--radius, 8px);
+			}
+			h3 {
+				font-size: 17px;
+				margin: 10px 0 4px;
+			}
+			p {
+				font-size: 13px;
+				line-height: 1.5;
+				margin: 0 0 8px;
+			}
+			a {
+				color: inherit;
+			}
+			summary {
+				cursor: pointer;
+				font-size: 13px;
+			}
+			details p {
+				margin-top: 8px;
+			}
+			@media (max-width: 560px) {
+				.grid {
+					grid-template-columns: 1fr;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<p class="intro">
+			Kitchen-side concepts using a 199″ × 204″ living area, 122″ TV wall, 33″ column and 98″ television. Dimension
+			schedules validate proposed furniture footprints; generated images retain architectural approximations.
+		</p>
+		<main class="grid">
+			<figure>
+				<a href="01-japandi/concept.png" target="_blank"
+					><img src="01-japandi/concept.png" alt="1 · Pale oak Japandi living room concept"
+				/></a>
+				<figcaption>
+					<h3>1 · Pale oak Japandi</h3>
+					<p>Pale oak, oatmeal upholstery, soft paper lighting.</p>
+					<details>
+						<summary>Geometry limitations</summary>
+						<p>
+							Switch spacing is compressed; glazing divisions are simplified. Island and west door are outside the crop.
+							Exact rendered dimensions are unverified.
+						</p>
+						<a href="01-japandi/concept.md">Dimension schedule and full prompts</a>
+					</details>
+				</figcaption>
+			</figure>
+			<figure>
+				<a href="02-walnut-cinema/concept.png" target="_blank"
+					><img src="02-walnut-cinema/concept.png" alt="2 · Walnut cinema living room concept"
+				/></a>
+				<figcaption>
+					<h3>2 · Walnut cinema</h3>
+					<p>Flat walnut panels, charcoal sofa, smoked glass and bronze.</p>
+					<details>
+						<summary>Geometry limitations</summary>
+						<p>
+							Rear solid-wall width, wood-panel extent and alarm offset drift from the schedule. Exact rendered
+							dimensions are unverified.
+						</p>
+						<a href="02-walnut-cinema/concept.md">Dimension schedule and full prompts</a>
+					</details>
+				</figcaption>
+			</figure>
+			<figure>
+				<a href="03-sculptural-stone/concept.png" target="_blank"
+					><img src="03-sculptural-stone/concept.png" alt="3 · Sculptural cream & travertine living room concept"
+				/></a>
+				<figcaption>
+					<h3>3 · Sculptural cream & travertine</h3>
+					<p>Rounded cream upholstery, mineral textures, broad oak panels.</p>
+					<details>
+						<summary>Geometry limitations</summary>
+						<p>
+							Floor lamp is too far west; small coffee table is on the opposite side from its scheduled position. Exact
+							rendered dimensions are unverified.
+						</p>
+						<a href="03-sculptural-stone/concept.md">Dimension schedule and full prompts</a>
+					</details>
+				</figcaption>
+			</figure>
+			<figure>
+				<a href="04-olive-cognac/concept.png" target="_blank"
+					><img src="04-olive-cognac/concept.png" alt="4 · Olive & cognac living room concept"
+				/></a>
+				<figcaption>
+					<h3>4 · Olive & cognac</h3>
+					<p>Olive plaster, honey oak, cognac leather and brass.</p>
+					<details>
+						<summary>Geometry limitations</summary>
+						<p>
+							Extra oak trim appears at the office recess; recess depth and side-table spacing remain approximate. Exact
+							rendered dimensions are unverified.
+						</p>
+						<a href="04-olive-cognac/concept.md">Dimension schedule and full prompts</a>
+					</details>
+				</figcaption>
+			</figure>
+		</main>
+		<dialog id="large">
+			<button onclick="this.parentElement.close()">Close</button><img id="large-image" alt="Enlarged concept" />
+		</dialog>
+		<style>
+			dialog {
+				max-width: 96%;
+				padding: 12px;
+				background: var(--card, #fff);
+				color: var(--foreground, #222);
+				border: 1px solid var(--border, #ccc);
+				border-radius: var(--radius, 8px);
+			}
+			dialog img {
+				max-height: 1100px;
+				width: auto;
+				max-width: 100%;
+				margin-top: 8px;
+			}
+			button {
+				cursor: pointer;
+				padding: 6px 12px;
+			}
+			dialog::backdrop {
+				background: rgba(0, 0, 0, 0.75);
+			}
+		</style>
+		<script>
+			document.querySelectorAll('figure>a').forEach(a =>
+				a.addEventListener('click', e => {
+					e.preventDefault();
+					document.getElementById('large-image').src = a.querySelector('img').src;
+					document.getElementById('large').showModal();
+				}),
+			);
+		</script>
+	</body>
+</html>
