@@ -15,6 +15,7 @@ Helps me furnish my apartment: what fits, where it goes, and what to buy.
 | Laundry    | In-unit washer and dryer                                                                                                       |
 | Appliances | Bosch dishwasher, oven, cooktop, microwave drawer, fridge/freezer                                                              |
 | Floors     | Wide-plank hardwood, tile in baths                                                                                             |
+| Ceilings   | 10 ft. Not on this listing or the floor plan; from listings for #3909, the same B4 plan in the same stack                      |
 | Pets       | Cats and dogs under 40 lb                                                                                                      |
 | Views      | Hotel Van Zandt, Lady Bird Lake, sunset from the primary suite                                                                 |
 | Building   | 24-hour concierge, 41st-floor pool and sky lounge, gym with yoga and spin studios, co-working lounge, sky dog run and dog wash |
