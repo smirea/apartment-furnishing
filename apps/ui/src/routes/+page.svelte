@@ -35,13 +35,34 @@
 	let placements = $state<Placement[]>([]);
 	let placementsLoaded = false;
 	let saveTimer: ReturnType<typeof setTimeout> | undefined;
+	// Keys edited here and not yet saved. Only these are sent, and polls wait until they are, so the AR app's moves
+	// are neither overwritten by this tab's older copy nor reverted on screen.
+	const unsaved = new Set<string>();
+	let saving: Promise<unknown> = Promise.resolve();
 	function updatePlacements(next: Placement[]) {
+		for (const p of next) if (placements.find(old => old.key === p.key) !== p) unsaved.add(p.key);
+		for (const p of placements) if (!next.some(n => n.key === p.key)) unsaved.add(p.key);
 		placements = next;
 		clearTimeout(saveTimer);
-		saveTimer = setTimeout(
-			() => void api('/api/placements', { method: 'PUT', body: JSON.stringify($state.snapshot(placements)) }),
-			SAVE_DELAY_MS,
-		);
+		saveTimer = setTimeout(() => {
+			saveTimer = undefined;
+			const keys = [...unsaved];
+			unsaved.clear();
+			const byKey = new Map($state.snapshot(placements).map(p => [p.key, p]));
+			saving = Promise.all(
+				keys.map(key => {
+					const placement = byKey.get(key);
+					return placement
+						? api(`/api/placements/${key}`, { method: 'PUT', body: JSON.stringify(placement) })
+						: api(`/api/placements/${key}`, { method: 'DELETE' });
+				}),
+			);
+		}, SAVE_DELAY_MS);
+	}
+	async function pollPlacements() {
+		await saving.catch(() => {});
+		const data = await api<Placement[]>('/api/placements');
+		if (!saveTimer && !unsaved.size) placements = data;
 	}
 	function patchPlacement(key: string, patch: Partial<Placement>) {
 		updatePlacements(placements.map(p => (p.key === key ? { ...p, ...patch } : p)));
@@ -118,7 +139,11 @@
 			placements = data;
 			placementsLoaded = true;
 		});
-		return () => v.dispose();
+		const poll = setInterval(() => void pollPlacements().catch(() => {}), 2000);
+		return () => {
+			clearInterval(poll);
+			v.dispose();
+		};
 	});
 
 	$effect(() => viewer?.setCutaway(cutaway));
