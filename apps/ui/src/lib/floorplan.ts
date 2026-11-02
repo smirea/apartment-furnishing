@@ -1,7 +1,7 @@
 // All coordinates are pixels traced from listing/photos/unit/floorplan-b4.jpg
 // (cropped 150,190 and doubled). The scale is a least-squares fit of ten tape-measured spans
 // (2026-11-02) against the trace; the builder's stated room sizes gave 24.8 and drew the unit ~4.5% small.
-// Measured rooms (primary bedroom, living room, TV wall, island, column) were then nudged to the tape.
+// Measured rooms (primary bedroom, living room, office, island, column) were then nudged to the tape.
 export const PX_PER_FT = 23.7;
 export const CEILING_FT = 10;
 
@@ -35,11 +35,11 @@ export const rooms: Room[] = [
 	{ name: 'Entry', floor: 'wood', rect: [740, 135, 865, 193] },
 	{ name: 'Kitchen', floor: 'wood', rect: [195, 290, 583, 520], size: `11'7" x 7'10"` },
 	{ name: 'Living room', floor: 'wood', rect: [183, 520, 588, 905], size: `16'7" x 17'0"` },
-	{ name: '', floor: 'wood', rect: [583, 548, 690, 654] },
-	{ name: 'Laundry / pantry', floor: 'tile', rect: [583, 290, 850, 385] },
-	{ name: 'Bath 2', floor: 'tile', rect: [583, 385, 850, 548] },
-	{ name: 'Closet 2', floor: 'wood', rect: [690, 555, 850, 654] },
-	{ name: 'Office / guest', floor: 'wood', rect: [588, 654, 850, 905], size: `10'8" x 10'2"` },
+	{ name: '', floor: 'wood', rect: [583, 548, 690, 641] },
+	{ name: 'Laundry / pantry', floor: 'tile', rect: [583, 290, 854, 385] },
+	{ name: 'Bath 2', floor: 'tile', rect: [583, 385, 854, 548] },
+	{ name: 'Closet 2', floor: 'wood', rect: [690, 555, 854, 641] },
+	{ name: 'Office / guest', floor: 'wood', rect: [583, 641, 854, 905], size: `11'0" x 10'5"` },
 	{ name: 'Balcony', floor: 'concrete', rect: [55, 495, 180, 900], size: `5'1" x 17'2"` },
 ];
 
@@ -68,36 +68,36 @@ export const walls: Wall[] = [
 	{ line: [195, 495, 250, 495], thickness: 14 },
 
 	{ line: [865, 135, 865, 340], gaps: [[145, 205]] },
-	{ line: [855, 340, 855, 925], thickness: 20 },
+	{ line: [859, 340, 859, 925], thickness: 20 },
 
 	{
-		line: [583, 290, 850, 290],
+		line: [583, 290, 859, 290],
 		gaps: [
 			[592, 632],
 			[645, 700],
 			[715, 835],
 		],
 	},
-	{ line: [583, 385, 850, 385] },
+	{ line: [583, 385, 859, 385] },
 	{ line: [640, 290, 640, 385] },
 	{ line: [710, 290, 710, 385] },
 	{ line: [583, 290, 583, 560], thickness: 20, gaps: [[480, 550]] },
-	{ line: [665, 548, 855, 548] },
-	{ line: [690, 548, 690, 654] },
+	{ line: [665, 548, 859, 548] },
+	{ line: [690, 548, 690, 641] },
 	{
-		line: [588, 654, 850, 654],
+		line: [583, 641, 859, 641],
 		gaps: [
-			[595, 660],
-			[700, 780],
+			[592, 663],
+			[707, 778],
 		],
 	},
-	{ line: [588, 654, 588, 925], thickness: 20 },
+	{ line: [583, 641, 583, 925] },
 
 	{ line: [180, 495, 180, 905], glass: true, gaps: [[540, 620]] },
 	{ line: [180, 905, 483, 905], glass: true },
-	{ line: [483, 905, 588, 905], thickness: 24 },
-	{ line: [588, 905, 822, 905], glass: true },
-	{ line: [822, 905, 860, 905], thickness: 24 },
+	{ line: [483, 905, 732, 905], thickness: 24 },
+	{ line: [732, 905, 827, 905], glass: true },
+	{ line: [827, 905, 864, 905], thickness: 24 },
 
 	{ line: [55, 495, 55, 900], glass: true, height: 3.5 },
 	{ line: [55, 495, 180, 495], glass: true, height: 3.5 },
@@ -138,9 +138,9 @@ export const fixtures: Fixture[] = [
 	{ rect: [700, 600, 840, 605], height: 0.15, y: 5.5, color: 0xd8c8a8 },
 	{ rect: [650, 300, 705, 380], height: 0.15, y: 5.5, color: 0xd8c8a8 },
 	// Living-room TV wall: switch, data jack + outlet, smoke alarm (taped elevation)
-	{ rect: [576, 672, 578, 678], height: 0.375, y: 3.75, color: 0xffffff },
-	{ rect: [576, 762, 578, 776], height: 0.375, y: 1.15, color: 0xffffff },
-	{ rect: [575, 708, 578, 719], height: 0.15, y: 8.75, color: 0xf4f4f4 },
+	{ rect: [576, 665, 578, 671], height: 0.375, y: 3.75, color: 0xffffff },
+	{ rect: [576, 755, 578, 769], height: 0.375, y: 1.15, color: 0xffffff },
+	{ rect: [575, 701, 578, 712], height: 0.15, y: 8.75, color: 0xf4f4f4 },
 ];
 
 export const doors: Door[] = [
@@ -149,8 +149,8 @@ export const doors: Door[] = [
 	[75, 293, 75, 358],
 	[180, 540, 100, 540],
 	[585, 480, 657, 480],
-	[600, 656, 600, 728],
-	[700, 654, 700, 726],
+	[594, 643, 594, 714],
+	[776, 643, 776, 714],
 	[760, 137, 815, 192],
 	[865, 205, 812, 190],
 	[620, 180, 665, 135],
