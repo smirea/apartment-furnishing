@@ -11,6 +11,7 @@
 		"dev": "concurrently --raw -k -s first \"bun --filter @repo/server dev\" \"bun --filter @repo/ui dev --host 127.0.0.1\"",
 		"format": "oxfmt --write .",
 		"import": "bun scripts/import-item.ts",
+		"ios": "bun app-ios/scripts/run",
 		"lint": "oxlint --fix && oxfmt --write .",
 		"lint:ci": "oxlint && oxfmt --check .",
 		"env:generate": "env-manager gen --local",
