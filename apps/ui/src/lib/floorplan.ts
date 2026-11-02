@@ -1,5 +1,7 @@
 // All coordinates are pixels traced from listing/photos/unit/floorplan-b4.jpg
 // (cropped 150,190 and doubled). The plan's stated room sizes give ~24.8 px per foot.
+// The primary bedroom, its window and doors use tape measurements (2026-11-02), which
+// made it 5" wider and 8" deeper than the builder plan: Bath 1 and the kitchen gave up the difference.
 export const PX_PER_FT = 24.8;
 export const CEILING_FT = 10;
 
@@ -25,12 +27,12 @@ export type Door = [hingeX: number, hingeY: number, endX: number, endY: number];
 export type Column = { x: number; y: number; r: number };
 
 export const rooms: Room[] = [
-	{ name: 'Bedroom', floor: 'wood', rect: [48, 35, 388, 285], size: `13'3" x 10'0"` },
-	{ name: 'Primary closet', floor: 'wood', rect: [48, 285, 190, 490] },
-	{ name: 'Bath 1', floor: 'tile', rect: [388, 35, 740, 188] },
+	{ name: 'Bedroom', floor: 'wood', rect: [48, 35, 398, 302], size: `13'6" x 10'2"` },
+	{ name: 'Primary closet', floor: 'wood', rect: [48, 302, 190, 490] },
+	{ name: 'Bath 1', floor: 'tile', rect: [398, 35, 740, 200] },
 	{ name: 'Mech.', floor: 'concrete', rect: [745, 35, 905, 135] },
-	{ name: 'Entry', floor: 'wood', rect: [388, 188, 865, 290] },
-	{ name: 'Entry', floor: 'wood', rect: [740, 135, 865, 188] },
+	{ name: 'Entry', floor: 'wood', rect: [398, 200, 865, 290] },
+	{ name: 'Entry', floor: 'wood', rect: [740, 135, 865, 200] },
 	{ name: 'Kitchen', floor: 'wood', rect: [195, 290, 583, 520], size: `11'7" x 7'10"` },
 	{ name: 'Living room', floor: 'wood', rect: [183, 520, 583, 905], size: `16'5" x 15'6"` },
 	{ name: '', floor: 'wood', rect: [583, 548, 690, 648] },
@@ -43,26 +45,26 @@ export const rooms: Room[] = [
 
 export const walls: Wall[] = [
 	{ line: [40, 35, 910, 35], thickness: 20 },
-	{ line: [48, 35, 48, 150], thickness: 20 },
-	{ line: [48, 150, 48, 255], glass: true },
-	{ line: [48, 255, 48, 490], thickness: 20 },
+	{ line: [48, 35, 48, 163], thickness: 20 },
+	{ line: [48, 163, 48, 266], glass: true },
+	{ line: [48, 266, 48, 490], thickness: 20 },
 	{ line: [910, 35, 910, 135], thickness: 20 },
 
 	{
-		line: [388, 35, 388, 285],
+		line: [398, 35, 398, 307],
 		gaps: [
-			[100, 180],
-			[205, 275],
+			[113, 194],
+			[206, 285],
 		],
 	},
-	{ line: [388, 188, 740, 188] },
+	{ line: [398, 200, 740, 200] },
 	{ line: [740, 35, 740, 135] },
 	{ line: [745, 135, 905, 135], gaps: [[760, 830]] },
 
-	{ line: [48, 285, 190, 285], gaps: [[70, 150]] },
-	{ line: [190, 285, 190, 495], thickness: 14 },
-	{ line: [190, 290, 490, 290], thickness: 20 },
-	{ line: [490, 290, 490, 350], thickness: 20 },
+	{ line: [48, 302, 190, 302], gaps: [[70, 139]] },
+	{ line: [190, 302, 190, 495], thickness: 14 },
+	{ line: [190, 307, 490, 307], thickness: 20 },
+	{ line: [490, 307, 490, 350], thickness: 20 },
 	{ line: [195, 495, 250, 495], thickness: 14 },
 
 	{ line: [865, 135, 865, 340], gaps: [[145, 205]] },
@@ -103,9 +105,9 @@ export const walls: Wall[] = [
 ];
 
 export const fixtures: Fixture[] = [
-	{ rect: [195, 295, 410, 340], height: 3, color: 0xc9a77c },
-	{ rect: [200, 340, 250, 495], height: 3, color: 0xc9a77c },
-	{ rect: [405, 300, 475, 365], height: 6, color: 0xb8bcc0 },
+	{ rect: [195, 312, 410, 357], height: 3, color: 0xc9a77c },
+	{ rect: [200, 357, 250, 495], height: 3, color: 0xc9a77c },
+	{ rect: [405, 317, 475, 382], height: 6, color: 0xb8bcc0 },
 	{ rect: [335, 445, 475, 530], height: 3, color: 0xe8e4dc },
 	{ rect: [435, 40, 585, 100], height: 3, color: 0xc9a77c },
 	{ rect: [665, 60, 735, 180], height: 0.1, color: 0xd8e4e8 },
@@ -113,14 +115,14 @@ export const fixtures: Fixture[] = [
 	{ rect: [780, 430, 835, 545], height: 1.6, color: 0xf2f2f2 },
 	{ rect: [715, 300, 770, 375], height: 3, color: 0xdcdcdc },
 	{ rect: [775, 300, 830, 375], height: 3, color: 0xdcdcdc },
-	{ rect: [400, 45, 430, 95], height: 7, color: 0xc9a77c },
+	{ rect: [410, 45, 440, 95], height: 7, color: 0xc9a77c },
 	{ rect: [470, 55, 500, 85], height: 0.3, y: 3, color: 0xffffff },
 	{ rect: [535, 55, 565, 85], height: 0.3, y: 3, color: 0xffffff },
 	{ rect: [605, 45, 640, 70], height: 2.6, color: 0xffffff },
 	{ rect: [608, 70, 637, 105], height: 1.4, color: 0xffffff },
 	{ rect: [663, 60, 667, 180], height: 7, color: 0x9fd0e8, solid: true },
 	{ rect: [665, 45, 735, 60], height: 0.4, y: 6.5, color: 0xb0b0b0 },
-	{ rect: [298, 315, 348, 340], height: 0.1, y: 3, color: 0x222222 },
+	{ rect: [298, 332, 348, 357], height: 0.1, y: 3, color: 0x222222 },
 	{ rect: [205, 395, 245, 450], height: 0.05, y: 3, color: 0x111111 },
 	{ rect: [340, 452, 372, 470], height: 0.6, y: 1.5, color: 0x333333 },
 	{ rect: [345, 530, 370, 545], height: 2.5, color: 0x333333 },
@@ -131,16 +133,16 @@ export const fixtures: Fixture[] = [
 	{ rect: [728, 410, 752, 445], height: 1.4, color: 0xffffff },
 	{ rect: [780, 390, 835, 425], height: 7, color: 0xc9a77c },
 	{ rect: [590, 300, 635, 380], height: 7, color: 0xd8c8a8 },
-	{ rect: [55, 300, 185, 305], height: 0.15, y: 5.5, color: 0xd8c8a8 },
+	{ rect: [55, 317, 185, 322], height: 0.15, y: 5.5, color: 0xd8c8a8 },
 	{ rect: [70, 450, 165, 490], height: 0.15, y: 5.5, color: 0xd8c8a8 },
 	{ rect: [700, 600, 840, 605], height: 0.15, y: 5.5, color: 0xd8c8a8 },
 	{ rect: [650, 300, 705, 380], height: 0.15, y: 5.5, color: 0xd8c8a8 },
 ];
 
 export const doors: Door[] = [
-	[392, 105, 468, 105],
-	[392, 205, 468, 205],
-	[150, 287, 150, 365],
+	[402, 118, 478, 118],
+	[402, 211, 478, 211],
+	[75, 304, 75, 370],
 	[180, 540, 100, 540],
 	[585, 480, 657, 480],
 	[595, 650, 595, 722],
