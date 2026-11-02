@@ -470,6 +470,34 @@
 		font-size: 0.8rem;
 	}
 
+	@media (max-width: 640px) {
+		.left {
+			top: 0.5rem;
+			right: 0.5rem;
+			bottom: auto;
+			left: 0.5rem;
+			width: auto;
+		}
+
+		.help {
+			display: none;
+		}
+
+		.items {
+			max-height: 30vh;
+			overflow-y: auto;
+		}
+
+		.card {
+			top: auto;
+			right: 0.5rem;
+			bottom: 0.5rem;
+			left: 0.5rem;
+			width: auto;
+			max-height: 45vh;
+		}
+	}
+
 	button {
 		border: 1px solid var(--app-border);
 		border-radius: 0.375rem;

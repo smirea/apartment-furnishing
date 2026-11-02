@@ -22,17 +22,23 @@ Helps me furnish my apartment: what fits, where it goes, and what to buy.
 
 Listing data and photos were captured on 2026-10-30; the listing may have changed since.
 
-### Room dimensions (from the floor plan, approximate)
+### Room dimensions (tape-measured where noted, otherwise from the floor plan)
 
-| Room                | Size                                                                                                                                  |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| Living room         | 16'5" x 15'6"                                                                                                                         |
-| Kitchen             | 11'7" x 7'10" (with island)                                                                                                           |
-| Bedroom 1 (primary) | 13'6" x 10'2" measured (plan says 13'3" x 10'0"), walk-in closet, double-vanity bath. My bedroom, behind the kitchen, one west window |
-| Bedroom 2           | 10'8" x 10'2", closet. Office / guest room, behind the living-room TV wall                                                            |
-| Balcony             | 5'1" x 17'2"                                                                                                                          |
+| Room                | Size                                                                                                                                             |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Living room         | 16'7" x 17'0" measured (west glass to TV wall; south glass to the end of the kitchen counter). Round column 33" across, 3'9" from the west glass |
+| Kitchen             | 11'7" x 7'10". Island 71" x 41" measured, 13'3" north of the column                                                                              |
+| Bedroom 1 (primary) | 13'6" x 10'2" measured (plan says 13'3" x 10'0"), walk-in closet, double-vanity bath. My bedroom, behind the kitchen, one west window            |
+| Bedroom 2           | 10'8" x 10'2", closet. Office / guest room, behind the living-room TV wall                                                                       |
+| Balcony             | 5'1" x 17'2"                                                                                                                                     |
 
-The builder's floor plan notes that dimensions are approximate and not to scale.
+The builder's floor plan notes that dimensions are approximate and not to scale. Tape measurements from 2026-11-02 showed the plan draws the unit about 4.5% small, so the 3D plan is scaled to them.
+
+**Living-room TV wall** (the wall shared with the office), measured, facing it (left = hallway end):
+
+- 10'2" (122") wide, 10' (120") floor to ceiling, 9'7" (115") above the 5" baseboard.
+- Studs: the finder showed 8–10 cm wide studs with 30 cm between them (about 16" on center if 30 cm is the gap, 12" if it is center to center); the first starts 34 cm (13.4") from one end. Which end is not recorded.
+- Light switch 6.5" from the hallway end, bottom 45" off the floor. Smoke alarm about 28" from the hallway end, 105" up. Data jack + outlet 16" off the floor, about centered (63" from the window end).
 
 ## Photos
 
