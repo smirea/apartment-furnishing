@@ -1,0 +1,28 @@
+{
+	"id": "slats-co-truewood-lite-natural-oak-slats-oatmeal-felt",
+	"url": "https://slats.co/products/118-natural-oak-truewood-lite-3-sided-veneer-acoustic-slat-panel-with-beige-felt-backing",
+	"importedAt": "2026-11-03T17:24:59.035Z",
+	"name": "TrueWood Lite Natural Oak Slats, Oatmeal Felt",
+	"brand": "SLATS.CO",
+	"price": 549,
+	"currency": "USD",
+	"panelsPerPack": 4,
+	"panel": {
+		"width": 12.01,
+		"height": 118,
+		"depth": 0.39
+	},
+	"summary": "Solid rubberwood slats wrapped in real natural oak veneer on three sides, stapled to oatmeal acoustic felt.",
+	"image": "/api/assets/slats-co-truewood-lite-natural-oak-slats-oatmeal-felt/image.jpg",
+	"group": "Truewood Lite slats",
+	"texture": {
+		"map": "/api/assets/slats-co-truewood-lite-natural-oak-slats-oatmeal-felt/texture.png?v=1793727244556",
+		"normalMap": "/api/assets/slats-co-truewood-lite-natural-oak-slats-oatmeal-felt/texture-normal.png?v=1793727244556",
+		"repeat": {
+			"width": 11.811023622047244,
+			"height": 23.62204724409449
+		},
+		"depthIn": 0.3937007874015748,
+		"note": "Manufacturer spec sheet overrides photo estimates: 8 rectangular 27 mm oak-veneered slats with 10.5 mm exposed felt gaps on a 37.5 mm pitch, 5 mm slats over 5 mm felt (10 mm total); the installed panel repeat is 300 mm, not the 305 mm end-to-end width. This 300 x 600 mm seamless tile uses pale natural oak tones sampled from main.jpg and warm oatmeal felt, with subtle softened edges and procedural, vertically wrapping grain."
+	}
+}

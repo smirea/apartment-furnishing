@@ -1,0 +1,28 @@
+{
+	"id": "slats-co-truewood-natural-oak-slats-black-felt",
+	"url": "https://slats.co/products/natural-oak-truewood-3-sided-veneer-acoustic-slat-panel",
+	"importedAt": "2026-11-03T17:24:57.542Z",
+	"name": "TrueWood Natural Oak Slats, Black Felt",
+	"brand": "SLATS.CO",
+	"price": 329,
+	"currency": "USD",
+	"panelsPerPack": 4,
+	"panel": {
+		"width": 11.8,
+		"height": 94.49,
+		"depth": 0.75
+	},
+	"summary": "Solid rubberwood core wrapped in real natural oak veneer on all three visible sides, with black acoustic felt backing.",
+	"image": "/api/assets/slats-co-truewood-natural-oak-slats-black-felt/image.jpg",
+	"group": "Truewood slats",
+	"texture": {
+		"map": "/api/assets/slats-co-truewood-natural-oak-slats-black-felt/texture.png?v=1793727266347",
+		"normalMap": "/api/assets/slats-co-truewood-natural-oak-slats-black-felt/texture-normal.png?v=1793727266347",
+		"repeat": {
+			"width": 11.8,
+			"height": 23.6
+		},
+		"depthIn": 0.75,
+		"note": "No manufacturer spec sheet was published; photos suggest 7 slats per recorded 11.8 in panel, estimated 1.12 in faces and 0.566 in rectangular felt gaps on a 1.686 in pitch with lightly softened edges, while 0.75 in total thickness is from the panel record. Tile covers 7 pitches by 23.6 in; muted natural oak veneer colors and charcoal black felt are matched to the main photo, with structure checked against the gallery."
+	}
+}

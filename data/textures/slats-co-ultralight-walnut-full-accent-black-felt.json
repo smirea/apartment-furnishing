@@ -1,0 +1,28 @@
+{
+	"id": "slats-co-ultralight-walnut-full-accent-black-felt",
+	"url": "https://slats.co/products/118-tall-ultralight-flexible-lightweight-full-walnut-accent-wall-panels-with-black-felt-backing",
+	"importedAt": "2026-11-03T17:25:05.830Z",
+	"name": "Ultralight Walnut Accent, Black Felt",
+	"brand": "SLATS.CO",
+	"price": 499,
+	"currency": "USD",
+	"panelsPerPack": 5,
+	"panel": {
+		"width": 11.81,
+		"height": 118.11,
+		"depth": 0.35
+	},
+	"summary": "Real walnut veneer laminated onto 9mm recycled black acoustic felt, with a continuous face and no rigid core.",
+	"image": "/api/assets/slats-co-ultralight-walnut-full-accent-black-felt/image.jpg",
+	"group": "Full accent panels",
+	"texture": {
+		"map": "/api/assets/slats-co-ultralight-walnut-full-accent-black-felt/texture.png?v=1793727019138",
+		"normalMap": "/api/assets/slats-co-ultralight-walnut-full-accent-black-felt/texture-normal.png?v=1793727019138",
+		"repeat": {
+			"width": 23.62204724409449,
+			"height": 29.52755905511811
+		},
+		"depthIn": 0.35433070866141736,
+		"note": "Manufacturer spec sheet overrides photo estimates: two 300 mm panels, each with a continuous 297 mm veneer face and no internal slats, meeting at a 3 mm wide, 1.5 mm deep 90-degree V reveal; total thickness is 9 mm. Pale taupe-brown walnut color is sampled from main.jpg with black felt at joins; grain wraps over 750 mm vertically, and Accent is not suitable for wrapping columns per the spec sheet."
+	}
+}

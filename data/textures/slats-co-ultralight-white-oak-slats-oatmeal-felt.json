@@ -1,0 +1,28 @@
+{
+	"id": "slats-co-ultralight-white-oak-slats-oatmeal-felt",
+	"url": "https://slats.co/products/118-tall-ultralight-flexible-lightweight-white-oak-acoustic-wood-slat-wall-panels-with-oatmeal-felt-backing",
+	"importedAt": "2026-11-03T17:25:11.583Z",
+	"name": "Ultralight White Oak Slats, Oatmeal Felt",
+	"brand": "SLATS.CO",
+	"price": 499,
+	"currency": "USD",
+	"panelsPerPack": 5,
+	"panel": {
+		"width": 11.8,
+		"height": 118.11,
+		"depth": 0.35
+	},
+	"summary": "White oak real-wood veneer laminated onto 9mm recycled oatmeal acoustic felt, with no MDF or rigid core. The oatmeal felt shows in the grooves between the slats.",
+	"image": "/api/assets/slats-co-ultralight-white-oak-slats-oatmeal-felt/image.png",
+	"group": "Ultralight slats",
+	"texture": {
+		"map": "/api/assets/slats-co-ultralight-white-oak-slats-oatmeal-felt/texture.png?v=1793726828290",
+		"normalMap": "/api/assets/slats-co-ultralight-white-oak-slats-oatmeal-felt/texture-normal.png?v=1793726828290",
+		"repeat": {
+			"width": 11.83,
+			"height": 23.66
+		},
+		"depthIn": 0.35,
+		"note": "Manufacturer spec sheet overrides photo estimates: seven 1.20 in faces on a 1.69 in pitch with 0.49 in, 90-degree V-grooves cut 6.2 mm into 9 mm felt; seven exact pitches span 11.83 in rather than the listed 11.80 in panel width. The seamless tile is 23.66 in tall, with pale white-oak veneer and oatmeal felt colors taken from the main listing photo; no MDF or rigid core."
+	}
+}

@@ -1,0 +1,24 @@
+{
+	"id": "slats-co-hexagon-white-oak-black-felt",
+	"url": "https://slats.co/products/white-oak-acoustic-hexagon-wood-panel-with-black-felt-backing",
+	"importedAt": "2026-11-03T17:25:15.316Z",
+	"name": "White Oak Acoustic Hexagon, Black Felt",
+	"brand": "Slats.co",
+	"price": 50,
+	"currency": "USD",
+	"panelsPerPack": 2,
+	"panel": null,
+	"summary": "White oak hexagon acoustic wood panel with a black felt backing. The felt lets sound pass through so the panel can diffuse and absorb it.",
+	"image": "/api/assets/slats-co-hexagon-white-oak-black-felt/image.jpg",
+	"group": "Hexagon tiles",
+	"texture": {
+		"map": "/api/assets/slats-co-hexagon-white-oak-black-felt/texture.png?v=1793727546302",
+		"normalMap": "/api/assets/slats-co-hexagon-white-oak-black-felt/texture-normal.png?v=1793727546302",
+		"repeat": {
+			"width": 15.0890625,
+			"height": 26.1
+		},
+		"depthIn": 0.75,
+		"note": "The dimension diagram (24.40 x 29.92 in overall; 22.48 x 25.98 in backing, nine hexagons per panel) implies approximately 9.35 x 8.10 in flat-top hexagon faces with 0.60 in black-felt joints on an 8.70 in vertical pitch; this seamless tile spans two staggered columns and three pitches. No manufacturer specs are published, so 0.75 in total thickness is an estimate; white-oak face colors are sampled from the first listing photo, with procedural vertical grain and no baked lighting."
+	}
+}

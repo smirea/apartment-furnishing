@@ -1,8 +1,8 @@
 {
 	"id": "slats-co-white-oak-ultralight-acoustic-slat-panel",
 	"url": "https://slats.co/products/118-tall-ultralight-flexible-lightweight-white-oak-acoustic-wood-slat-wall-panels-with-black-felt-backing",
-	"importedAt": "2026-11-03T16:06:26.910Z",
-	"name": "White Oak Ultralight Acoustic Slat Panel",
+	"importedAt": "2026-11-03T17:25:10.183Z",
+	"name": "Ultralight White Oak Slats, Black Felt",
 	"brand": "SLATS.CO",
 	"price": 499,
 	"currency": "USD",
@@ -12,16 +12,17 @@
 		"height": 118.11,
 		"depth": 0.35
 	},
-	"summary": "White oak real wood veneer laminated onto 9mm recycled black acoustic felt, with no MDF or rigid core.",
+	"summary": "Oak veneer in a white oak finish, laminated onto 9 mm recycled acoustic felt with a black backing. The panel has no MDF or other rigid core.",
 	"image": "/api/assets/slats-co-white-oak-ultralight-acoustic-slat-panel/image.jpg",
+	"group": "Ultralight slats",
 	"texture": {
-		"map": "/api/assets/slats-co-white-oak-ultralight-acoustic-slat-panel/texture.png?v=1793722059511",
-		"normalMap": "/api/assets/slats-co-white-oak-ultralight-acoustic-slat-panel/texture-normal.png?v=1793722059511",
+		"map": "/api/assets/slats-co-white-oak-ultralight-acoustic-slat-panel/texture.png?v=1793727613614",
+		"normalMap": "/api/assets/slats-co-white-oak-ultralight-acoustic-slat-panel/texture-normal.png?v=1793727613614",
 		"repeat": {
-			"width": 11.8,
-			"height": 23.6
+			"width": 11.83,
+			"height": 23.66
 		},
 		"depthIn": 0.35,
-		"note": "Seven slats and an approximately 3:1 face-to-gap ratio are estimated from the sole listing photo: 1.264 in faces, 0.421 in gaps, and 1.686 in pitch across the recorded 11.8 in panel width; tile height is 23.6 in and recorded total thickness is 0.35 in. Warm muted white oak is sampled from the main photo over charcoal black felt, with thin veneer relief rather than a rigid wood core."
+		"note": "Manufacturer specifications override photo estimates: seven 1.20 in slat faces on a 1.69 in pitch, 0.49 in wide 90-degree V-grooves cut 6.2 mm into coreless felt, and 0.35 in total depth; these inch components total 11.83 in versus the listed 11.80 in nominal panel width. The tile is seven pitches wide and 23.66 in tall, with procedural wrapping oak grain and oak/black-felt colors sampled from the main listing photo."
 	}
 }

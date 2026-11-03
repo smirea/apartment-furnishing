@@ -1,0 +1,28 @@
+{
+	"id": "slats-co-solid-african-walnut-slats-black-felt",
+	"url": "https://slats.co/products/solid-wood-slat-acoustic-panel-in-african-walnut-black-felt",
+	"importedAt": "2026-11-03T17:25:03.026Z",
+	"name": "African Walnut Solid Acoustic Slat Panels, Black Felt",
+	"brand": "SLATS.CO",
+	"price": 219,
+	"currency": "USD",
+	"panelsPerPack": 2,
+	"panel": {
+		"width": 12.6,
+		"height": 94.49,
+		"depth": 0.83
+	},
+	"summary": "100% solid African walnut slats on a black felt backing, sold as a two-panel box.",
+	"image": "/api/assets/slats-co-solid-african-walnut-slats-black-felt/image.jpg",
+	"group": "Solid wood slats",
+	"texture": {
+		"map": "/api/assets/slats-co-solid-african-walnut-slats-black-felt/texture.png?v=1793727117177",
+		"normalMap": "/api/assets/slats-co-solid-african-walnut-slats-black-felt/texture-normal.png?v=1793727117177",
+		"repeat": {
+			"width": 12.6,
+			"height": 25.2
+		},
+		"depthIn": 0.83,
+		"note": "No manufacturer spec sheet is published; the dimension diagram shows 8 slats per 12.6 in panel, giving a 1.575 in pitch, with photo-estimated 1.10 in faces, 0.475 in gaps and softly eased edges (0.60 in relief estimated within the recorded 0.83 in total thickness). Tile is 8 pitches wide and 25.2 in tall; dark African walnut tones are sampled from main.jpg with black felt backing, not the lighter gallery close-up."
+	}
+}

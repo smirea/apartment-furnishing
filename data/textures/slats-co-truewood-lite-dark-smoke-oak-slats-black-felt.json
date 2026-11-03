@@ -1,0 +1,28 @@
+{
+	"id": "slats-co-truewood-lite-dark-smoke-oak-slats-black-felt",
+	"url": "https://slats.co/products/118-dark-smoke-oak-truewood-lite-3-sided-veneer-acoustic-slat-panel",
+	"importedAt": "2026-11-03T17:24:55.851Z",
+	"name": "TrueWood Lite Dark Smoke Oak Slats, Black Felt",
+	"brand": "SLATS.CO",
+	"price": 549,
+	"currency": "USD",
+	"panelsPerPack": 4,
+	"panel": {
+		"width": 12.01,
+		"height": 118,
+		"depth": 0.39
+	},
+	"summary": "Solid rubberwood slats wrapped in real dark smoke oak veneer on three sides, backed with black acoustic felt.",
+	"image": "/api/assets/slats-co-truewood-lite-dark-smoke-oak-slats-black-felt/image.png",
+	"group": "Truewood Lite slats",
+	"texture": {
+		"map": "/api/assets/slats-co-truewood-lite-dark-smoke-oak-slats-black-felt/texture.png?v=1793727328394",
+		"normalMap": "/api/assets/slats-co-truewood-lite-dark-smoke-oak-slats-black-felt/texture-normal.png?v=1793727328394",
+		"repeat": {
+			"width": 11.811023622047244,
+			"height": 24
+		},
+		"depthIn": 0.3937007874015748,
+		"note": "Manufacturer spec sheet overrides photo estimates: 8 slats with 27 mm (1.063 in) faces and 10.5 mm (0.413 in) rectangular felt gaps on a 37.5 mm (1.476 in) pitch give a 300 mm installed repeat, with 5 mm slats over 5 mm felt (10 mm total), rather than the 305 mm loose-panel width. Warm dark smoke oak tones are sampled from the main listing photo over black felt; procedural grain wraps over 24 in vertically, with a small edge softening for the normal map."
+	}
+}

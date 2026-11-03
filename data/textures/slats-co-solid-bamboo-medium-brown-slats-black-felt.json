@@ -1,0 +1,28 @@
+{
+	"id": "slats-co-solid-bamboo-medium-brown-slats-black-felt",
+	"url": "https://slats.co/products/141-12ft-solid-bamboo-slat-acoustic-panels-in-medium-brown-black-felt",
+	"importedAt": "2026-11-03T17:25:01.128Z",
+	"name": "Solid Medium Brown Bamboo Slats, Black Felt",
+	"brand": "SLATS.CO",
+	"price": 449,
+	"currency": "USD",
+	"panelsPerPack": 2,
+	"panel": {
+		"width": 12.6,
+		"height": 141.6,
+		"depth": 0.87
+	},
+	"summary": "Solid bamboo slats, milled all the way through with no veneer or core, in a medium brown finish sealed with a matte protective lacquer, on recycled black acoustic felt.",
+	"image": "/api/assets/slats-co-solid-bamboo-medium-brown-slats-black-felt/image.jpg",
+	"group": "Solid wood slats",
+	"texture": {
+		"map": "/api/assets/slats-co-solid-bamboo-medium-brown-slats-black-felt/texture.png?v=1793727190349",
+		"normalMap": "/api/assets/slats-co-solid-bamboo-medium-brown-slats-black-felt/texture-normal.png?v=1793727190349",
+		"repeat": {
+			"width": 12.08,
+			"height": 24.16
+		},
+		"depthIn": 0.87,
+		"note": "Manufacturer bamboo specifications override photo estimates: 8 solid 1.00 in slats with square profiles and 0.51 in gaps on a 1.51 in pitch, 0.51 in slat thickness over 0.35 in felt, and 0.87 in specified total depth; this eight-pitch tile is 12.08 in wide (the sheet separately rounds installed panel coverage to 12.09 in). Medium brown bamboo tones are sampled from main.jpg with procedural wrapping grain, recycled black felt, and a matte non-gloss lacquer appearance."
+	}
+}

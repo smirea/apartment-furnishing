@@ -1,0 +1,28 @@
+{
+	"id": "slats-co-ultralight-white-oak-accent-panel-black-felt",
+	"url": "https://slats.co/products/118-tall-ultralight-flexible-lightweight-full-white-oak-accent-wall-panels-with-black-felt-backing",
+	"importedAt": "2026-11-03T17:25:06.384Z",
+	"name": "Ultralight White Oak Accent, Black Felt",
+	"brand": "SLATS.CO",
+	"price": 499,
+	"currency": "USD",
+	"panelsPerPack": 5,
+	"panel": {
+		"width": 11.81,
+		"height": 118.11,
+		"depth": 0.35
+	},
+	"summary": "Continuous white oak real-wood veneer laminated onto 9mm recycled black felt, with no MDF or rigid core.",
+	"image": "/api/assets/slats-co-ultralight-white-oak-accent-panel-black-felt/image.jpg",
+	"group": "Full accent panels",
+	"texture": {
+		"map": "/api/assets/slats-co-ultralight-white-oak-accent-panel-black-felt/texture.png?v=1793726988449",
+		"normalMap": "/api/assets/slats-co-ultralight-white-oak-accent-panel-black-felt/texture-normal.png?v=1793726988449",
+		"repeat": {
+			"width": 23.62204724409449,
+			"height": 29.52755905511811
+		},
+		"depthIn": 0.35433070866141736,
+		"note": "Manufacturer spec overrides photo estimates: two 300 mm panel pitches, each with a continuous 297 mm oak face and a 3 mm wide, 1.5 mm deep 90-degree V reveal at joins only; total depth is 9 mm, with oak color sampled from main.jpg and procedural grain. This 600 x 750 mm tile wraps in both directions, but the manufacturer says Accent cannot wrap a column; its 3000 mm maximum panel length also needs trim coverage on a full 10 ft wall."
+	}
+}

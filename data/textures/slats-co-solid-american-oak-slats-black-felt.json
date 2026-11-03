@@ -1,0 +1,28 @@
+{
+	"id": "slats-co-solid-american-oak-slats-black-felt",
+	"url": "https://slats.co/products/141-12ft-solid-oak-slat-acoustic-panels-black-felt",
+	"importedAt": "2026-11-03T17:25:02.137Z",
+	"name": "Solid American Oak Slats, Black Felt",
+	"brand": "SLATS.CO",
+	"price": 669,
+	"currency": "USD",
+	"panelsPerPack": 2,
+	"panel": {
+		"width": 11.81,
+		"height": 141.6,
+		"depth": 0.87
+	},
+	"summary": "Solid American oak slats with three coats of low-satin polyurethane, backed by 9mm black acoustic felt.",
+	"image": "/api/assets/slats-co-solid-american-oak-slats-black-felt/image.jpg",
+	"group": "Solid wood slats",
+	"texture": {
+		"map": "/api/assets/slats-co-solid-american-oak-slats-black-felt/texture.png?v=1793727707022",
+		"normalMap": "/api/assets/slats-co-solid-american-oak-slats-black-felt/texture-normal.png?v=1793727707022",
+		"repeat": {
+			"width": 11.76,
+			"height": 23.52
+		},
+		"depthIn": 0.87,
+		"note": "Manufacturer spec sheet overrides photo estimates: 8 square-cut 1.06 in solid oak slats per panel, 0.41 in black PET felt gaps, 1.47 in pitch, 0.51 in slat thickness over 9 mm felt, and 0.87 in total depth with three coats of low-satin polyurethane. Tile covers 8 pitches by 23.52 in (11.76 in wide, preserving the specified face/gap sizes despite the separately listed 11.81 in installed panel width); oak tones are sampled from the main listing photo, with procedural wrapping grain and black felt."
+	}
+}

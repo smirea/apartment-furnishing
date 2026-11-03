@@ -1,0 +1,28 @@
+{
+	"id": "slats-co-slat-paint-ready-fluted-panels",
+	"url": "https://slats.co/products/118-slat-paint-ready-fluted-wall-panels-4-panels",
+	"importedAt": "2026-11-03T17:25:00.698Z",
+	"name": "Paint-Ready Slat Fluted Panels",
+	"brand": "SLATS.CO",
+	"price": 549,
+	"currency": "USD",
+	"panelsPerPack": 4,
+	"panel": {
+		"width": 11.8,
+		"height": 118.11,
+		"depth": 0.2
+	},
+	"summary": "Primed white MDF with the Slat profile routed into the face and about five coats of primer sanded flat. A PVC film is bonded to the back for rigidity.",
+	"image": "/api/assets/slats-co-slat-paint-ready-fluted-panels/image.png",
+	"group": "Paint-ready fluted",
+	"texture": {
+		"map": "/api/assets/slats-co-slat-paint-ready-fluted-panels/texture.png?v=1793727662367",
+		"normalMap": "/api/assets/slats-co-slat-paint-ready-fluted-panels/texture-normal.png?v=1793727662367",
+		"repeat": {
+			"width": 11.62,
+			"height": 23.24
+		},
+		"depthIn": 0.2,
+		"note": "Manufacturer spec sheet overrides photo estimates: Slat has 1.11 in flat faces, 0.55 in square channels, 1.66 in pitch, 7 repeats per panel, 0.14 in cut depth and 0.20 in total thickness; its stated 11.80 in panel width differs from 7 pitches (11.62 in), so this seamless tile preserves the exact pitch over seven repeats. Main-photo neutral primed white is exposure-corrected for unlit albedo across faces and groove floors, with subtle sanded-primer texture, no exposed wood grain or felt; the 11.62 by 23.24 in tile has no vertical board joints."
+	}
+}
