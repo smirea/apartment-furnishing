@@ -5,6 +5,7 @@ import { modelJobs, startModelJob } from './generate-model';
 import { planGeometry } from '@repo/shared/plan';
 import { usdzPath } from './usdz';
 import { config } from './config';
+import { ideaFile, ideasHtml } from './ideas';
 import {
 	FINISH_SURFACES,
 	importTexture,
@@ -134,6 +135,9 @@ const server = Bun.serve({
 				return Response.json({ ok: true });
 			},
 		},
+		'/api/ideas': async () =>
+			new Response(await ideasHtml(), { headers: { 'content-type': 'text/html; charset=utf-8' } }),
+		'/api/ideas/files/*': request => ideaFile(new URL(request.url).pathname),
 		'/api/assets/*': async request => {
 			const rel = normalize(decodeURIComponent(new URL(request.url).pathname.slice('/api/assets/'.length)));
 			if (rel.startsWith('..')) return new Response('Bad path', { status: 400 });

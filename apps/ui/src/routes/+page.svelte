@@ -24,7 +24,12 @@
 	const saved = JSON.parse(localStorage.getItem(OPTIONS_KEY) ?? '{}');
 	let cutaway = $state<boolean>(saved.cutaway ?? true);
 	let labels = $state<boolean>(saved.labels ?? false);
-	let open = $state<{ furniture: boolean; textures: boolean }>({ furniture: true, textures: true, ...saved.open });
+	let open = $state<{ furniture: boolean; textures: boolean; ideas: boolean }>({
+		furniture: true,
+		textures: true,
+		ideas: false,
+		...saved.open,
+	});
 	let viewer = $state<ReturnType<typeof createViewer>>();
 
 	async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -42,6 +47,16 @@
 	}));
 	const catalogList = $derived(catalogQuery.data ?? []);
 	const catalog = $derived(Object.fromEntries(catalogList.map(item => [item.id, item])));
+
+	const ideasQuery = createQuery(() => ({
+		queryKey: ['ideas'],
+		queryFn: async () => {
+			const res = await fetch('/api/ideas');
+			if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+			return res.text();
+		},
+		enabled: open.ideas,
+	}));
 
 	const texturesQuery = createQuery(() => ({
 		queryKey: ['textures'],
@@ -419,88 +434,113 @@
 	{/if}
 </div>
 
-{#if selected && selectedPlacement}
-	<aside class="panel card">
-		<button type="button" class="close" aria-label="Close" onclick={() => viewer?.select(null)}>×</button>
-		{#if selected.image}<img src={selected.image} alt={selected.name} />{/if}
-		<h2>{selected.name}</h2>
-		<p class="meta">
-			{#if money(selected)}<strong>{money(selected)}</strong>{/if}
-			{#if selected.brand}<span>{selected.brand}</span>{/if}
-			<span>{mountLabel[selected.mount]}</span>
-		</p>
-		{#if selected.dimensions}
-			<p class="dims">
-				{inches(selected.dimensions.width)} W × {inches(selected.dimensions.height)} H × {inches(
-					selected.dimensions.depth,
-				)} D{#if selected.weightLb}
-					· {selected.weightLb} lb{/if}
-			</p>
-			{#if selected.dimensionsNote}<p class="note">{selected.dimensionsNote}</p>{/if}
-		{/if}
-
-		<div class="controls">
-			<div class="row">
-				<span>Turn</span>
-				<button type="button" onclick={() => rotate(-90)}>↺ 90°</button>
-				<button type="button" onclick={() => rotate(-15)}>−15°</button>
-				<button type="button" onclick={() => rotate(15)}>+15°</button>
-				<button type="button" onclick={() => rotate(90)}>↻ 90°</button>
-			</div>
-			<label class="row">
-				<span>Height off floor</span>
-				<input
-					type="number"
-					min="0"
-					max="100"
-					step="1"
-					value={Math.round(selectedPlacement.position[1] * 12 * 10) / 10}
-					oninput={e => {
-						const [x, , z] = selectedPlacement.position;
-						patchPlacement(selectedPlacement.key, { position: [x, (Number(e.currentTarget.value) || 0) / 12, z] });
-					}}
-				/>
-				<span class="muted">in</span>
-			</label>
-			<div class="row">
-				<button type="button" onclick={() => addToRoom(selected.id)}>Add another</button>
-				<button type="button" class="danger" onclick={removeSelected}>Remove from room</button>
-			</div>
-		</div>
-
-		<p class="model-status">
-			{#if selected.modelJob?.state === 'running'}
-				<span class="status busy"
-					>Codex is building a 3D model from the listing photos (2–5 min). Shown as a box until then.</span
-				>
-			{:else}
-				{#if selected.modelJob?.state === 'failed'}<span class="error"
-						>Model generation failed: {selected.modelJob.error}</span
-					>
-				{:else if selected.modelSource === 'listing'}<span class="muted">3D model from the listing.</span>
-				{:else if selected.modelSource === 'generated'}<span class="muted"
-						>3D model approximated by Codex from the listing photos.</span
-					>
-				{:else}<span class="muted">The listing has no 3D model.</span>{/if}
-				{#if selected.modelSource !== 'listing'}
-					<button type="button" onclick={() => generateMutation.mutate(selected.id)}>
-						{selected.modelSource === 'generated' ? 'Regenerate' : 'Generate'} 3D model
-					</button>
+<div class="right">
+	{#if mode === 'orbit'}
+		<section class="panel ideas" class:open={open.ideas}>
+			<button
+				type="button"
+				class="section-toggle"
+				aria-expanded={open.ideas}
+				onclick={() => (open.ideas = !open.ideas)}
+			>
+				Ideas
+			</button>
+			{#if open.ideas}
+				{#if ideasQuery.data}
+					<!-- Our own ideas/README.md, rendered by the server. -->
+					<div class="ideas-doc">{@html ideasQuery.data}</div>
+				{:else if ideasQuery.isError}
+					<p class="error">{ideasQuery.error.message}</p>
+				{:else}
+					<p class="muted">Loading…</p>
 				{/if}
 			{/if}
-		</p>
+		</section>
+	{/if}
 
-		<p>{selected.summary}</p>
-		{#if selected.highlights.length}
-			<ul>
-				{#each selected.highlights as h (h)}<li>{h}</li>{/each}
-			</ul>
-		{/if}
-		<a href={selected.url} target="_blank" rel="noreferrer"
-			>View on {new URL(selected.url).hostname.replace('www.', '')} ↗</a
-		>
-	</aside>
-{/if}
+	{#if selected && selectedPlacement}
+		<aside class="panel card">
+			<button type="button" class="close" aria-label="Close" onclick={() => viewer?.select(null)}>×</button>
+			{#if selected.image}<img src={selected.image} alt={selected.name} />{/if}
+			<h2>{selected.name}</h2>
+			<p class="meta">
+				{#if money(selected)}<strong>{money(selected)}</strong>{/if}
+				{#if selected.brand}<span>{selected.brand}</span>{/if}
+				<span>{mountLabel[selected.mount]}</span>
+			</p>
+			{#if selected.dimensions}
+				<p class="dims">
+					{inches(selected.dimensions.width)} W × {inches(selected.dimensions.height)} H × {inches(
+						selected.dimensions.depth,
+					)} D{#if selected.weightLb}
+						· {selected.weightLb} lb{/if}
+				</p>
+				{#if selected.dimensionsNote}<p class="note">{selected.dimensionsNote}</p>{/if}
+			{/if}
+
+			<div class="controls">
+				<div class="row">
+					<span>Turn</span>
+					<button type="button" onclick={() => rotate(-90)}>↺ 90°</button>
+					<button type="button" onclick={() => rotate(-15)}>−15°</button>
+					<button type="button" onclick={() => rotate(15)}>+15°</button>
+					<button type="button" onclick={() => rotate(90)}>↻ 90°</button>
+				</div>
+				<label class="row">
+					<span>Height off floor</span>
+					<input
+						type="number"
+						min="0"
+						max="100"
+						step="1"
+						value={Math.round(selectedPlacement.position[1] * 12 * 10) / 10}
+						oninput={e => {
+							const [x, , z] = selectedPlacement.position;
+							patchPlacement(selectedPlacement.key, { position: [x, (Number(e.currentTarget.value) || 0) / 12, z] });
+						}}
+					/>
+					<span class="muted">in</span>
+				</label>
+				<div class="row">
+					<button type="button" onclick={() => addToRoom(selected.id)}>Add another</button>
+					<button type="button" class="danger" onclick={removeSelected}>Remove from room</button>
+				</div>
+			</div>
+
+			<p class="model-status">
+				{#if selected.modelJob?.state === 'running'}
+					<span class="status busy"
+						>Codex is building a 3D model from the listing photos (2–5 min). Shown as a box until then.</span
+					>
+				{:else}
+					{#if selected.modelJob?.state === 'failed'}<span class="error"
+							>Model generation failed: {selected.modelJob.error}</span
+						>
+					{:else if selected.modelSource === 'listing'}<span class="muted">3D model from the listing.</span>
+					{:else if selected.modelSource === 'generated'}<span class="muted"
+							>3D model approximated by Codex from the listing photos.</span
+						>
+					{:else}<span class="muted">The listing has no 3D model.</span>{/if}
+					{#if selected.modelSource !== 'listing'}
+						<button type="button" onclick={() => generateMutation.mutate(selected.id)}>
+							{selected.modelSource === 'generated' ? 'Regenerate' : 'Generate'} 3D model
+						</button>
+					{/if}
+				{/if}
+			</p>
+
+			<p>{selected.summary}</p>
+			{#if selected.highlights.length}
+				<ul>
+					{#each selected.highlights as h (h)}<li>{h}</li>{/each}
+				</ul>
+			{/if}
+			<a href={selected.url} target="_blank" rel="noreferrer"
+				>View on {new URL(selected.url).hostname.replace('www.', '')} ↗</a
+			>
+		</aside>
+	{/if}
+</div>
 
 <style>
 	.viewer {
@@ -761,35 +801,6 @@
 		font-size: 0.8rem;
 	}
 
-	@media (max-width: 640px) {
-		.left {
-			top: 0.5rem;
-			right: 0.5rem;
-			bottom: auto;
-			left: 0.5rem;
-			width: auto;
-		}
-
-		.help {
-			display: none;
-		}
-
-		.items,
-		.items.textures {
-			max-height: 26vh;
-			overflow-y: auto;
-		}
-
-		.card {
-			top: auto;
-			right: 0.5rem;
-			bottom: 0.5rem;
-			left: 0.5rem;
-			width: auto;
-			max-height: 45vh;
-		}
-	}
-
 	button {
 		border: 1px solid var(--app-border);
 		border-radius: 0.375rem;
@@ -806,14 +817,127 @@
 		color: var(--app-accent-ink);
 	}
 
-	.card {
+	.right {
 		position: fixed;
 		top: 1rem;
 		right: 1rem;
+		bottom: 1rem;
+		display: flex;
+		flex-direction: column;
+		align-items: flex-end;
+		gap: 0.75rem;
+		width: min(28rem, calc(100vw - 25rem));
+		pointer-events: none;
+	}
+
+	.ideas {
+		display: flex;
+		flex-direction: column;
+		gap: 0.6rem;
+		min-height: 0;
+		padding: 0.6rem 1rem;
+		font-size: 0.85rem;
+	}
+
+	.ideas.open {
+		flex: 1 1 0;
+		width: 100%;
+		min-height: 12rem;
+	}
+
+	.ideas-doc {
 		display: grid;
 		gap: 0.6rem;
+		min-height: 0;
+		overflow-y: auto;
+	}
+
+	.ideas-doc :global(*) {
+		margin: 0;
+	}
+
+	/* The README's title and its note about the folder layout are for reading it on GitHub. */
+	.ideas-doc :global(h1),
+	.ideas-doc :global(h1 + p) {
+		display: none;
+	}
+
+	.ideas-doc :global(h2) {
+		font-size: 1rem;
+	}
+
+	.ideas-doc :global(ul) {
+		padding-left: 1.1rem;
+		list-style: disc;
+	}
+
+	.ideas-doc :global(p > img) {
+		width: 100%;
+		border-radius: 0.375rem;
+	}
+
+	.ideas-doc :global(a) {
+		color: var(--app-accent);
+		font-weight: 600;
+	}
+
+	.ideas-doc :global(table),
+	.ideas-doc :global(tbody),
+	.ideas-doc :global(td) {
+		display: block;
+	}
+
+	.ideas-doc :global(thead) {
+		display: none;
+	}
+
+	.ideas-doc :global(tr) {
+		display: grid;
+		grid-template-columns: 4.5rem auto 1fr;
+		gap: 0.15rem 0.6rem;
+		align-items: start;
+		padding: 0.5rem 0;
+		border-top: 1px solid var(--app-border);
+	}
+
+	.ideas-doc :global(td:nth-child(1)) {
+		grid-row: 1 / span 3;
+	}
+
+	.ideas-doc :global(td img) {
+		width: 4.5rem;
+		height: 4.5rem;
+		border-radius: 0.25rem;
+		background: #fff;
+		object-fit: contain;
+	}
+
+	.ideas-doc :global(td:nth-child(2)),
+	.ideas-doc :global(td:nth-child(5)) {
+		grid-column: 2 / span 2;
+	}
+
+	.ideas-doc :global(td:nth-child(3)) {
+		font-weight: 600;
+	}
+
+	.ideas-doc :global(td:nth-child(4)),
+	.ideas-doc :global(td:nth-child(5)) {
+		color: var(--app-muted);
+	}
+
+	.ideas-doc :global(td:nth-child(4))::before {
+		content: '· ';
+	}
+
+	.card {
+		position: relative;
+		display: grid;
+		flex: 0 1 auto;
+		gap: 0.6rem;
 		width: 20rem;
-		max-height: calc(100vh - 2rem);
+		max-width: 100%;
+		min-height: 0;
 		overflow-y: auto;
 		padding: 1rem;
 		border: 1px solid var(--app-border);
@@ -891,5 +1015,48 @@
 	:global(.room-label small) {
 		font-weight: 400;
 		opacity: 0.75;
+	}
+
+	@media (max-width: 640px) {
+		.left {
+			top: 0.5rem;
+			right: 0.5rem;
+			bottom: auto;
+			left: 0.5rem;
+			width: auto;
+		}
+
+		.help {
+			display: none;
+		}
+
+		.items,
+		.items.textures {
+			max-height: 26vh;
+			overflow-y: auto;
+		}
+
+		.right {
+			top: auto;
+			right: 0.5rem;
+			bottom: 0.5rem;
+			left: 0.5rem;
+			flex-direction: column-reverse;
+			align-items: stretch;
+			width: auto;
+			max-height: 50vh;
+		}
+
+		.right:has(.ideas.open) {
+			height: 50vh;
+		}
+
+		.card {
+			width: auto;
+		}
+
+		.right .panel {
+			background: var(--app-panel);
+		}
 	}
 </style>

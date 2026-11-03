@@ -56,7 +56,7 @@ Names were assigned by looking at each image, so a couple are best guesses (`bed
 
 ## Ideas
 
-Furniture ideas and inspiration photos live in [`ideas/`](ideas/README.md).
+Furniture ideas and inspiration photos live in [`ideas/`](ideas/README.md). The app shows them in the **Ideas** panel at the top right, collapsed until you open it.
 
 ## Adding furniture
 
