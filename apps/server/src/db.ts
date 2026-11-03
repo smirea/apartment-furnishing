@@ -66,12 +66,29 @@ CREATE TABLE IF NOT EXISTS settings (
 ) STRICT;
 `;
 
+// Before fixtures, the bed and the wall texture picks had settings rows of their own. A database from then moves them
+// into the fixtures row, filling only the picks that row doesn't have yet.
+const MIGRATIONS = `
+INSERT INTO settings (key, value)
+SELECT 'fixtures', json_patch(
+	json_object(
+		'bed', (SELECT json_extract(value, '$.itemId') FROM settings WHERE key = 'bed'),
+		'wallTexture', (SELECT json_extract(value, '$.tvWall') FROM settings WHERE key = 'finishes')
+	),
+	coalesce((SELECT value FROM settings WHERE key = 'fixtures'), '{}')
+)
+WHERE EXISTS (SELECT 1 FROM settings WHERE key IN ('bed', 'finishes'))
+ON CONFLICT(key) DO UPDATE SET value = excluded.value;
+DELETE FROM settings WHERE key IN ('bed', 'finishes');
+`;
+
 function open() {
 	const db = new Database(FILE, { create: true, strict: true });
 	db.run('PRAGMA foreign_keys = ON');
 	// The import scripts write from their own process while the server's model and texture jobs write too.
 	db.run('PRAGMA busy_timeout = 5000');
 	db.run(SCHEMA);
+	db.run(MIGRATIONS);
 	return db;
 }
 
