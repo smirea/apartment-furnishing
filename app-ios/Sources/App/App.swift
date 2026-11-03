@@ -63,7 +63,7 @@ struct ContentView: View {
                         .font(.callout)
                     if let plan = scene.plan {
                         PlanMap(plan: plan, marks: draft.first.map { [$0.plan] } ?? [], selection: draft.planPoint, onPick: scene.pick)
-                            .frame(height: 300)
+                            .frame(height: min(300, screen.height * 0.4))
                     }
                     Button("Set point \(draft.first == nil ? 1 : 2)") { scene.markFloor(at: crosshair) }
                         .buttonStyle(.borderedProminent)
@@ -80,6 +80,7 @@ struct ContentView: View {
         .padding()
         .frame(maxWidth: .infinity)
         .background(.regularMaterial, in: .rect(cornerRadius: 20))
+        .frame(maxWidth: 520)
     }
 
     private func caption(_ text: String) -> some View {
