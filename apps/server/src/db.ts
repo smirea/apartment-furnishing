@@ -67,14 +67,18 @@ CREATE TABLE IF NOT EXISTS settings (
 `;
 
 // Before fixtures, the bed and the wall texture picks had settings rows of their own. A database from then moves them
-// into the fixtures row; a fixtures row already there wins.
+// into the fixtures row, filling only the picks that row doesn't have yet.
 const MIGRATIONS = `
-INSERT OR IGNORE INTO settings (key, value)
-SELECT 'fixtures', json_object(
-	'bed', (SELECT json_extract(value, '$.itemId') FROM settings WHERE key = 'bed'),
-	'wallTexture', (SELECT json_extract(value, '$.tvWall') FROM settings WHERE key = 'finishes')
+INSERT INTO settings (key, value)
+SELECT 'fixtures', json_patch(
+	json_object(
+		'bed', (SELECT json_extract(value, '$.itemId') FROM settings WHERE key = 'bed'),
+		'wallTexture', (SELECT json_extract(value, '$.tvWall') FROM settings WHERE key = 'finishes')
+	),
+	coalesce((SELECT value FROM settings WHERE key = 'fixtures'), '{}')
 )
-WHERE EXISTS (SELECT 1 FROM settings WHERE key IN ('bed', 'finishes'));
+WHERE EXISTS (SELECT 1 FROM settings WHERE key IN ('bed', 'finishes'))
+ON CONFLICT(key) DO UPDATE SET value = excluded.value;
 DELETE FROM settings WHERE key IN ('bed', 'finishes');
 `;
 
