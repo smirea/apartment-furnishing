@@ -1,12 +1,12 @@
 import type { CatalogEntry, Placement, TvSettings, WallTextureEntry } from '@repo/shared/items';
 import { join, normalize } from 'node:path';
-import { ASSET_DIR, importProducts, listCatalog, readItem, readPlacements, updatePlacements } from './catalog';
+import { ASSET_DIR, catalog, importProducts, placements } from './catalog';
 import { modelJobs, startModelJob } from './generate-model';
 import { planGeometry } from '@repo/shared/plan';
 import { usdzPath } from './usdz';
 import { config } from './config';
 import { ideaFile, ideasHtml } from './ideas';
-import { listTextures, textureJobs } from './textures';
+import { textureJobs, textures } from './textures';
 import {
 	buildOption,
 	FixtureError,
@@ -45,12 +45,12 @@ const server = Bun.serve({
 		'/api/catalog': {
 			GET: async () =>
 				Response.json(
-					(await listCatalog()).map((item): CatalogEntry => ({ ...item, modelJob: modelJobs.get(item.id) ?? null })),
+					catalog.all().map((item): CatalogEntry => ({ ...item, modelJob: modelJobs.get(item.id) ?? null })),
 				),
 		},
 		'/api/catalog/:id/model': {
 			POST: async request => {
-				const item = await readItem(request.params.id).catch(() => null);
+				const item = catalog.get(request.params.id);
 				if (!item) return Response.json({ error: 'Unknown item' }, { status: 404 });
 				startModelJob(item);
 				return Response.json({ ok: true });
@@ -75,7 +75,7 @@ const server = Bun.serve({
 		'/api/textures': {
 			GET: async () =>
 				Response.json(
-					(await listTextures()).map((t): WallTextureEntry => ({ ...t, textureJob: textureJobs.get(t.id) ?? null })),
+					textures.all().map((t): WallTextureEntry => ({ ...t, textureJob: textureJobs.get(t.id) ?? null })),
 				),
 		},
 		'/api/fixtures': { GET: async () => Response.json(await listFixtures()) },
@@ -165,11 +165,11 @@ const server = Bun.serve({
 		},
 		'/api/plan': Response.json(planGeometry()),
 		'/api/catalog/:id/model.usdz': async request => {
-			const item = await readItem(request.params.id).catch(() => null);
+			const item = catalog.get(request.params.id);
 			const path = item && (await usdzPath(item));
 			return path ? new Response(Bun.file(path)) : Response.json({ error: 'No model' }, { status: 404 });
 		},
-		'/api/placements': { GET: async () => Response.json(await readPlacements()) },
+		'/api/placements': { GET: () => Response.json(placements.all()) },
 		// Clients save only the items they changed, so a client holding an older copy of the rest can't revert edits
 		// another client (the web plan or the AR app) made meanwhile.
 		'/api/placements/:key': {
@@ -178,21 +178,17 @@ const server = Bun.serve({
 				const { itemId, position, rotation } = (await request.json()) as Partial<Placement>;
 				if (!isVec3(position) || !isVec3(rotation))
 					return Response.json({ error: 'Expected a finite position and rotation' }, { status: 400 });
-				let saved: Placement | undefined;
-				await updatePlacements(placements => {
-					const existing = placements.find(p => p.key === key);
-					if (existing) {
-						saved = { ...existing, position, rotation };
-						return placements.map(p => (p.key === key ? saved! : p));
-					}
-					if (!itemId) return placements;
-					saved = { key, itemId, position, rotation };
-					return [...placements, saved];
-				});
-				return saved ? Response.json(saved) : Response.json({ error: 'Unknown placement' }, { status: 404 });
+				const existing = placements.get(key);
+				let saved: Placement;
+				if (existing) saved = { ...existing, position, rotation };
+				else if (!itemId) return Response.json({ error: 'Unknown placement' }, { status: 404 });
+				else if (!catalog.get(itemId)) return Response.json({ error: `No catalog item ${itemId}` }, { status: 400 });
+				else saved = { key, itemId, position, rotation };
+				placements.put(saved);
+				return Response.json(saved);
 			},
-			DELETE: async request => {
-				await updatePlacements(placements => placements.filter(p => p.key !== request.params.key));
+			DELETE: request => {
+				placements.remove(request.params.key);
 				return Response.json({ ok: true });
 			},
 		},

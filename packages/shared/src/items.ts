@@ -113,4 +113,4 @@ export function tvSize(diagonalIn: number, [w, h]: readonly [number, number]) {
 export const DEFAULT_TV: TvSettings = { visible: true, ...tvSize(98, [16, 9]), centerIn: 48, tiltDeg: 0 };
 
 // A TV whose size was read off a product page, kept so the TV panel can switch between candidates.
-export type TvModel = { id: string; url: string; name: string; widthIn: number; heightIn: number };
+export type TvModel = { id: string; url: string; importedAt: string; name: string; widthIn: number; heightIn: number };
