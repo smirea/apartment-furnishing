@@ -143,7 +143,9 @@ async function deploy(target: Target, project: string) {
             "-configuration", "Debug", "-destination", target.destination, "-derivedDataPath", build,
             "-clonedSourcePackagesDirPath", join(root, "DerivedData", "SourcePackages"),
             ...(target.kind === "device" ? ["-allowProvisioningUpdates", "-allowProvisioningDeviceRegistration"] : ["CODE_SIGNING_ALLOWED=NO"]),
-            ...(values.team ? [`DEVELOPMENT_TEAM=${values.team}`] : []), "build",
+            ...(values.team ? [`DEVELOPMENT_TEAM=${values.team}`] : []),
+            // iOS keeps a home-screen icon cached per build number, so a reinstall with the same one keeps an old icon.
+            `CURRENT_PROJECT_VERSION=${Math.floor(Date.now() / 1000)}`, "build",
         ], false, fd);
     } catch {
         console.error(readFileSync(log, "utf8"));

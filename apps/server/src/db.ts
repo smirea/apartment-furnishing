@@ -67,6 +67,18 @@ CREATE TABLE IF NOT EXISTS settings (
 ) STRICT;
 `;
 
+// Before fixtures, the bed and the wall texture picks had settings rows of their own. A database from then, such as one
+// kept locally across a pull, moves them into the fixtures row; a fixtures row already there wins.
+const MIGRATIONS = `
+INSERT OR IGNORE INTO settings (key, value)
+SELECT 'fixtures', json_object(
+	'bed', (SELECT json_extract(value, '$.itemId') FROM settings WHERE key = 'bed'),
+	'wallTexture', (SELECT json_extract(value, '$.tvWall') FROM settings WHERE key = 'finishes')
+)
+WHERE EXISTS (SELECT 1 FROM settings WHERE key IN ('bed', 'finishes'));
+DELETE FROM settings WHERE key IN ('bed', 'finishes');
+`;
+
 function open() {
 	// The file is committed like the JSON it replaced, so it keeps SQLite's default rollback journal: in WAL mode
 	// recent writes would sit in a -wal file that git doesn't track.
@@ -75,6 +87,7 @@ function open() {
 	// The import scripts write from their own process while the server's model and texture jobs write too.
 	db.run('PRAGMA busy_timeout = 5000');
 	db.run(SCHEMA);
+	db.run(MIGRATIONS);
 	return { db, inode: statSync(FILE).ino };
 }
 
