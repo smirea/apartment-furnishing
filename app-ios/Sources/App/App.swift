@@ -50,10 +50,22 @@ struct ContentView: View {
                     Text(message).font(.callout)
                     Button("Retry") { Task { await scene.start() } }.buttonStyle(.borderedProminent)
                 }
+            case .choosingRoom:
+                VStack(spacing: 10) {
+                    Text("Tap the room you're in").font(.callout)
+                    if let plan = scene.plan {
+                        PlanMap(plan: plan, mode: .rooms(current: scene.room, onPick: scene.enter))
+                            .frame(height: min(300, screen.height * 0.4))
+                    }
+                    if scene.canCancelRoomChoice { Button("Cancel", action: scene.cancelChoosingRoom).buttonStyle(.bordered) }
+                }
             case .relocalizing:
                 VStack(spacing: 12) {
-                    Text("Look around the room so it recognizes your saved alignment.").font(.callout)
-                    Button("Realign", action: scene.realign).buttonStyle(.bordered)
+                    Text("Look around the \(scene.room?.rawValue.lowercased() ?? "room") so it recognizes your saved alignment.").font(.callout)
+                    HStack {
+                        roomButton
+                        Button("Realign", action: scene.realign).buttonStyle(.bordered)
+                    }
                 }
             case .aligning(let draft):
                 VStack(spacing: 10) {
@@ -61,19 +73,29 @@ struct ContentView: View {
                         ? "Tap corner \(draft.first == nil ? 1 : 2) of 2 on the plan"
                         : "Aim the crosshair at that corner on the floor, then tap Set")
                         .font(.callout)
-                    if let plan = scene.plan {
-                        PlanMap(plan: plan, marks: draft.first.map { [$0.plan] } ?? [], selection: draft.planPoint, onPick: scene.pick)
+                    if let plan = scene.plan, let room = scene.room {
+                        PlanMap(plan: plan, mode: .corners(in: room, marks: draft.first.map { [$0.plan] } ?? [], selection: draft.planPoint, onPick: scene.pick))
                             .frame(height: min(300, screen.height * 0.4))
                     }
-                    Button("Set point \(draft.first == nil ? 1 : 2)") { scene.markFloor(at: crosshair) }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(draft.planPoint == nil)
+                    HStack {
+                        roomButton
+                        Button("Set point \(draft.first == nil ? 1 : 2)") { scene.markFloor(at: crosshair) }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(draft.planPoint == nil)
+                    }
                 }
             case .placed:
                 HStack {
-                    Toggle("Outline", isOn: $scene.showsOutline).fixedSize()
+                    VStack(alignment: .leading) {
+                        Toggle("Outline", isOn: $scene.showsOutline)
+                        Toggle("Textures", isOn: $scene.showsTextures)
+                    }
+                    .fixedSize()
                     Spacer()
-                    Button("Realign", action: scene.realign).buttonStyle(.bordered)
+                    VStack(alignment: .trailing) {
+                        roomButton
+                        Button("Realign", action: scene.realign).buttonStyle(.bordered)
+                    }
                 }
             }
         }
@@ -81,6 +103,13 @@ struct ContentView: View {
         .frame(maxWidth: .infinity)
         .background(.regularMaterial, in: .rect(cornerRadius: 20))
         .frame(maxWidth: 520)
+    }
+
+    private var roomButton: some View {
+        Button(action: scene.chooseRoom) {
+            Label(scene.room?.rawValue ?? "Room", systemImage: "map")
+        }
+        .buttonStyle(.bordered)
     }
 
     private func caption(_ text: String) -> some View {

@@ -37,17 +37,30 @@ struct PlanAlignment {
     }
 }
 
-// The ARKit world map carries the alignment anchor, so a relaunch relocalizes without marking points again.
-enum WorldMapStore {
-    static let url = URL.applicationSupportDirectory.appending(path: "world.arworldmap")
+// The rooms you can stand in and align. Each keeps its own ARKit world map, because a map only relocalizes where its
+// camera has been. Names match the plan's rooms (packages/shared/src/floorplan.ts).
+enum ARRoom: String, CaseIterable {
+    case bedroom = "Bedroom"
+    case livingRoom = "Living room"
+    case office = "Office / guest"
+}
 
-    static func load() -> ARWorldMap? {
-        guard let data = try? Data(contentsOf: url) else { return nil }
+// Each room's world map carries its alignment anchor, so a relaunch relocalizes without marking points again.
+enum WorldMapStore {
+    // Before rooms there was one map for whichever room was aligned; it can't be assigned to a room, so it goes.
+    static func removeLegacy() {
+        try? FileManager.default.removeItem(at: URL.applicationSupportDirectory.appending(path: "world.arworldmap"))
+    }
+
+    static func url(_ room: ARRoom) -> URL { URL.applicationSupportDirectory.appending(path: "world-\(room).arworldmap") }
+
+    static func load(_ room: ARRoom) -> ARWorldMap? {
+        guard let data = try? Data(contentsOf: url(room)) else { return nil }
         return try? NSKeyedUnarchiver.unarchivedObject(ofClass: ARWorldMap.self, from: data)
     }
 
-    static func write(_ data: Data) throws {
-        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try data.write(to: url, options: .atomic)
+    static func write(_ data: Data, for room: ARRoom) throws {
+        try FileManager.default.createDirectory(at: url(room).deletingLastPathComponent(), withIntermediateDirectories: true)
+        try data.write(to: url(room), options: .atomic)
     }
 }
