@@ -52,7 +52,7 @@ Names were assigned by looking at each image, so a couple are best guesses (`bed
 
 ## Seeing it in the room
 
-[`app-ios/`](app-ios) is an iPhone AR app that places the same furniture in the real apartment, aligned from two floor corners you mark. Moves made in the app save back to the plan. Run it with `bun run ios` while the server runs; see [`app-ios/README.md`](app-ios/README.md).
+[`app-ios/`](app-ios) is an iPhone and iPad AR app that places the same furniture in the real apartment, aligned from two floor corners you mark. Moves made in the app save back to the plan. Run it with `bun run ios` while the server runs; see [`app-ios/README.md`](app-ios/README.md).
 
 ## Ideas
 

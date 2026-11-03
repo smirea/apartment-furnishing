@@ -1,12 +1,12 @@
 # Apartment AR
 
-An iPhone app that shows the furniture from the 3D plan in the real apartment through the camera. It is a personal app: it installs straight onto Stefan's iPhone from Xcode, never through TestFlight, and reads everything from the laptop's server over the tailnet.
+An iPhone and iPad app that shows the furniture from the 3D plan in the real apartment through the camera. It is a personal app: it installs straight onto Stefan's iPhone and iPad from Xcode, never through TestFlight, and reads everything from the laptop's server over the tailnet.
 
 ## Run it
 
 1. On the laptop, start the server from the repo root: `bun run start`. It listens on every interface, port 6161.
-2. Connect the iPhone by cable or Wi-Fi pairing, unlock it, and run `./scripts/run` from this folder. The launcher prefers a connected device, builds with team `FNYFHG5SV7`, installs, and launches.
-3. Keep Tailscale on, on both the phone and the laptop. The app talks to `http://stefans-macbook-pro.tailff2195.ts.net:6161`.
+2. Connect the iPhone or iPad by cable or Wi-Fi pairing, unlock it, and run `./scripts/run` from this folder (`-t "Stefan’s iPad"` picks the iPad when both are connected). The launcher prefers a connected device, builds with team `FNYFHG5SV7`, installs, and launches.
+3. Keep Tailscale on, on both the device and the laptop, with **Use Tailscale DNS** enabled on the device. The app talks to `http://stefans-macbook-pro.tailff2195.ts.net:6161`. The tailnet access policy must let the device reach the laptop; a device it leaves out times out with no other sign.
 
 To point the app at another server, set `serverURL` in its defaults, for example on a simulator: `xcrun simctl spawn <udid> defaults write com.stefan.apartment-ar serverURL http://127.0.0.1:16161`.
 
@@ -18,7 +18,7 @@ To point the app at another server, set `serverURL` in its defaults, for example
 - **Live updates.** The app polls placements every second and the catalog every 5 seconds, so items you move or import on the laptop appear on the phone.
 - **Outline.** The wall footprints are drawn on the floor (glass in cyan) so you can check the alignment against the real walls.
 
-On a LiDAR iPhone, real walls, furniture, and people hide the virtual furniture behind them.
+On a LiDAR iPhone or iPad, real walls, furniture, and people hide the virtual furniture behind them.
 
 ## How the models get here
 
