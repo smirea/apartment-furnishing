@@ -11,6 +11,7 @@ struct ApartmentARApp: App {
 struct ContentView: View {
     @State private var scene = ApartmentScene()
     @State private var screen = CGSize.zero
+    @State private var picking: String?
     @Environment(\.scenePhase) private var scenePhase
 
     // The camera view fills the screen, so the crosshair and the raycast share its full-screen coordinates.
@@ -34,6 +35,9 @@ struct ContentView: View {
             .padding(.horizontal)
         }
         .preferredColorScheme(.dark)
+        .sheet(isPresented: Binding(get: { picking != nil }, set: { if !$0 { picking = nil } })) {
+            if let picking { FixturePicker(scene: scene, key: picking) }
+        }
         .task { await scene.start() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background, scene.phase == .placed { Task { await scene.saveWorldMap(attempts: 1) } }
@@ -85,16 +89,19 @@ struct ContentView: View {
                     }
                 }
             case .placed:
-                HStack {
-                    VStack(alignment: .leading) {
-                        Toggle("Outline", isOn: $scene.showsOutline)
-                        Toggle("Textures", isOn: $scene.showsTextures)
-                    }
-                    .fixedSize()
-                    Spacer()
-                    VStack(alignment: .trailing) {
-                        roomButton
-                        Button("Realign", action: scene.realign).buttonStyle(.bordered)
+                VStack(spacing: 12) {
+                    fixtureButtons
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Toggle("Outline", isOn: $scene.showsOutline)
+                            Toggle("Textures", isOn: $scene.showsTextures)
+                        }
+                        .fixedSize()
+                        Spacer()
+                        VStack(alignment: .trailing) {
+                            roomButton
+                            Button("Realign", action: scene.realign).buttonStyle(.bordered)
+                        }
                     }
                 }
             }
@@ -103,6 +110,25 @@ struct ContentView: View {
         .frame(maxWidth: .infinity)
         .background(.regularMaterial, in: .rect(cornerRadius: 20))
         .frame(maxWidth: 520)
+    }
+
+    // The room's fixtures (TV and wall texture, or the bed), each opening its picker with the current pick on it.
+    @ViewBuilder private var fixtureButtons: some View {
+        let here = scene.fixtures.filter { $0.room == scene.room?.rawValue }
+        if !here.isEmpty {
+            HStack {
+                ForEach(here) { fixture in
+                    Button { picking = fixture.key } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(fixture.title).font(.caption).foregroundStyle(.secondary)
+                            Text(fixture.selectedOption?.name ?? "None").font(.subheadline).lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+        }
     }
 
     private var roomButton: some View {

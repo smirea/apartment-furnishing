@@ -6,6 +6,7 @@ import {
 	type TvSettings,
 	type WallTexture,
 } from '@repo/shared/items';
+import type { WallSpot } from '@repo/shared/fixtures';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {
@@ -41,7 +42,6 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
 import { CSS2DObject, CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import {
-	bedWallFace,
 	CEILING_FT,
 	columns,
 	doors,
@@ -472,25 +472,18 @@ export function createViewer(
 		return object;
 	}
 
-	// The bed is built in like the TV: headboard (the model's back, -z) flush to the primary bedroom's north wall and
-	// centered between the side walls, with its size written across the top.
-	const bedWallSnap = wallBoxes.find(
-		b => b.z2 === ft(bedWallFace.y) && b.x1 <= ft(bedWallFace.x1) && b.x2 >= ft(bedWallFace.x2),
-	);
-	if (!bedWallSnap) throw new Error('Bed wall face does not match a wall run in the floor plan');
-	const bedSpanIn = ft(bedWallFace.x2 - bedWallFace.x1) * 12;
-	const bedGroup = new Group();
-	bedGroup.position.x = ft((bedWallFace.x1 + bedWallFace.x2) / 2);
-	scene.add(bedGroup);
-	const bedModels = new Map<string, Promise<Object3D>>();
-	const bedLabelMat = new MeshBasicMaterial({ transparent: true, depthWrite: false });
-	const bedLabel = new Mesh(new PlaneGeometry(1, 1), bedLabelMat);
-	// Lies flat with the text's top toward the headboard, so it reads from the foot of the bed.
-	bedLabel.rotation.x = -Math.PI / 2;
-	let bedVersion = 0;
-	let shownBedKey: string | null = null;
+	// Item fixtures (the bed) are built in like the TV: the model's back (-z) flush to the fixture's wall face and
+	// centered on it, with the size and the room left to either side written across the top.
+	type WallItem = {
+		group: Group;
+		label: Mesh<PlaneGeometry, MeshBasicMaterial>;
+		version: number;
+		shown: string | null;
+	};
+	const wallItems = new Map<string, WallItem>();
+	const wallItemModels = new Map<string, Promise<Object3D>>();
 
-	function bedLabelTexture(lines: [string, string]) {
+	function wallItemLabelTexture(lines: [string, string]) {
 		const canvas = document.createElement('canvas');
 		canvas.width = 1024;
 		canvas.height = 400;
@@ -512,42 +505,64 @@ export function createViewer(
 		return texture;
 	}
 
-	async function setBed(item: CatalogItem | null) {
-		const version = ++bedVersion;
+	function wallItem(key: string) {
+		let entry = wallItems.get(key);
+		if (!entry) {
+			const label = new Mesh(new PlaneGeometry(1, 1), new MeshBasicMaterial({ transparent: true, depthWrite: false }));
+			// Lies flat with the text's top toward the wall, so it reads from the front of the item.
+			label.rotation.x = -Math.PI / 2;
+			entry = { group: new Group(), label, version: 0, shown: null };
+			scene.add(entry.group);
+			wallItems.set(key, entry);
+		}
+		return entry;
+	}
+
+	async function setWallItem(key: string, spot: WallSpot, item: CatalogItem | null) {
+		const entry = wallItem(key);
+		const { group, label } = entry;
+		const version = ++entry.version;
 		if (!item) {
-			bedGroup.clear();
-			shownBedKey = null;
+			group.clear();
+			entry.shown = null;
 			return;
 		}
-		const key = `${signature(item)}|${JSON.stringify(item.dimensions)}`;
-		if (key === shownBedKey) return;
-		if (!bedModels.has(key)) bedModels.set(key, buildItem(item));
-		const model = await bedModels.get(key)!.catch(error => {
-			bedModels.delete(key);
-			if (version === bedVersion) {
-				bedGroup.clear();
-				shownBedKey = null;
+		const shown = `${signature(item)}|${JSON.stringify(item.dimensions)}|${JSON.stringify(spot)}`;
+		if (shown === entry.shown) return;
+		const modelKey = `${signature(item)}|${JSON.stringify(item.dimensions)}`;
+		if (!wallItemModels.has(modelKey)) wallItemModels.set(modelKey, buildItem(item));
+		const model = await wallItemModels.get(modelKey)!.catch(error => {
+			wallItemModels.delete(modelKey);
+			if (version === entry.version) {
+				group.clear();
+				entry.shown = null;
 			}
 			throw error;
 		});
-		if (version !== bedVersion) return;
-		bedGroup.clear();
-		bedGroup.add(model, bedLabel);
-		shownBedKey = key;
+		if (version !== entry.version) return;
+		group.clear();
+		group.add(model, label);
+		entry.shown = shown;
+		// Measured unturned, so a turned spot doesn't swap width and depth.
+		group.position.set(0, 0, 0);
+		group.rotation.y = 0;
+		group.updateMatrixWorld(true);
 		const size = new Box3().setFromObject(model).getSize(new Vector3());
-		bedGroup.position.z = ft(bedWallFace.y) + size.z / 2;
-		bedGroup.updateMatrixWorld(true);
+		const yaw = spot.yaw * DEG;
+		group.rotation.y = yaw;
+		group.position.set(spot.x + Math.sin(yaw) * (size.z / 2), 0, spot.z + Math.cos(yaw) * (size.z / 2));
+		group.updateMatrixWorld(true);
 
 		const { width, height, depth } = item.dimensions ?? { width: size.x * 12, height: size.y * 12, depth: size.z * 12 };
-		bedLabelMat.map?.dispose();
-		bedLabelMat.map = bedLabelTexture([
+		label.material.map?.dispose();
+		label.material.map = wallItemLabelTexture([
 			`${round1(width)}″ × ${round1(depth)}″`,
-			`${round1(height)}″ high · ${round1((bedSpanIn - size.x * 12) / 2)}″ each side`,
+			`${round1(height)}″ high · ${round1((spot.span * 12 - size.x * 12) / 2)}″ each side`,
 		]);
-		bedLabelMat.needsUpdate = true;
+		label.material.needsUpdate = true;
 		const labelWidth = Math.min(size.x * 0.8, size.z * 0.45 * (1024 / 400));
 		const labelDepth = (labelWidth * 400) / 1024;
-		bedLabel.scale.set(labelWidth, labelDepth, 1);
+		label.scale.set(labelWidth, labelDepth, 1);
 
 		// The label rests on the highest thing under it (mattress, slats or platform); one ray down the middle can pass
 		// between slats and leave the text buried under them.
@@ -557,10 +572,10 @@ export function createViewer(
 		const STEP_FT = 2 / 12;
 		for (let dx = -labelWidth / 2; dx <= labelWidth / 2; dx += STEP_FT)
 			for (let dz = -labelDepth / 2; dz <= labelDepth / 2; dz += STEP_FT) {
-				ray.set(new Vector3(bedGroup.position.x + dx, CEILING_FT, bedGroup.position.z + dz), down);
+				ray.set(group.localToWorld(new Vector3(dx, CEILING_FT, dz)), down);
 				top = Math.max(top, ray.intersectObject(model, true)[0]?.point.y ?? 0);
 			}
-		bedLabel.position.y = (top || size.y) + 0.03;
+		label.position.y = (top || size.y) + 0.03;
 	}
 
 	function placeRoot(root: Group, p: Placement) {
@@ -899,10 +914,12 @@ export function createViewer(
 		setLabels,
 		setPlacements,
 		setTv,
-		setBed: (item: CatalogItem | null) => setBed(item).catch(error => console.error('Bed model failed to load', error)),
-		setFinishes: (textures: Record<FinishSurface, WallTexture | null>) => {
-			void setFinish('tvWall', textures.tvWall);
-			void setFinish('column', textures.column);
+		setWallItem: (key: string, spot: WallSpot, item: CatalogItem | null) =>
+			setWallItem(key, spot, item).catch(error => console.error(`${key} model failed to load`, error)),
+		// One texture dresses both the TV wall and the column.
+		setWallTexture: (texture: WallTexture | null) => {
+			void setFinish('tvWall', texture);
+			void setFinish('column', texture);
 		},
 		select,
 		snapWhenLoaded: (key: string) => snapOnLoad.add(key),

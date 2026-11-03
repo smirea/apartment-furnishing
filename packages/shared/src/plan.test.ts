@@ -22,3 +22,7 @@ test('places the texture surfaces on the TV wall face and the column, in feet', 
 		column: { x: 12.954, z: 36.498, radius: 1.392 },
 	});
 });
+
+test('hangs the TV centered on the measured 122" of the TV wall', () => {
+	expect(planGeometry().tvMount).toEqual({ x: 24.388, z: 32.596 });
+});

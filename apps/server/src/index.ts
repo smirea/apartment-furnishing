@@ -1,30 +1,37 @@
-import {
-	DEFAULT_TV,
-	type BedSettings,
-	type CatalogEntry,
-	type Finishes,
-	type Placement,
-	type TvSettings,
-	type WallTextureEntry,
-} from '@repo/shared/items';
+import type { CatalogEntry, Placement, TvSettings, WallTextureEntry } from '@repo/shared/items';
 import { join, normalize } from 'node:path';
 import { ASSET_DIR, catalog, importProducts, placements } from './catalog';
 import { modelJobs, startModelJob } from './generate-model';
 import { planGeometry } from '@repo/shared/plan';
 import { usdzPath } from './usdz';
 import { config } from './config';
-import { importTv, tvs } from './tvs';
 import { ideaFile, ideasHtml } from './ideas';
-import { finishes, FINISH_SURFACES, importTexture, startTextureJob, textureJobs, textures } from './textures';
-import { setting } from './db';
+import { textureJobs, textures } from './textures';
+import {
+	buildOption,
+	FixtureError,
+	importOption,
+	isFixtureKey,
+	itemFixtureFor,
+	listFixtures,
+	readFixture,
+	removeOption,
+	saveTv,
+	selectOption,
+} from './fixtures';
 
 const isVec3 = (v: unknown): v is [number, number, number] =>
 	Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
 
-const tvSettings = setting<TvSettings>('tv', () => DEFAULT_TV);
-const bed = setting<BedSettings>('bed', () => ({
-	itemId: catalog.all().find(item => item.category === 'bed')?.id ?? null,
-}));
+const productUrl = (url: unknown): url is string => typeof url === 'string' && /^https?:\/\//.test(url);
+const failure = (error: unknown) => {
+	if (!(error instanceof FixtureError)) console.error(error);
+	return Response.json(
+		{ error: error instanceof Error ? error.message : String(error) },
+		{ status: error instanceof FixtureError ? 400 : 502 },
+	);
+};
+const unknownFixture = (key: string) => Response.json({ error: `No fixture ${key}` }, { status: 404 });
 
 const uiBuildPath = new URL('../../ui/build/', import.meta.url);
 
@@ -36,13 +43,13 @@ const server = Bun.serve({
 	routes: {
 		'/api/status': Response.json({ ok: true, now: new Date().toISOString() }),
 		'/api/catalog': {
-			GET: () =>
+			GET: async () =>
 				Response.json(
 					catalog.all().map((item): CatalogEntry => ({ ...item, modelJob: modelJobs.get(item.id) ?? null })),
 				),
 		},
 		'/api/catalog/:id/model': {
-			POST: request => {
+			POST: async request => {
 				const item = catalog.get(request.params.id);
 				if (!item) return Response.json({ error: 'Unknown item' }, { status: 404 });
 				startModelJob(item);
@@ -51,85 +58,88 @@ const server = Bun.serve({
 		},
 		'/api/catalog/import': {
 			POST: async request => {
-				const { url, category } = (await request.json()) as { url?: string; category?: string };
-				if (!url || !/^https?:\/\//.test(url)) return Response.json({ error: 'Paste a product URL' }, { status: 400 });
+				const { url } = (await request.json()) as { url?: string };
+				if (!productUrl(url)) return Response.json({ error: 'Paste a product URL' }, { status: 400 });
 				try {
-					const [item] = await importProducts([url], console.log, category);
+					const [item] = await importProducts([url], console.log);
 					if (!item!.model) startModelJob(item!);
+					// A product that has a fixture, like a bed, becomes that fixture's pick instead of furniture to place.
+					const fixture = itemFixtureFor(item!.category);
+					if (fixture) await selectOption(fixture, item!.id);
 					return Response.json(item);
 				} catch (error) {
-					console.error(error);
-					return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 502 });
+					return failure(error);
 				}
 			},
 		},
 		'/api/textures': {
-			GET: () =>
+			GET: async () =>
 				Response.json(
 					textures.all().map((t): WallTextureEntry => ({ ...t, textureJob: textureJobs.get(t.id) ?? null })),
 				),
 		},
-		'/api/textures/import': {
-			POST: async request => {
-				const { url } = (await request.json()) as { url?: string };
-				if (!url || !/^https?:\/\//.test(url)) return Response.json({ error: 'Paste a product URL' }, { status: 400 });
-				try {
-					const texture = await importTexture(url, console.log);
-					if (!texture.texture) startTextureJob(texture);
-					return Response.json(texture);
-				} catch (error) {
-					console.error(error);
-					return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 502 });
-				}
+		'/api/fixtures': { GET: async () => Response.json(await listFixtures()) },
+		'/api/fixtures/:key': {
+			GET: async request => {
+				const { key } = request.params;
+				return isFixtureKey(key) ? Response.json(await readFixture(key)) : unknownFixture(key);
 			},
-		},
-		'/api/textures/:id/generate': {
-			POST: request => {
-				const texture = textures.get(request.params.id);
-				if (!texture) return Response.json({ error: 'Unknown texture' }, { status: 404 });
-				startTextureJob(texture);
-				return Response.json({ ok: true });
-			},
-		},
-		'/api/finishes': {
-			GET: () => Response.json(finishes.get()),
 			PUT: async request => {
-				const body = (await request.json()) as Partial<Finishes>;
-				const saved = finishes.get();
-				for (const surface of FINISH_SURFACES) {
-					const id = body[surface];
-					if (id === undefined) continue;
-					if (id !== null && !textures.get(id)?.texture)
-						return Response.json({ error: `No finished texture ${id}` }, { status: 400 });
-					saved[surface] = id;
-				}
-				finishes.set(saved);
-				return Response.json(saved);
-			},
-		},
-		'/api/tvs': { GET: () => Response.json(tvs.all()) },
-		'/api/tvs/import': {
-			POST: async request => {
-				const { url } = (await request.json()) as { url?: string };
-				if (!url || !/^https?:\/\//.test(url)) return Response.json({ error: 'Paste a product URL' }, { status: 400 });
+				const { key } = request.params;
+				if (!isFixtureKey(key)) return unknownFixture(key);
+				const { selected } = ((await request.json().catch(() => null)) ?? {}) as { selected?: unknown };
+				if (selected !== null && typeof selected !== 'string')
+					return Response.json({ error: 'Expected selected: an option id or null' }, { status: 400 });
 				try {
-					return Response.json(await importTv(url));
+					await selectOption(key, selected);
+					return Response.json(await readFixture(key));
 				} catch (error) {
-					console.error(error);
-					return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 502 });
+					return failure(error);
 				}
 			},
 		},
-		'/api/tvs/:id': {
-			DELETE: request => {
-				tvs.remove(request.params.id);
-				return Response.json({ ok: true });
+		'/api/fixtures/:key/import': {
+			POST: async request => {
+				const { key } = request.params;
+				if (!isFixtureKey(key)) return unknownFixture(key);
+				const { url } = ((await request.json().catch(() => null)) ?? {}) as { url?: unknown };
+				if (!productUrl(url)) return Response.json({ error: 'Paste a product URL' }, { status: 400 });
+				try {
+					await importOption(key, url);
+					return Response.json(await readFixture(key));
+				} catch (error) {
+					return failure(error);
+				}
 			},
 		},
+		'/api/fixtures/:key/options/:id/build': {
+			POST: async request => {
+				const { key, id } = request.params;
+				if (!isFixtureKey(key)) return unknownFixture(key);
+				try {
+					await buildOption(key, id);
+					return Response.json(await readFixture(key));
+				} catch (error) {
+					return failure(error);
+				}
+			},
+		},
+		'/api/fixtures/:key/options/:id': {
+			DELETE: async request => {
+				const { key, id } = request.params;
+				if (!isFixtureKey(key)) return unknownFixture(key);
+				try {
+					await removeOption(key, id);
+					return Response.json(await readFixture(key));
+				} catch (error) {
+					return failure(error);
+				}
+			},
+		},
+		// The TV's hand-set size and mount; picking an imported TV goes through /api/fixtures/tv.
 		'/api/tv': {
-			GET: () => Response.json(tvSettings.get()),
 			PUT: async request => {
-				const tv = (await request.json()) as Partial<TvSettings>;
+				const tv = ((await request.json().catch(() => null)) ?? {}) as Partial<TvSettings>;
 				const sizes = [tv.widthIn, tv.heightIn, tv.centerIn];
 				if (
 					typeof tv.visible !== 'boolean' ||
@@ -149,20 +159,8 @@ const server = Bun.serve({
 					centerIn: tv.centerIn!,
 					tiltDeg: tv.tiltDeg,
 				};
-				tvSettings.set(saved);
-				return Response.json(saved);
-			},
-		},
-		'/api/bed': {
-			GET: () => Response.json(bed.get()),
-			PUT: async request => {
-				const { itemId } = ((await request.json().catch(() => null)) ?? {}) as Partial<BedSettings>;
-				const item = typeof itemId === 'string' ? catalog.get(itemId) : null;
-				if (itemId !== null && item?.category !== 'bed')
-					return Response.json({ error: `No bed ${itemId}` }, { status: 400 });
-				const saved: BedSettings = { itemId: item?.id ?? null };
-				bed.set(saved);
-				return Response.json(saved);
+				await saveTv(saved);
+				return Response.json(await readFixture('tv'));
 			},
 		},
 		'/api/plan': Response.json(planGeometry()),

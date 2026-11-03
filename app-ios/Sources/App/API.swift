@@ -32,14 +32,17 @@ struct Plan: Decodable {
         let column: Column
     }
 
+    struct Point: Decodable { let x, z: Float }
+
     let walls: [Wall]
     let columns: [Column]
     let rooms: [Room]
     let ceiling: Float
     let finishSurfaces: FinishSurfaces
+    let tvMount: Point
 }
 
-// Mirrors WallTexture and Finishes in packages/shared/src/items.ts.
+// Mirrors WallTexture in packages/shared/src/items.ts.
 struct WallTexture: Decodable {
     struct Tile: Decodable, Equatable {
         struct Size: Decodable, Equatable { let width, height: Float }
@@ -54,10 +57,56 @@ struct WallTexture: Decodable {
     let texture: Tile?
 }
 
-struct Finishes: Decodable, Equatable {
-    let tvWall: String?
-    let column: String?
+// Mirrors packages/shared/src/fixtures.ts: a built-in spot (the TV, the bed, the wall texture) holding one of several
+// imported options. The picker treats every fixture alike; only drawing one depends on its kind.
+struct Fixture: Decodable, Identifiable, Equatable {
+    enum Kind: String, Decodable {
+        case tv, wallTexture, item, other
+
+        // A kind added on the server after this build still lists and switches, it just isn't drawn.
+        init(from decoder: Decoder) throws {
+            self = Kind(rawValue: try decoder.singleValueContainer().decode(String.self)) ?? .other
+        }
+    }
+
+    struct Option: Decodable, Identifiable, Equatable {
+        struct Job: Decodable, Equatable { let state: String; let error: String? }
+
+        let id: String
+        let name: String
+        let url: String
+        let image: String?
+        let detail: String
+        let warning: String?
+        let group: String?
+        let job: Job?
+        let ready: Bool
+    }
+
+    // The middle of the wall face an item fixture's back sits flush against, in plan feet; yaw as Placement.rotation.
+    struct Spot: Decodable, Equatable { let x, z, yaw, span: Float }
+
+    let key: String
+    let kind: Kind
+    let title: String
+    let room: String
+    let importLabel: String
+    let spot: Spot?
+    var selected: String?
+    let removable: Bool
+    let options: [Option]
+    let tv: TVSettings?
+
+    var id: String { key }
+    var selectedOption: Option? { options.first { $0.id == selected } }
 }
+
+struct TVSettings: Decodable, Equatable {
+    let visible: Bool
+    let widthIn, heightIn, centerIn, tiltDeg: Float
+}
+
+private struct ServerError: Decodable { let error: String }
 
 enum API {
     // The laptop's server over the tailnet. Override with `defaults write com.stefan.apartment-ar serverURL <url>`.
@@ -66,8 +115,23 @@ enum API {
     static func plan() async throws -> Plan { try await get("api/plan") }
     static func catalog() async throws -> [CatalogItem] { try await get("api/catalog") }
     static func placements() async throws -> [Placement] { try await get("api/placements") }
-    static func finishes() async throws -> Finishes { try await get("api/finishes") }
     static func textures() async throws -> [WallTexture] { try await get("api/textures") }
+    static func fixtures() async throws -> [Fixture] { try await get("api/fixtures") }
+
+    static func select(_ fixture: String, _ option: String?) async throws -> Fixture {
+        try await send(json(["selected": option ?? NSNull()], "PUT", "api/fixtures/\(fixture)", timeout: 10))
+    }
+
+    // Reading the page and a grok call take about a minute.
+    static func importOption(_ fixture: String, url: String) async throws -> Fixture {
+        try await send(json(["url": url], "POST", "api/fixtures/\(fixture)/import", timeout: 240))
+    }
+
+    static func remove(_ fixture: String, _ option: String) async throws -> Fixture {
+        var request = URLRequest(url: baseURL.appending(path: "api/fixtures/\(fixture)/options/\(option)"), timeoutInterval: 10)
+        request.httpMethod = "DELETE"
+        return try await send(request)
+    }
 
     // Texture files come as server-absolute paths with a `?v=` cache buster, like `/api/assets/<id>/texture.png?v=1`.
     static func assetURL(_ path: String) -> URL { URL(string: path, relativeTo: baseURL)!.absoluteURL }
@@ -86,6 +150,14 @@ enum API {
         return url
     }
 
+    private static func json(_ body: [String: Any], _ method: String, _ path: String, timeout: TimeInterval) throws -> URLRequest {
+        var request = URLRequest(url: baseURL.appending(path: path), timeoutInterval: timeout)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONSerialization.data(withJSONObject: body)
+        return request
+    }
+
     private static func get<T: Decodable>(_ path: String) async throws -> T {
         try await send(URLRequest(url: baseURL.appending(path: path), timeoutInterval: 5))
     }
@@ -93,7 +165,10 @@ enum API {
     private static func send<T: Decodable>(_ request: URLRequest) async throws -> T {
         let (data, response) = try await URLSession.shared.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        guard status == 200 else { throw URLError(.badServerResponse, userInfo: [NSLocalizedDescriptionKey: "\(request.url!.path) returned \(status)"]) }
+        guard status == 200 else {
+            let message = (try? JSONDecoder().decode(ServerError.self, from: data))?.error ?? "\(request.url!.path) returned \(status)"
+            throw URLError(.badServerResponse, userInfo: [NSLocalizedDescriptionKey: message])
+        }
         return try JSONDecoder().decode(T.self, from: data)
     }
 }

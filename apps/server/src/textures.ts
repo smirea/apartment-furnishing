@@ -1,6 +1,6 @@
 // Wall textures: wall-panel products imported like furniture (page capture, grok, photos), then turned into a
-// seamless tile by Codex instead of a 3D model. Finishes record which texture each living-room surface wears.
-import type { Finishes, FinishSurface, Job, WallTexture } from '@repo/shared/items';
+// seamless tile by Codex instead of a 3D model. The wallTexture fixture (fixtures.ts) picks which one the living room wears.
+import type { Job, WallTexture } from '@repo/shared/items';
 import { copyFile, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -14,7 +14,7 @@ import {
 	productKey,
 	slug,
 } from './catalog';
-import { setting, table } from './db';
+import { table } from './db';
 import { collectPhotos, runCodex } from './generate-model';
 
 // Spec-sheet text saved next to the photos at import, so texture builds (and rebuilds) get exact slat sizes.
@@ -22,15 +22,11 @@ const SPEC_FILE = 'spec.txt';
 const PROMPT_FILE = Bun.file(join(import.meta.dir, 'texture-prompt.md'));
 if (!(await PROMPT_FILE.exists())) throw new Error(`missing ${PROMPT_FILE.name}`);
 
-export const FINISH_SURFACES: FinishSurface[] = ['tvWall', 'column'];
-
 export const textures = table<WallTexture>('wall_textures', {
 	key: 'id',
 	json: ['panel', 'texture'],
 	order: 'importedAt DESC',
 });
-
-export const finishes = setting<Finishes>('finishes', () => ({ tvWall: null, column: null }));
 
 const panelSchema = {
 	type: 'object',

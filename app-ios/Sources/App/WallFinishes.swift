@@ -1,7 +1,7 @@
 import Metal
 import RealityKit
 
-// The wall textures chosen in the web plan, built like apps/ui/src/lib/scene.ts: panels on the TV wall's living-room
+// The picked wall texture, built like apps/ui/src/lib/scene.ts: panels on the TV wall's living-room
 // face and a sleeve around the column, standing out by the panel depth, with the tile repeating at real scale.
 @MainActor
 final class WallFinishes {
@@ -18,37 +18,38 @@ final class WallFinishes {
     }
 
     // Past the panel face, so LiDAR occlusion of the real wall, a centimeter or two noisy, can't hide the panels.
-    private static let standoffFeet: Float = 1 / 12
+    static let standoffFeet: Float = 1 / 12
 
     let root = Entity()
-    private var shown: [Surface: (tile: WallTexture.Tile, entity: Entity?)] = [:]
+    // `claim` tells apart two builds of the same tile, as when you leave the room and come back mid-download.
+    private var shown: [Surface: (tile: WallTexture.Tile, claim: UUID, entity: Entity?)] = [:]
     private var textures: [String: Task<TextureResource, Error>] = [:]
     // The room of the latest apply. An older apply for another room stops before its next surface, so a download it
     // was waiting on can't carry its room into the new one.
     private var room: [Float]?
 
-    // Surfaces outside `room` stay bare, so only the room you're standing in shows its textures.
-    func apply(_ finishes: Finishes, _ catalog: [WallTexture], plan: Plan, room: [Float]?) async throws {
-        let tiles = Dictionary(catalog.compactMap { texture in texture.texture.map { (texture.id, $0) } }) { a, _ in a }
+    // One tile dresses both surfaces. Surfaces outside `room` stay bare, so only the room you're standing in shows them.
+    func apply(_ picked: WallTexture.Tile?, plan: Plan, room: [Float]?) async throws {
         var failure: Error?
         self.room = room
         for surface in Surface.allCases {
             guard self.room == room else { break }
             let inRoom = room.map { Plan.contains($0, surface.spot(in: plan)) } ?? false
-            let tile = inRoom ? (surface == .tvWall ? finishes.tvWall : finishes.column).flatMap { tiles[$0] } : nil
+            let tile = inRoom ? picked : nil
             guard tile != shown[surface]?.tile else { continue }
             shown[surface]?.entity?.removeFromParent()
             shown[surface] = nil
             guard let tile else { continue }
             // Claimed before the downloads, so a poll arriving meanwhile doesn't build the same surface twice.
-            shown[surface] = (tile, nil)
+            let claim = UUID()
+            shown[surface] = (tile, claim, nil)
             do {
                 let entity = try await build(surface, tile, plan)
-                guard shown[surface]?.tile == tile else { continue }
+                guard shown[surface]?.claim == claim else { continue }
                 root.addChild(entity)
-                shown[surface] = (tile, entity)
+                shown[surface] = (tile, claim, entity)
             } catch {
-                if shown[surface]?.tile == tile { shown[surface] = nil }
+                if shown[surface]?.claim == claim { shown[surface] = nil }
                 failure = error
             }
         }

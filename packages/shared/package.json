@@ -6,6 +6,7 @@
 		".": "./src/index.ts",
 		"./env": "./src/env.ts",
 		"./items": "./src/items.ts",
+		"./fixtures": "./src/fixtures.ts",
 		"./floorplan": "./src/floorplan.ts",
 		"./plan": "./src/plan.ts",
 		"./package.json": "./package.json"

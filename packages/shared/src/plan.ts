@@ -1,4 +1,4 @@
-import { CEILING_FT, columns, ft, rooms, tvWallFace, walls, type Rect } from './floorplan';
+import { CEILING_FT, columns, finishAreasIn, ft, rooms, tvWallFace, walls, type Rect } from './floorplan';
 
 // The floor plan as the AR app needs it, in feet (+x east, +z south): the floor footprint of every wall run between
 // door openings, so the outline's edges are the wall faces you can line up against in the room.
@@ -7,12 +7,14 @@ export type PlanGeometry = {
 	columns: { x: number; z: number; radius: number }[];
 	rooms: { name: string; rect: Rect }[];
 	ceiling: number;
-	// Surfaces a wall texture can cover (see /api/finishes): the TV wall's living-room face, a plane at `x` facing west
+	// Surfaces a wall texture can cover (see the wallTexture fixture): the TV wall's living-room face, a plane at `x` facing west
 	// from z1 to z2, and the column the sleeve wraps.
 	finishSurfaces: {
 		tvWall: { x: number; z1: number; z2: number };
 		column: { x: number; z: number; radius: number };
 	};
+	// Where the TV hangs: the middle of the TV wall's measured span on its living-room face, before any wall texture.
+	tvMount: { x: number; z: number };
 };
 
 const round = (n: number) => Math.round(n * 1000) / 1000;
@@ -47,5 +49,6 @@ export function planGeometry(): PlanGeometry {
 			tvWall: { x: round(ft(tvWallFace.x)), z1: round(ft(tvWallFace.y1)), z2: round(ft(tvWallFace.y2)) },
 			column: { x: round(ft(column.x)), z: round(ft(column.y)), radius: round(ft(column.r)) },
 		},
+		tvMount: { x: round(ft(tvWallFace.x)), z: round(ft(tvWallFace.y2) - finishAreasIn.tvWall.width / 24) },
 	};
 }

@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS tv_models (
 	heightIn REAL NOT NULL
 ) STRICT;
 
--- One JSON value per singleton: the TV size, the bed pick, the wall finishes.
+-- One JSON value per singleton: the TV size, the fixture picks.
 CREATE TABLE IF NOT EXISTS settings (
 	key TEXT PRIMARY KEY,
 	value TEXT NOT NULL

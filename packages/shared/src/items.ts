@@ -75,9 +75,6 @@ export type WallTextureEntry = WallTexture & { textureJob: Job | null };
 
 export type FinishSurface = 'tvWall' | 'column';
 
-// Which wall texture each living-room surface wears, by texture id.
-export type Finishes = Record<FinishSurface, string | null>;
-
 // Panels to buy for a surface. Full-height columns of panels across the width; when the panel is shorter than the
 // surface, the strips that top up each column are cut from shared panels.
 export function panelsNeeded(panel: { width: number; height: number }, area: { width: number; height: number }) {
@@ -117,7 +114,3 @@ export const DEFAULT_TV: TvSettings = { visible: true, ...tvSize(98, [16, 9]), c
 
 // A TV whose size was read off a product page, kept so the TV panel can switch between candidates.
 export type TvModel = { id: string; url: string; importedAt: string; name: string; widthIn: number; heightIn: number };
-
-// The primary bedroom's bed, picked from the imported beds (catalog items in the `bed` category). It is built in like
-// the TV: headboard flush to the bedroom's north wall and centered on it, so both sides keep the same nightstand room.
-export type BedSettings = { itemId: string | null };
