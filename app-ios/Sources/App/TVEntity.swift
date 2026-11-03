@@ -3,6 +3,7 @@ import UIKit
 
 // The living-room TV, built like apps/ui/src/lib/scene.ts: a thin body on a tilting mount centered on the TV wall's
 // measured span, out from any wall texture, with its size written on the screen. Plan feet, like the rest of planRoot.
+@MainActor
 enum TVEntity {
     private static let depth: Float = 1.2 / 12
     private static let mountDepth: Float = 2.5 / 12

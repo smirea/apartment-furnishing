@@ -126,7 +126,8 @@ export const saveTv = (tv: TvSettings) => tvSettings.set(tv);
 
 // The web plan can also size the TV by hand, so the selection is the picked TV while the size still matches it, else
 // another imported TV of that size, else a `custom` option standing for the hand-entered one.
-const CUSTOM_TV = 'custom';
+// Not a slug, so no imported TV can share it.
+const CUSTOM_TV = ':custom';
 const tvDetail = (tv: Pick<TvSettings, 'widthIn' | 'heightIn'>) =>
 	`${round1(tvDiagonal(tv))}″ · ${round1(tv.widthIn)} × ${round1(tv.heightIn)}″`;
 
@@ -231,7 +232,11 @@ export const listFixtures = () => Promise.all(FIXTURE_KEYS.map(readFixture));
 
 export class FixtureError extends Error {}
 
+// Bumped by every pick, so an import that finishes a minute later doesn't overwrite a pick made meanwhile.
+const pickCount: Partial<Record<FixtureKey, number>> = {};
+
 export async function selectOption(key: FixtureKey, id: string | null) {
+	pickCount[key] = (pickCount[key] ?? 0) + 1;
 	if (id !== null) {
 		const option = (await SOURCES[key].options()).find(o => o.id === id);
 		if (!option) throw new FixtureError(`${FIXTURES[key].title} has no option ${id}`);
@@ -242,9 +247,10 @@ export async function selectOption(key: FixtureKey, id: string | null) {
 
 // The new option becomes the pick when it can be shown right away, since that is why its link was pasted.
 export async function importOption(key: FixtureKey, url: string) {
+	const picks = pickCount[key];
 	const id = await SOURCES[key].import(url);
 	const option = (await SOURCES[key].options()).find(o => o.id === id);
-	if (option?.ready) await SOURCES[key].select(id);
+	if (option?.ready && pickCount[key] === picks) await SOURCES[key].select(id);
 }
 
 export async function buildOption(key: FixtureKey, id: string) {

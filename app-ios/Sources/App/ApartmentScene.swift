@@ -53,6 +53,8 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
     // while picks are still saving are dropped.
     @ObservationIgnored private var fixtureEdits = 0
     @ObservationIgnored private var picksSaving = 0
+    // The newest pick per fixture; replies to older picks that land after it are dropped.
+    @ObservationIgnored private var latestPick: [String: UUID] = [:]
     @ObservationIgnored private var planAnchor: AnchorEntity?
     @ObservationIgnored private var marker: AnchorEntity?
     @ObservationIgnored private var catalog: [String: CatalogItem] = [:]
@@ -364,12 +366,14 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
         fixtures[index].selected = option
         applyFixtures()
         picksSaving += 1
+        let pick = UUID()
+        latestPick[fixture.key] = pick
         Task {
             defer { picksSaving -= 1 }
             do {
                 let saved = try await API.select(fixture.key, option)
                 fixtureEdits += 1
-                store(saved)
+                if latestPick[fixture.key] == pick { store(saved) }
             } catch {
                 note = "Couldn't switch the \(fixture.title.lowercased()): \(error.localizedDescription)"
                 fixtureEdits += 1

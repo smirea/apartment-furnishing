@@ -72,6 +72,8 @@
 	);
 	const furnitureList = $derived(catalogList.filter(item => !fixtureCategories.has(item.category)));
 	let picksSaving = 0;
+	// The newest pick per fixture; replies to older picks that land after it are dropped.
+	const latestPick: Partial<Record<FixtureKey, number>> = {};
 	// The plan draws picks from the catalog and texture lists, which only refresh on their own while a build they know
 	// about runs. A pick or build started elsewhere, like the AR app importing a bed, has to refresh them from here.
 	$effect(() => {
@@ -102,13 +104,18 @@
 					api<Fixture>(`/api/fixtures/${key}`, { method: 'PUT', body: JSON.stringify({ selected }) }),
 				onMutate: async (selected: string | null) => {
 					picksSaving++;
+					const pick = (latestPick[key] ?? 0) + 1;
+					latestPick[key] = pick;
 					if (key === 'tv') dropTvDraft();
 					await queryClient.cancelQueries({ queryKey: ['fixtures'] });
 					queryClient.setQueryData<Fixture[]>(['fixtures'], list =>
 						list?.map(f => (f.key === key ? { ...f, selected } : f)),
 					);
+					return { pick };
 				},
-				onSuccess: storeFixture,
+				onSuccess: (next: Fixture, _selected: string | null, context: { pick: number } | undefined) => {
+					if (context?.pick === latestPick[key]) storeFixture(next);
+				},
 				onError: () => queryClient.invalidateQueries({ queryKey: ['fixtures'] }),
 				onSettled: () => picksSaving--,
 			})),

@@ -9,13 +9,23 @@ export const tvs = table<TvModel>('tv_models', { key: 'id', json: [], order: 'im
 // ratio rather than the overall body, whose bezel and depth vary between spec sheets.
 export async function importTv(url: string): Promise<TvModel> {
 	const [page] = await fetchPages([url]);
-	const tv = await grokStructured<{ name: string; diagonalIn: number; ratioWidth: number; ratioHeight: number }>(
+	const tv = await grokStructured<{
+		isTv: boolean;
+		name: string;
+		diagonalIn: number;
+		ratioWidth: number;
+		ratioHeight: number;
+	}>(
 		`Read this TV listing's name, its screen size class (the diagonal it is sold as, in inches) and its aspect ratio (16:9 unless the listing says otherwise).\n\n${pageContext(page!)}`,
 		{
 			type: 'object',
 			additionalProperties: false,
-			required: ['name', 'diagonalIn', 'ratioWidth', 'ratioHeight'],
+			required: ['isTv', 'name', 'diagonalIn', 'ratioWidth', 'ratioHeight'],
 			properties: {
+				isTv: {
+					type: 'boolean',
+					description: 'Whether the product is a television (not a monitor, projector or TV mount)',
+				},
 				name: { type: 'string', description: 'Short name with brand and model, without retailer noise' },
 				diagonalIn: { type: 'number' },
 				ratioWidth: { type: 'number' },
@@ -23,6 +33,7 @@ export async function importTv(url: string): Promise<TvModel> {
 			},
 		},
 	);
+	if (!tv.isTv) throw new Error(`${tv.name} is not a TV`);
 	if (!(tv.diagonalIn > 10 && tv.ratioWidth > 0 && tv.ratioHeight > 0))
 		throw new Error(`No usable size on ${url}: ${JSON.stringify(tv)}`);
 	const existing = tvs.all().find(t => productKey(t.url) === productKey(page!.url));
