@@ -20,6 +20,9 @@ struct FixturePicker: View {
         NavigationStack {
             if let fixture {
                 List {
+                    if fixture.kind == .tv, let tv = fixture.tv, tv.visible, fixture.selected != nil {
+                        Section("Mount") { mount(tv) }
+                    }
                     Section {
                         row(fixture, name: "None", detail: nil, symbol: "circle.slash", selected: fixture.selected == nil) { scene.select(fixture, nil) }
                     }
@@ -57,6 +60,31 @@ struct FixturePicker: View {
         // The camera feed behind a glass sheet leaves its rows unreadable.
         .presentationBackground(.thickMaterial)
         .presentationBackgroundInteraction(.enabled(upThrough: .medium))
+    }
+
+    // The web plan's Center and Tilt fields, in inches and degrees.
+    @ViewBuilder private func mount(_ tv: TVSettings) -> some View {
+        let ceiling = Double(scene.plan?.ceiling ?? 10) * 12
+        let half = tv.heightIn / 2
+        VStack(alignment: .leading, spacing: 4) {
+            LabeledContent("Height", value: String(format: "%.1f″ to the center", tv.centerIn))
+            Slider(value: binding(tv, \.centerIn), in: half.rounded(.up)...(ceiling - half).rounded(.down), step: 0.5)
+                .accessibilityLabel("TV height")
+            Text(String(format: "Bottom edge %.1f″ off the floor, top %.1f″", tv.centerIn - half, tv.centerIn + half))
+                .font(.caption).foregroundStyle(.secondary)
+        }
+        VStack(alignment: .leading, spacing: 4) {
+            LabeledContent("Tilt", value: String(format: "%.0f°", tv.tiltDeg))
+            Slider(value: binding(tv, \.tiltDeg), in: 0...15, step: 1).accessibilityLabel("TV tilt")
+        }
+    }
+
+    private func binding(_ tv: TVSettings, _ field: WritableKeyPath<TVSettings, Double>) -> Binding<Double> {
+        Binding(get: { scene.fixtures.first { $0.kind == .tv }?.tv?[keyPath: field] ?? tv[keyPath: field] }) { value in
+            guard var current = scene.fixtures.first(where: { $0.kind == .tv })?.tv else { return }
+            current[keyPath: field] = value
+            scene.updateTV(current)
+        }
     }
 
     // Wall textures come in product lines, listed by name like the web plan's swatch rows.

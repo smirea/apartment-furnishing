@@ -1,7 +1,7 @@
 # Stack
 
 - Language: Swift
-- iPhone (portrait) and iPad (any orientation), iOS 18+, ARKit + RealityKit. No Swift package: `App.xcodeproj` is the only build.
+- iPhone (portrait) and iPad (any orientation), iOS 26+ (for Liquid Glass), ARKit + RealityKit. No Swift package: `App.xcodeproj` is the only build.
 - Read `README.md` first: it covers the server, alignment, and how models reach the app.
 - Keep dependencies rare and intentional
 

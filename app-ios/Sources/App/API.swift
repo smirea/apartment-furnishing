@@ -33,6 +33,7 @@ struct Plan: Decodable {
     }
 
     struct Point: Decodable { let x, z: Float }
+    struct Device: Decodable { let rect: [Float]; let y, height: Float; let color: Int }
 
     let walls: [Wall]
     let columns: [Column]
@@ -40,6 +41,7 @@ struct Plan: Decodable {
     let ceiling: Float
     let finishSurfaces: FinishSurfaces
     let tvMount: Point
+    let tvWallDevices: [Device]
 }
 
 // Mirrors WallTexture in packages/shared/src/items.ts.
@@ -95,15 +97,16 @@ struct Fixture: Decodable, Identifiable, Equatable {
     var selected: String?
     let removable: Bool
     let options: [Option]
-    let tv: TVSettings?
+    var tv: TVSettings?
 
     var id: String { key }
     var selectedOption: Option? { options.first { $0.id == selected } }
 }
 
-struct TVSettings: Decodable, Equatable {
-    let visible: Bool
-    let widthIn, heightIn, centerIn, tiltDeg: Float
+// Doubles, so saving a new height writes the size back exactly as the web plan stored it.
+struct TVSettings: Codable, Equatable {
+    var visible: Bool
+    var widthIn, heightIn, centerIn, tiltDeg: Double
 }
 
 private struct ServerError: Decodable { let error: String }
@@ -125,6 +128,15 @@ enum API {
     // Reading the page and a grok call take about a minute.
     static func importOption(_ fixture: String, url: String) async throws -> Fixture {
         try await send(json(["url": url], "POST", "api/fixtures/\(fixture)/import", timeout: 240))
+    }
+
+    // The TV's size and mount; picking an imported TV goes through select.
+    static func save(_ tv: TVSettings) async throws -> Fixture {
+        var request = URLRequest(url: baseURL.appending(path: "api/tv"), timeoutInterval: 10)
+        request.httpMethod = "PUT"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try JSONEncoder().encode(tv)
+        return try await send(request)
     }
 
     static func remove(_ fixture: String, _ option: String) async throws -> Fixture {
