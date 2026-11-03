@@ -1,12 +1,11 @@
 // Wall textures: wall-panel products imported like furniture (page capture, grok, photos), then turned into a
 // seamless tile by Codex instead of a 3D model. Finishes record which texture each living-room surface wears.
 import type { Finishes, FinishSurface, Job, WallTexture } from '@repo/shared/items';
-import { copyFile, mkdir, mkdtemp, readdir, writeFile } from 'node:fs/promises';
+import { copyFile, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
 	ASSET_DIR,
-	DATA_DIR,
 	downloadPhotos,
 	fetchPages,
 	grokStructured,
@@ -15,37 +14,23 @@ import {
 	productKey,
 	slug,
 } from './catalog';
+import { setting, table } from './db';
 import { collectPhotos, runCodex } from './generate-model';
 
-const TEXTURE_DIR = join(DATA_DIR, 'textures');
 // Spec-sheet text saved next to the photos at import, so texture builds (and rebuilds) get exact slat sizes.
 const SPEC_FILE = 'spec.txt';
-const FINISHES_FILE = join(DATA_DIR, 'finishes.json');
 const PROMPT_FILE = Bun.file(join(import.meta.dir, 'texture-prompt.md'));
 if (!(await PROMPT_FILE.exists())) throw new Error(`missing ${PROMPT_FILE.name}`);
 
 export const FINISH_SURFACES: FinishSurface[] = ['tvWall', 'column'];
 
-export async function listTextures(): Promise<WallTexture[]> {
-	await mkdir(TEXTURE_DIR, { recursive: true });
-	const files = (await readdir(TEXTURE_DIR)).filter(f => f.endsWith('.json'));
-	const items: WallTexture[] = await Promise.all(files.map(f => Bun.file(join(TEXTURE_DIR, f)).json()));
-	return items.sort((a, b) => b.importedAt.localeCompare(a.importedAt));
-}
+export const textures = table<WallTexture>('wall_textures', {
+	key: 'id',
+	json: ['panel', 'texture'],
+	order: 'importedAt DESC',
+});
 
-export const readTexture = (id: string): Promise<WallTexture> => Bun.file(join(TEXTURE_DIR, `${id}.json`)).json();
-
-const saveTexture = (texture: WallTexture) =>
-	writeFile(join(TEXTURE_DIR, `${texture.id}.json`), JSON.stringify(texture, null, '\t') + '\n');
-
-export async function readFinishes(): Promise<Finishes> {
-	const file = Bun.file(FINISHES_FILE);
-	return (await file.exists()) ? file.json() : { tvWall: null, column: null };
-}
-
-export async function saveFinishes(finishes: Finishes) {
-	await writeFile(FINISHES_FILE, JSON.stringify(finishes, null, '\t') + '\n');
-}
+export const finishes = setting<Finishes>('finishes', () => ({ tvWall: null, column: null }));
 
 const panelSchema = {
 	type: 'object',
@@ -95,7 +80,6 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promis
 }
 
 export async function importTextures(urls: string[], log: (line: string) => void = () => {}): Promise<WallTexture[]> {
-	await mkdir(TEXTURE_DIR, { recursive: true });
 	log(`capturing ${urls.length} page(s)…`);
 	const pages = await fetchPages(urls);
 	const specs = await Promise.all(pages.map(page => readDocuments(page.documents)));
@@ -107,7 +91,7 @@ export async function importTextures(urls: string[], log: (line: string) => void
 		).catch((error: unknown) => (error instanceof Error ? error : new Error(String(error)))),
 	);
 	const failures: string[] = [];
-	const known = await listTextures();
+	const known = textures.all();
 	const imported: WallTexture[] = [];
 	for (const [i, page] of pages.entries()) {
 		const result = parsed[i]!;
@@ -131,7 +115,7 @@ export async function importTextures(urls: string[], log: (line: string) => void
 			group: existing?.group ?? null,
 			texture: existing?.texture ?? null,
 		};
-		await saveTexture(texture);
+		textures.put(texture);
 		await writeFile(join(ASSET_DIR, id, SPEC_FILE), specs[i]!);
 		known.push(texture);
 		imported.push(texture);
@@ -148,7 +132,7 @@ export async function importTextures(urls: string[], log: (line: string) => void
 // Names the product type of every texture that has none, in one call over the whole collection so colorways of a
 // line share a group and new imports join the groups already in use.
 export async function assignGroups(log: (line: string) => void = () => {}) {
-	const all = await listTextures();
+	const all = textures.all();
 	const missing = all.filter(t => !t.group);
 	if (!missing.length) return;
 	const groups = [...new Set(all.map(t => t.group).filter(Boolean))];
@@ -177,7 +161,7 @@ ${missing.map(t => `${t.id}: ${t.name} (${t.url}). ${t.summary}`).join('\n')}`,
 	for (const t of missing) {
 		const group = byId.get(t.id);
 		if (!group) throw new Error(`grok assigned no group to ${t.id}`);
-		await saveTexture({ ...(await readTexture(t.id)), group });
+		textures.put({ ...textures.read(t.id), group });
 	}
 	log(`grouped ${missing.length} texture(s): ${[...new Set(byId.values())].join(', ')}`);
 }
@@ -222,8 +206,8 @@ export async function generateTexture(texture: WallTexture, log: (line: string) 
 	await Promise.all(Object.entries(outputs).map(([from, to]) => copyFile(join(work, from), join(dir, to))));
 	// Cache-busting version: the paths stay the same across regenerations.
 	const v = Date.now();
-	await saveTexture({
-		...(await readTexture(texture.id)),
+	textures.put({
+		...textures.read(texture.id),
 		texture: {
 			map: `/api/assets/${texture.id}/texture.png?v=${v}`,
 			normalMap: `/api/assets/${texture.id}/texture-normal.png?v=${v}`,
