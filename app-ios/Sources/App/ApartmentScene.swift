@@ -34,8 +34,10 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
         didSet {
             UserDefaults.standard.set(showsTextures, forKey: "showsTextures")
             wallFinishes.root.isEnabled = showsTextures
+            applyFixtures()
         }
     }
+    private(set) var fixtures: [Fixture] = []
 
     @ObservationIgnored let view: ARView
     // Children of planRoot are in plan feet; its scale turns them into meters under the alignment anchor.
@@ -43,6 +45,12 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
     @ObservationIgnored private let outline = Entity()
     @ObservationIgnored private let items = Entity()
     @ObservationIgnored private let wallFinishes = WallFinishes()
+    @ObservationIgnored private let fixtureRoot = Entity()
+    // What each fixture currently draws, keyed by fixture; the signature changes when its pick or size does.
+    @ObservationIgnored private var shownFixtures: [String: (signature: String, entity: Entity)] = [:]
+    @ObservationIgnored private var textures: [WallTexture] = []
+    // Bumped by every pick, so a fixtures poll that left before it can't put the old pick back.
+    @ObservationIgnored private var fixtureEdits = 0
     @ObservationIgnored private var planAnchor: AnchorEntity?
     @ObservationIgnored private var marker: AnchorEntity?
     @ObservationIgnored private var catalog: [String: CatalogItem] = [:]
@@ -61,7 +69,6 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
     @ObservationIgnored private var leaving: Task<Void, Never>?
     // Bumped by every session reset, so a world map taken before a room change is never saved under the new room.
     @ObservationIgnored private var session = 0
-    @ObservationIgnored private var finishChoice: (Finishes, [WallTexture])?
     @ObservationIgnored private var previewCamera: PerspectiveCamera?
 
     private struct PlacedItem {
@@ -81,6 +88,7 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
         planRoot.addChild(outline)
         planRoot.addChild(items)
         planRoot.addChild(wallFinishes.root)
+        planRoot.addChild(fixtureRoot)
         wallFinishes.root.isEnabled = showsTextures
         view.session.delegate = self
     }
@@ -91,7 +99,7 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
             async let plan = API.plan()
             async let catalog = API.catalog()
             async let placements = API.placements()
-            async let finishes = API.finishes()
+            async let fixtures = API.fixtures()
             async let textures = API.textures()
             let loaded = try await plan
             let missing = ARRoom.allCases.filter { loaded.rect(of: $0) == nil }.map(\.rawValue)
@@ -100,8 +108,8 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
             buildOutline(loaded)
             self.catalog = Dictionary(try await catalog.map { ($0.id, $0) }) { a, _ in a }
             apply(try await placements)
-            let (chosen, available) = (try await finishes, try await textures)
-            Task { await applyFinishes(chosen, available) }
+            (self.fixtures, self.textures) = (try await fixtures, try await textures)
+            applyFixtures()
         } catch {
             phase = .failed("Can't reach \(API.baseURL.absoluteString): \(error.localizedDescription)")
             return
@@ -136,7 +144,7 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
         phaseBeforeChoosing = nil
         for (key, item) in placed { remove(key, item) }
         apply(placements)
-        if let (finishes, textures) = finishChoice { Task { await applyFinishes(finishes, textures) } }
+        applyFixtures()
         #if targetEnvironment(simulator)
         if let rect = plan?.rect(of: room) {
             let center = SIMD3((rect[0] + rect[2]) / 2, 0, (rect[1] + rect[3]) / 2)
@@ -314,9 +322,11 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
             do {
                 if tick.isMultiple(of: 5) {
                     catalog = Dictionary(try await API.catalog().map { ($0.id, $0) }) { a, _ in a }
-                    let (chosen, available) = (try await API.finishes(), try await API.textures())
-                    // Texture downloads can take a while; placements keep polling meanwhile.
-                    Task { await applyFinishes(chosen, available) }
+                    let edits = fixtureEdits
+                    let (incoming, available) = (try await API.fixtures(), try await API.textures())
+                    textures = available
+                    if edits == fixtureEdits, incoming != fixtures { fixtures = incoming }
+                    applyFixtures()
                 }
                 let generation = saves
                 let incoming = try await API.placements()
@@ -344,13 +354,113 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
         }
     }
 
-    private func applyFinishes(_ finishes: Finishes, _ textures: [WallTexture]) async {
-        finishChoice = (finishes, textures)
+    // MARK: Fixtures
+
+    func select(_ fixture: Fixture, _ option: String?) {
+        guard let index = fixtures.firstIndex(where: { $0.key == fixture.key }), fixtures[index].selected != option else { return }
+        fixtureEdits += 1
+        fixtures[index].selected = option
+        applyFixtures()
+        Task {
+            do {
+                let saved = try await API.select(fixture.key, option)
+                fixtureEdits += 1
+                store(saved)
+            } catch {
+                note = "Couldn't switch the \(fixture.title.lowercased()): \(error.localizedDescription)"
+                fixtureEdits += 1
+                if let fresh = try? await API.fixtures() { fixtures = fresh; applyFixtures() }
+            }
+        }
+    }
+
+    func importOption(_ fixture: Fixture, url: String) async throws {
+        let saved = try await API.importOption(fixture.key, url: url)
+        fixtureEdits += 1
+        // The new option's model or texture comes with the catalog or the texture list.
+        catalog = Dictionary(try await API.catalog().map { ($0.id, $0) }) { a, _ in a }
+        textures = try await API.textures()
+        store(saved)
+    }
+
+    func remove(_ fixture: Fixture, _ option: String) {
+        Task {
+            do {
+                let saved = try await API.remove(fixture.key, option)
+                fixtureEdits += 1
+                store(saved)
+            } catch {
+                note = "Couldn't remove it: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func store(_ fixture: Fixture) {
+        guard let index = fixtures.firstIndex(where: { $0.key == fixture.key }) else { return }
+        fixtures[index] = fixture
+        applyFixtures()
+    }
+
+    // Only the fixtures of the room you're standing in show, like the furniture.
+    private func applyFixtures() {
         guard let plan else { return }
-        do {
-            try await wallFinishes.apply(finishes, textures, plan: plan, room: room.flatMap(plan.rect(of:)))
-        } catch {
-            note = "Wall texture: \(error.localizedDescription)"
+        let tile = fixtures.first { $0.kind == .wallTexture }?.selected.flatMap { id in textures.first { $0.id == id }?.texture }
+        for fixture in fixtures {
+            let inRoom = fixture.room == room?.rawValue
+            switch fixture.kind {
+            case .item: showItem(fixture, inRoom: inRoom)
+            case .tv:
+                // The TV hangs on the texture's face when one is up.
+                let wallDepth = showsTextures ? tile.map { $0.depthIn / 12 + WallFinishes.standoffFeet } ?? 0 : 0
+                showTV(fixture, inRoom: inRoom, plan: plan, wallDepth: wallDepth)
+            case .wallTexture, .other: break
+            }
+        }
+        Task {
+            do {
+                try await wallFinishes.apply(tile, plan: plan, room: room.flatMap(plan.rect(of:)))
+            } catch {
+                note = "Wall texture: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func show(_ key: String, signature: String?, build: () -> Entity) {
+        guard shownFixtures[key]?.signature != signature else { return }
+        shownFixtures[key]?.entity.removeFromParent()
+        shownFixtures[key] = nil
+        guard let signature else { return }
+        let entity = build()
+        fixtureRoot.addChild(entity)
+        shownFixtures[key] = (signature, entity)
+    }
+
+    private func showTV(_ fixture: Fixture, inRoom: Bool, plan: Plan, wallDepth: Float) {
+        let tv = fixture.tv.flatMap { inRoom && $0.visible && fixture.selected != nil ? $0 : nil }
+        show(fixture.key, signature: tv.map { "\($0)|\(wallDepth)" }) {
+            let entity = TVEntity.make(tv!)
+            entity.transform = TVEntity.transform(tv!, mount: plan.tvMount, wallDepth: wallDepth)
+            return entity
+        }
+    }
+
+    // Back flush to the fixture's wall face and centered on it, the way the web plan places it.
+    private func showItem(_ fixture: Fixture, inRoom: Bool) {
+        let item = inRoom ? fixture.selected.flatMap { catalog[$0] } : nil
+        guard let spot = fixture.spot else { return }
+        show(fixture.key, signature: item.map { "\($0.signature)|\(spot)" }) {
+            let entity = Entity()
+            let template = template(for: item!)
+            Task {
+                let model = await template.value.clone(recursive: true)
+                guard shownFixtures[fixture.key]?.entity === entity else { return }
+                entity.addChild(model)
+                let halfDepth = model.visualBounds(relativeTo: entity).extents.z / 2
+                let yaw = spot.yaw * .pi / 180
+                entity.transform = Transform(rotation: simd_quatf(angle: yaw, axis: [0, 1, 0]),
+                                             translation: [spot.x + sin(yaw) * halfDepth, 0, spot.z + cos(yaw) * halfDepth])
+            }
+            return entity
         }
     }
 

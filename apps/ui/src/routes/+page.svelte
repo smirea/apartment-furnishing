@@ -1,16 +1,14 @@
 <script lang="ts">
-	import { bedWallFace, finishAreasIn, ft } from '@repo/shared/floorplan';
+	import { finishAreasIn } from '@repo/shared/floorplan';
+	import { FIXTURE_KEYS, type Fixture, type FixtureKey } from '@repo/shared/fixtures';
 	import {
 		panelsNeeded,
-		type BedSettings,
 		TV_RATIOS,
 		tvDiagonal,
 		tvSize,
-		type TvModel,
 		type TvSettings,
 		type CatalogEntry,
 		type CatalogItem,
-		type Finishes,
 		type FinishSurface,
 		type Placement,
 		type WallTexture,
@@ -30,11 +28,9 @@
 	const saved = JSON.parse(localStorage.getItem(OPTIONS_KEY) ?? '{}');
 	let cutaway = $state<boolean>(saved.cutaway ?? true);
 	let labels = $state<boolean>(saved.labels ?? false);
-	let open = $state<{ furniture: boolean; textures: boolean; tv: boolean; bed: boolean; ideas: boolean }>({
+	let open = $state<Record<FixtureKey | 'furniture' | 'ideas', boolean>>({
 		furniture: true,
-		textures: true,
-		tv: true,
-		bed: true,
+		...(Object.fromEntries(FIXTURE_KEYS.map(key => [key, true])) as Record<FixtureKey, boolean>),
 		ideas: false,
 		...saved.open,
 	});
@@ -55,42 +51,69 @@
 	}));
 	const catalogList = $derived(catalogQuery.data ?? []);
 	const catalog = $derived(Object.fromEntries(catalogList.map(item => [item.id, item])));
-	const furnitureList = $derived(catalogList.filter(item => item.category !== 'bed'));
-	const beds = $derived(catalogList.filter(item => item.category === 'bed'));
+	const fixturesQuery = createQuery(() => ({
+		queryKey: ['fixtures'],
+		queryFn: () => api<Fixture[]>('/api/fixtures'),
+		// The AR app switches fixtures too, and model and texture builds report progress through it.
+		refetchInterval: 3000,
+	}));
+	const fixtureList = $derived(fixturesQuery.data ?? []);
+	const fixtures = $derived(
+		Object.fromEntries(fixtureList.map(f => [f.key, f])) as Partial<Record<FixtureKey, Fixture>>,
+	);
+	// Products that belong to an item fixture, like beds, are picked in its panel rather than placed as furniture.
+	const fixtureCategories = $derived(
+		new Map(fixtureList.flatMap(f => (f.kind === 'item' ? [[f.category, f.key] as const] : []))),
+	);
+	const furnitureList = $derived(catalogList.filter(item => !fixtureCategories.has(item.category)));
 
-	const bedQuery = createQuery(() => ({ queryKey: ['bed'], queryFn: () => api<BedSettings>('/api/bed') }));
-	const bed = $derived(bedQuery.data?.itemId ? (catalog[bedQuery.data.itemId] ?? null) : null);
-	const BED_SPAN_IN = ft(bedWallFace.x2 - bedWallFace.x1) * 12;
-	const bedFacts = (item: CatalogItem) => {
-		const d = item.dimensions;
-		return [d && `${round1(d.width)} × ${round1(d.depth)} × ${round1(d.height)}″`, money(item)]
-			.filter(Boolean)
-			.join(' · ');
-	};
-	const sideRoom = (item: CatalogItem) => (item.dimensions ? (BED_SPAN_IN - item.dimensions.width) / 2 : null);
-	// Narrow nightstands start around 18 in; less than that beside the bed is a squeeze.
-	const NIGHTSTAND_MIN_IN = 18;
-	const bedPick = createMutation(() => ({
-		mutationFn: (itemId: string | null) =>
-			api<BedSettings>('/api/bed', { method: 'PUT', body: JSON.stringify({ itemId }) }),
-		onMutate: async (itemId: string | null) => {
-			await queryClient.cancelQueries({ queryKey: ['bed'] });
-			queryClient.setQueryData(['bed'], { itemId });
-		},
-		onSuccess: (saved: BedSettings) => queryClient.setQueryData(['bed'], saved),
-		onError: () => queryClient.invalidateQueries({ queryKey: ['bed'] }),
-	}));
-	let bedUrl = $state('');
-	// Adding a bed link also switches to it, since that is why it was pasted.
-	const bedImport = createMutation(() => ({
-		mutationFn: (url: string) =>
-			api<CatalogItem>('/api/catalog/import', { method: 'POST', body: JSON.stringify({ url, category: 'bed' }) }),
-		onSuccess: async (item: CatalogItem) => {
-			bedUrl = '';
-			await queryClient.invalidateQueries({ queryKey: ['catalog'] });
-			bedPick.mutate(item.id);
-		},
-	}));
+	function storeFixture(next: Fixture) {
+		void queryClient.cancelQueries({ queryKey: ['fixtures'] });
+		queryClient.setQueryData<Fixture[]>(['fixtures'], list => list?.map(f => (f.key === next.key ? next : f)));
+	}
+	const fixtureUrls = $state(Object.fromEntries(FIXTURE_KEYS.map(key => [key, ''])) as Record<FixtureKey, string>);
+	function fixtureMutations(key: FixtureKey) {
+		return {
+			select: createMutation(() => ({
+				mutationFn: (selected: string | null) =>
+					api<Fixture>(`/api/fixtures/${key}`, { method: 'PUT', body: JSON.stringify({ selected }) }),
+				onMutate: async (selected: string | null) => {
+					if (key === 'tv') dropTvDraft();
+					await queryClient.cancelQueries({ queryKey: ['fixtures'] });
+					queryClient.setQueryData<Fixture[]>(['fixtures'], list =>
+						list?.map(f => (f.key === key ? { ...f, selected } : f)),
+					);
+				},
+				onSuccess: storeFixture,
+				onError: () => queryClient.invalidateQueries({ queryKey: ['fixtures'] }),
+			})),
+			import: createMutation(() => ({
+				mutationFn: (url: string) =>
+					api<Fixture>(`/api/fixtures/${key}/import`, { method: 'POST', body: JSON.stringify({ url }) }),
+				onSuccess: async (next: Fixture) => {
+					fixtureUrls[key] = '';
+					if (key === 'tv') dropTvDraft();
+					storeFixture(next);
+					await queryClient.invalidateQueries({ queryKey: [next.kind === 'wallTexture' ? 'textures' : 'catalog'] });
+				},
+			})),
+			build: createMutation(() => ({
+				mutationFn: (id: string) => api<Fixture>(`/api/fixtures/${key}/options/${id}/build`, { method: 'POST' }),
+				onSuccess: async (next: Fixture) => {
+					storeFixture(next);
+					await queryClient.invalidateQueries({ queryKey: ['textures'] });
+				},
+			})),
+			remove: createMutation(() => ({
+				mutationFn: (id: string) => api<Fixture>(`/api/fixtures/${key}/options/${id}`, { method: 'DELETE' }),
+				onSuccess: storeFixture,
+			})),
+		};
+	}
+	const fixtureActions = Object.fromEntries(FIXTURE_KEYS.map(key => [key, fixtureMutations(key)])) as Record<
+		FixtureKey,
+		ReturnType<typeof fixtureMutations>
+	>;
 
 	const ideasQuery = createQuery(() => ({
 		queryKey: ['ideas'],
@@ -109,16 +132,6 @@
 			query.state.data?.some(t => t.textureJob && t.textureJob.state !== 'failed') ? 3000 : false,
 	}));
 	const textureList = $derived(texturesQuery.data ?? []);
-	const finishesQuery = createQuery(() => ({
-		queryKey: ['finishes'],
-		queryFn: () => api<Finishes>('/api/finishes'),
-	}));
-	const finishes = $derived(finishesQuery.data ?? { tvWall: null, column: null });
-	const finishMutation = createMutation(() => ({
-		mutationFn: (patch: Partial<Finishes>) =>
-			api<Finishes>('/api/finishes', { method: 'PUT', body: JSON.stringify(patch) }),
-		onSuccess: (next: Finishes) => queryClient.setQueryData(['finishes'], next),
-	}));
 	// Swatches show the tile at a fixed scale so slat widths compare across products.
 	const SWATCH_PX_PER_FT = 40;
 	const textureGroups = $derived(
@@ -126,13 +139,11 @@
 			.map(([group, items]) => [group, items!.toSorted((a, b) => a.name.localeCompare(b.name))] as const)
 			.toSorted(([a], [b]) => a.localeCompare(b)),
 	);
-	// One texture dresses both the TV wall and the column.
-	const applied = (t: WallTexture) => finishes.tvWall === t.id || finishes.column === t.id;
+	const applied = (t: WallTexture) => fixtures.wallTexture?.selected === t.id;
 	function clickSwatch(t: WallTextureEntry) {
-		if (t.texture && t.textureJob?.state !== 'failed') {
-			const id = applied(t) ? null : t.id;
-			finishMutation.mutate({ tvWall: id, column: id });
-		} else if (!t.textureJob || t.textureJob.state === 'failed') textureGenerate.mutate(t.id);
+		if (t.texture && t.textureJob?.state !== 'failed')
+			fixtureActions.wallTexture.select.mutate(applied(t) ? null : t.id);
+		else if (!t.textureJob || t.textureJob.state === 'failed') fixtureActions.wallTexture.build.mutate(t.id);
 	}
 	let tip = $state<{ texture: WallTextureEntry; x: number; y: number } | null>(null);
 	function showTip(texture: WallTextureEntry, el: HTMLElement) {
@@ -141,20 +152,6 @@
 		const x = r.right + 8 + width > innerWidth ? Math.max(8, r.left - width - 8) : r.right + 8;
 		tip = { texture, x: Math.min(x, innerWidth - width - 8), y: Math.max(8, Math.min(r.top, innerHeight - 300)) };
 	}
-
-	let textureUrl = $state('');
-	const textureImport = createMutation(() => ({
-		mutationFn: (url: string) =>
-			api<WallTexture>('/api/textures/import', { method: 'POST', body: JSON.stringify({ url }) }),
-		onSuccess: async () => {
-			textureUrl = '';
-			await queryClient.invalidateQueries({ queryKey: ['textures'] });
-		},
-	}));
-	const textureGenerate = createMutation(() => ({
-		mutationFn: (id: string) => api(`/api/textures/${id}/generate`, { method: 'POST' }),
-		onSuccess: () => queryClient.invalidateQueries({ queryKey: ['textures'] }),
-	}));
 
 	function estimate(t: WallTexture, surface: FinishSurface) {
 		if (!t.panel) return null;
@@ -255,9 +252,11 @@
 		onSuccess: async (item: CatalogItem) => {
 			importUrl = '';
 			await queryClient.invalidateQueries({ queryKey: ['catalog'] });
-			if (item.category !== 'bed') return addToRoom(item.id);
-			open.bed = true;
-			bedPick.mutate(item.id);
+			const fixture = fixtureCategories.get(item.category);
+			if (!fixture) return addToRoom(item.id);
+			// The server made it the fixture's pick.
+			open[fixture] = true;
+			await queryClient.invalidateQueries({ queryKey: ['fixtures'] });
 		},
 	}));
 
@@ -266,37 +265,40 @@
 		onSuccess: () => queryClient.invalidateQueries({ queryKey: ['catalog'] }),
 	}));
 
-	let tv = $state<TvSettings | null>(null);
+	// Hand edits stay local until their save lands, so a fixtures poll can't snap the inputs back mid-drag.
+	let tvDraft = $state<TvSettings | null>(null);
+	const tv = $derived(tvDraft ?? fixtures.tv?.tv ?? null);
 	let tvError = $state<string | null>(null);
 	let tvSaveTimer: ReturnType<typeof setTimeout> | undefined;
 	function updateTv(patch: Partial<TvSettings>) {
 		if (!tv) return;
-		tv = { ...tv, ...patch };
+		tvDraft = { ...tv, ...patch };
 		clearTimeout(tvSaveTimer);
-		tvSaveTimer = setTimeout(() => {
-			api<TvSettings>('/api/tv', { method: 'PUT', body: JSON.stringify($state.snapshot(tv)) }).then(
-				() => (tvError = null),
-				(error: Error) => (tvError = error.message),
-			);
-		}, SAVE_DELAY_MS);
+		tvSaveTimer = setTimeout(() => void saveTv(), SAVE_DELAY_MS);
+	}
+	async function saveTv() {
+		tvSaveTimer = undefined;
+		const sent = $state.snapshot(tvDraft);
+		try {
+			storeFixture(await api<Fixture>('/api/tv', { method: 'PUT', body: JSON.stringify(sent) }));
+			tvError = null;
+			if (!tvSaveTimer && JSON.stringify($state.snapshot(tvDraft)) === JSON.stringify(sent)) tvDraft = null;
+		} catch (error) {
+			tvError = (error as Error).message;
+		}
+	}
+	function dropTvDraft() {
+		clearTimeout(tvSaveTimer);
+		tvSaveTimer = undefined;
+		tvDraft = null;
 	}
 	const round1 = (n: number) => Math.round(n * 10) / 10;
-	const tvModelsQuery = createQuery(() => ({ queryKey: ['tvs'], queryFn: () => api<TvModel[]>('/api/tvs') }));
-	const tvModels = $derived(tvModelsQuery.data ?? []);
-	let tvUrl = $state('');
-	// Adding a TV link also switches to its size, since that is why it was pasted.
-	const tvImport = createMutation(() => ({
-		mutationFn: (url: string) => api<TvModel>('/api/tvs/import', { method: 'POST', body: JSON.stringify({ url }) }),
-		onSuccess: async (m: TvModel) => {
-			tvUrl = '';
-			updateTv({ widthIn: m.widthIn, heightIn: m.heightIn });
-			await queryClient.invalidateQueries({ queryKey: ['tvs'] });
-		},
-	}));
-	const tvRemove = createMutation(() => ({
-		mutationFn: (id: string) => api(`/api/tvs/${id}`, { method: 'DELETE' }),
-		onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tvs'] }),
-	}));
+	function fixtureSummary(f: Fixture) {
+		if (f.kind === 'tv') return tv?.visible ? `${round1(tvDiagonal(tv))}″` : 'off';
+		if (f.kind === 'wallTexture') return String(f.options.length);
+		const d = f.selected ? catalog[f.selected]?.dimensions : null;
+		return d ? `${round1(d.width)}″ × ${round1(d.depth)}″` : '';
+	}
 	const positive = (value: string) => (Number(value) > 0 ? Number(value) : null);
 	const tvRatio = $derived(
 		tv ? TV_RATIOS.findIndex(([w, h]) => Math.abs(tv!.widthIn / tv!.heightIn - w / h) < 0.01) : -1,
@@ -322,7 +324,6 @@
 			(key, position, rotation) => patchPlacement(key, { position, rotation }),
 		);
 		viewer = v;
-		void api<TvSettings>('/api/tv').then(data => (tv = data));
 		void api<Placement[]>('/api/placements').then(data => {
 			placements = data;
 			placementsLoaded = true;
@@ -340,14 +341,16 @@
 		if (viewer && tv) viewer.setTv($state.snapshot(tv));
 	});
 	$effect(() => {
-		if (viewer && bedQuery.data) viewer.setBed(bed);
+		if (!viewer || !catalogQuery.data) return;
+		for (const f of fixtureList)
+			if (f.kind === 'item') viewer.setWallItem(f.key, f.spot, f.selected ? (catalog[f.selected] ?? null) : null);
 	});
 	$effect(() => {
 		if (viewer && (placementsLoaded || placements.length)) viewer.setPlacements($state.snapshot(placements), catalog);
 	});
 	$effect(() => {
-		const byId = Object.fromEntries(textureList.map(t => [t.id, t]));
-		viewer?.setFinishes({ tvWall: byId[finishes.tvWall ?? ''] ?? null, column: byId[finishes.column ?? ''] ?? null });
+		const id = fixtures.wallTexture?.selected;
+		viewer?.setWallTexture(textureList.find(t => t.id === id) ?? null);
 	});
 	$effect(() => localStorage.setItem(OPTIONS_KEY, JSON.stringify({ cutaway, labels, open })));
 </script>
@@ -378,274 +381,223 @@
 	</header>
 
 	{#if mode === 'orbit'}
-		<section class="panel items textures">
-			<button
-				type="button"
-				class="section-toggle"
-				aria-expanded={open.textures}
-				onclick={() => (open.textures = !open.textures)}
-			>
-				Living room wall texture <span class="muted">{textureList.length}</span>
-			</button>
-			{#if open.textures}
-				{#if finishMutation.isError}
-					<p class="error">{finishMutation.error.message}</p>
-				{/if}
-				{#each textureGroups as [group, items] (group)}
-					<h3 class="group">{group} <span class="muted">{items.length}</span></h3>
-					<div class="swatches">
-						{#each items as t (t.id)}
-							<button
-								type="button"
-								class="swatch"
-								class:on-target={applied(t)}
-								class:busy={t.textureJob?.state === 'queued' || t.textureJob?.state === 'running'}
-								class:failed={t.textureJob?.state === 'failed'}
-								style:background-image="url({t.texture?.map ?? t.image})"
-								style:background-size={t.texture
-									? `${(t.texture.repeat.width / 12) * SWATCH_PX_PER_FT}px auto`
-									: 'cover'}
-								aria-label={t.name}
-								onclick={() => clickSwatch(t)}
-								onpointerenter={e => showTip(t, e.currentTarget)}
-								onpointerleave={() => (tip = null)}
-								onfocus={e => showTip(t, e.currentTarget)}
-								onblur={() => (tip = null)}
-							>
-							</button>
-						{/each}
-					</div>
-				{/each}
-				{#if textureImport.isPending}<div class="swatches">
-						<span class="swatch busy" aria-label="Importing"></span>
-					</div>{/if}
-				{#if !textureList.length && !textureImport.isPending}
-					<p class="muted">
-						{texturesQuery.isPending ? 'Loading…' : 'Paste a wall panel link to cover the TV wall and the column.'}
-					</p>
-				{/if}
-				<form
-					class="import"
-					onsubmit={e => {
-						e.preventDefault();
-						if (textureUrl.trim()) textureImport.mutate(textureUrl.trim());
-					}}
+		{#each fixtureList as f (f.key)}
+			{@const actions = fixtureActions[f.key]}
+			<section class="panel items fixture">
+				<button
+					type="button"
+					class="section-toggle"
+					aria-expanded={open[f.key]}
+					onclick={() => (open[f.key] = !open[f.key])}
 				>
-					<input
-						type="url"
-						placeholder="Paste a wall panel link"
-						bind:value={textureUrl}
-						disabled={textureImport.isPending}
-					/>
-					<button type="submit" class="primary" disabled={textureImport.isPending || !textureUrl.trim()}>
-						{textureImport.isPending ? 'Importing…' : 'Import'}
-					</button>
-				</form>
-				{#if textureImport.isError}
-					<p class="error">{textureImport.error.message}</p>
-				{/if}
-			{/if}
-		</section>
-
-		<section class="panel items tv">
-			<button type="button" class="section-toggle" aria-expanded={open.tv} onclick={() => (open.tv = !open.tv)}>
-				TV <span class="muted">{tv ? `${round1(tvDiagonal(tv))}″` : ''}</span>
-			</button>
-			{#if open.tv && tv}
-				<label class="check"
-					><input type="checkbox" checked={tv.visible} onchange={e => updateTv({ visible: e.currentTarget.checked })} />
-					On the TV wall</label
-				>
-				<div class="tv-fields">
-					<label
-						>Diagonal
-						<input
-							type="number"
-							min="10"
-							step="1"
-							value={round1(tvDiagonal(tv))}
-							onchange={e => setDiagonal(e.currentTarget.value)}
-						/>
-					</label>
-					<label
-						>Ratio
-						<select
-							value={tvRatio}
-							onchange={e => updateTv(tvSize(tvDiagonal(tv!), TV_RATIOS[Number(e.currentTarget.value)]!))}
+					{f.kind === 'wallTexture' ? `${f.room} wall texture` : f.title}
+					<span class="muted">{fixtureSummary(f)}</span>
+				</button>
+				{#if open[f.key]}
+					{#if f.kind === 'tv' && tv}
+						<label class="check"
+							><input
+								type="checkbox"
+								checked={tv.visible}
+								onchange={e => updateTv({ visible: e.currentTarget.checked })}
+							/>
+							On the TV wall</label
 						>
-							{#each TV_RATIOS as [w, h], i (i)}<option value={i}>{w}:{h}</option>{/each}
-							{#if tvRatio === -1}<option value={-1} disabled>{round1((tv.widthIn / tv.heightIn) * 9)}:9</option>{/if}
-						</select>
-					</label>
-					<label
-						>Width
-						<input
-							type="number"
-							min="1"
-							step="0.1"
-							value={round1(tv.widthIn)}
-							onchange={e => {
-								const widthIn = positive(e.currentTarget.value);
-								if (widthIn) updateTv({ widthIn });
-							}}
-						/>
-					</label>
-					<label
-						>Height
-						<input
-							type="number"
-							min="1"
-							step="0.1"
-							value={round1(tv.heightIn)}
-							onchange={e => {
-								const heightIn = positive(e.currentTarget.value);
-								if (heightIn) updateTv({ heightIn });
-							}}
-						/>
-					</label>
-					<label
-						>Center {round1(tv.centerIn)}″
-						<input
-							type="range"
-							min={Math.ceil(tv.heightIn / 2)}
-							max={Math.floor(120 - tv.heightIn / 2)}
-							step="0.5"
-							value={tv.centerIn}
-							oninput={e => updateTv({ centerIn: Number(e.currentTarget.value) })}
-						/>
-					</label>
-					<label
-						>Tilt {tv.tiltDeg}°
-						<input
-							type="range"
-							min="0"
-							max="15"
-							step="1"
-							value={tv.tiltDeg}
-							oninput={e => updateTv({ tiltDeg: Number(e.currentTarget.value) })}
-						/>
-					</label>
-				</div>
-				<p class="muted">
-					Inches. Bottom edge {round1(tv.centerIn - tv.heightIn / 2)}″ off the floor, top {round1(
-						tv.centerIn + tv.heightIn / 2,
-					)}″, centered on the wall.
-				</p>
-				{#if tvError}<p class="error">{tvError}</p>{/if}
-				{#if tvModels.length}
-					<ul class="tv-models">
-						{#each tvModels as m (m.id)}
-							<li class:current={Math.abs(m.widthIn - tv.widthIn) < 0.05 && Math.abs(m.heightIn - tv.heightIn) < 0.05}>
-								<button
-									type="button"
-									class="pick"
-									onclick={() => updateTv({ widthIn: m.widthIn, heightIn: m.heightIn })}
-									>{round1(tvDiagonal(m))}″</button
+						<div class="tv-fields">
+							<label
+								>Diagonal
+								<input
+									type="number"
+									min="10"
+									step="1"
+									value={round1(tvDiagonal(tv))}
+									onchange={e => setDiagonal(e.currentTarget.value)}
+								/>
+							</label>
+							<label
+								>Ratio
+								<select
+									value={tvRatio}
+									onchange={e => updateTv(tvSize(tvDiagonal(tv!), TV_RATIOS[Number(e.currentTarget.value)]!))}
 								>
-								<a href={m.url} target="_blank" rel="noreferrer" title={m.name}>{m.name}</a>
-								<button type="button" class="remove" aria-label="Remove {m.name}" onclick={() => tvRemove.mutate(m.id)}
-									>×</button
-								>
-							</li>
-						{/each}
-					</ul>
-				{/if}
-				<form
-					class="import"
-					onsubmit={e => {
-						e.preventDefault();
-						if (tvUrl.trim()) tvImport.mutate(tvUrl.trim());
-					}}
-				>
-					<input
-						type="url"
-						placeholder="Paste a TV link for its size"
-						bind:value={tvUrl}
-						disabled={tvImport.isPending}
-					/>
-					<button type="submit" class="primary" disabled={tvImport.isPending || !tvUrl.trim()}>
-						{tvImport.isPending ? 'Reading…' : 'Add'}
-					</button>
-				</form>
-				{#if tvImport.isError}<p class="error">{tvImport.error.message}</p>{/if}
-			{/if}
-		</section>
-
-		<section class="panel items bed">
-			<button type="button" class="section-toggle" aria-expanded={open.bed} onclick={() => (open.bed = !open.bed)}>
-				Bed <span class="muted"
-					>{bed?.dimensions ? `${round1(bed.dimensions.width)}″ × ${round1(bed.dimensions.depth)}″` : ''}</span
-				>
-			</button>
-			{#if open.bed}
-				<ul>
-					{#if bedImport.isPending}
-						<li class="bed-option">
-							<span class="pick">
-								<span class="thumb"></span>
-								<span class="text">
-									<strong>{new URL(bedImport.variables).hostname.replace('www.', '')} link</strong>
-									<span class="status busy">Importing · reading the page (about a minute)</span>
-								</span>
-							</span>
-						</li>
-					{/if}
-					{#each beds as item (item.id)}
-						{@const side = sideRoom(item)}
-						<li class="bed-option" class:current={item.id === bed?.id}>
-							<button
-								type="button"
-								class="pick"
-								aria-pressed={item.id === bed?.id}
-								onclick={() => bedPick.mutate(item.id === bed?.id ? null : item.id)}
-							>
-								{#if item.image}<img src={item.image} alt="" />{:else}<span class="thumb"></span>{/if}
-								<span class="text">
-									<strong>{item.name}</strong>
-									<span class="muted">{bedFacts(item)}</span>
-									{#if side !== null}<span
-											class:muted={side >= NIGHTSTAND_MIN_IN}
-											class:error={side < NIGHTSTAND_MIN_IN}>{round1(side)}″ each side</span
+									{#each TV_RATIOS as [w, h], i (i)}<option value={i}>{w}:{h}</option>{/each}
+									{#if tvRatio === -1}<option value={-1} disabled>{round1((tv.widthIn / tv.heightIn) * 9)}:9</option
 										>{/if}
-									{#if item.modelJob?.state === 'running'}
-										<span class="status busy">Building 3D model · 2–5 min</span>
-									{:else if item.modelJob?.state === 'failed'}
-										<span class="status failed" title={item.modelJob.error}>3D model failed</span>
-									{/if}
-								</span>
-							</button>
-							{#if item.modelJob?.state === 'failed'}
-								<button type="button" onclick={() => generateMutation.mutate(item.id)}>Retry 3D</button>
-							{:else}
-								<a href={item.url} target="_blank" rel="noreferrer" aria-label="Open {item.name} listing">↗</a>
-							{/if}
-						</li>
+								</select>
+							</label>
+							<label
+								>Width
+								<input
+									type="number"
+									min="1"
+									step="0.1"
+									value={round1(tv.widthIn)}
+									onchange={e => {
+										const widthIn = positive(e.currentTarget.value);
+										if (widthIn) updateTv({ widthIn });
+									}}
+								/>
+							</label>
+							<label
+								>Height
+								<input
+									type="number"
+									min="1"
+									step="0.1"
+									value={round1(tv.heightIn)}
+									onchange={e => {
+										const heightIn = positive(e.currentTarget.value);
+										if (heightIn) updateTv({ heightIn });
+									}}
+								/>
+							</label>
+							<label
+								>Center {round1(tv.centerIn)}″
+								<input
+									type="range"
+									min={Math.ceil(tv.heightIn / 2)}
+									max={Math.floor(120 - tv.heightIn / 2)}
+									step="0.5"
+									value={tv.centerIn}
+									oninput={e => updateTv({ centerIn: Number(e.currentTarget.value) })}
+								/>
+							</label>
+							<label
+								>Tilt {tv.tiltDeg}°
+								<input
+									type="range"
+									min="0"
+									max="15"
+									step="1"
+									value={tv.tiltDeg}
+									oninput={e => updateTv({ tiltDeg: Number(e.currentTarget.value) })}
+								/>
+							</label>
+						</div>
+						<p class="muted">
+							Inches. Bottom edge {round1(tv.centerIn - tv.heightIn / 2)}″ off the floor, top {round1(
+								tv.centerIn + tv.heightIn / 2,
+							)}″, centered on the wall.
+						</p>
+						{#if tvError}<p class="error">{tvError}</p>{/if}
+					{/if}
+					{#if actions.select.isError}<p class="error">{actions.select.error.message}</p>{/if}
+					{#if actions.build.isError}<p class="error">{actions.build.error.message}</p>{/if}
+					{#if f.kind === 'wallTexture'}
+						{#each textureGroups as [group, items] (group)}
+							<h3 class="group">{group} <span class="muted">{items.length}</span></h3>
+							<div class="swatches">
+								{#each items as t (t.id)}
+									<button
+										type="button"
+										class="swatch"
+										class:on-target={applied(t)}
+										class:busy={t.textureJob?.state === 'queued' || t.textureJob?.state === 'running'}
+										class:failed={t.textureJob?.state === 'failed'}
+										style:background-image="url({t.texture?.map ?? t.image})"
+										style:background-size={t.texture
+											? `${(t.texture.repeat.width / 12) * SWATCH_PX_PER_FT}px auto`
+											: 'cover'}
+										aria-label={t.name}
+										onclick={() => clickSwatch(t)}
+										onpointerenter={e => showTip(t, e.currentTarget)}
+										onpointerleave={() => (tip = null)}
+										onfocus={e => showTip(t, e.currentTarget)}
+										onblur={() => (tip = null)}
+									>
+									</button>
+								{/each}
+							</div>
+						{/each}
+						{#if actions.import.isPending}<div class="swatches">
+								<span class="swatch busy" aria-label="Importing"></span>
+							</div>{/if}
 					{:else}
-						{#if !bedImport.isPending}
-							<li class="muted">{catalogQuery.isPending ? 'Loading…' : 'No beds yet. Paste a link below.'}</li>
-						{/if}
-					{/each}
-				</ul>
-				<p class="muted">
-					Headboard flush to the north wall, centered on its {round1(BED_SPAN_IN)}″. Click a bed to switch, click it
-					again to clear the room.
-				</p>
-				{#if bedPick.isError}<p class="error">{bedPick.error.message}</p>{/if}
-				<form
-					class="import"
-					onsubmit={e => {
-						e.preventDefault();
-						if (bedUrl.trim()) bedImport.mutate(bedUrl.trim());
-					}}
-				>
-					<input type="url" placeholder="Paste a bed link" bind:value={bedUrl} disabled={bedImport.isPending} />
-					<button type="submit" class="primary" disabled={bedImport.isPending || !bedUrl.trim()}>
-						{bedImport.isPending ? 'Importing…' : 'Import'}
-					</button>
-				</form>
-				{#if bedImport.isError}<p class="error">{bedImport.error.message}</p>{/if}
-			{/if}
-		</section>
+						<ul>
+							{#if actions.import.isPending}
+								<li class="fixture-option">
+									<span class="pick">
+										<span class="thumb"></span>
+										<span class="text">
+											<strong>{new URL(actions.import.variables).hostname.replace('www.', '')} link</strong>
+											<span class="status busy">Importing · reading the page (about a minute)</span>
+										</span>
+									</span>
+								</li>
+							{/if}
+							{#each f.options as option (option.id)}
+								<li class="fixture-option" class:current={option.id === f.selected}>
+									<button
+										type="button"
+										class="pick"
+										aria-pressed={option.id === f.selected}
+										disabled={!option.ready}
+										onclick={() => actions.select.mutate(option.id === f.selected ? null : option.id)}
+									>
+										{#if option.image}<img src={option.image} alt="" />{:else}<span class="thumb"></span>{/if}
+										<span class="text">
+											<strong>{option.name}</strong>
+											<span class="muted">{option.detail}</span>
+											{#if option.warning}<span class="error">{option.warning}</span>{/if}
+											{#if option.job?.state === 'queued' || option.job?.state === 'running'}
+												<span class="status busy">Building · 2–5 min</span>
+											{:else if option.job?.state === 'failed'}
+												<span class="status failed" title={option.job.error}>Build failed</span>
+											{/if}
+										</span>
+									</button>
+									{#if option.job?.state === 'failed'}
+										<button type="button" onclick={() => actions.build.mutate(option.id)}>Retry</button>
+									{:else if option.url}
+										<a href={option.url} target="_blank" rel="noreferrer" aria-label="Open {option.name} listing">↗</a>
+									{/if}
+									{#if f.removable && option.url}
+										<button
+											type="button"
+											class="remove"
+											aria-label="Remove {option.name}"
+											onclick={() => actions.remove.mutate(option.id)}>×</button
+										>
+									{/if}
+								</li>
+							{:else}
+								{#if !actions.import.isPending}
+									<li class="muted">Nothing yet. Paste a link below.</li>
+								{/if}
+							{/each}
+						</ul>
+					{/if}
+					{#if f.kind === 'item'}
+						<p class="muted">
+							Back flush to the wall, centered on its {round1(f.spot.span * 12)}″. Click one to switch to it, again to
+							clear the room.
+						</p>
+					{/if}
+					<form
+						class="import"
+						onsubmit={e => {
+							e.preventDefault();
+							if (fixtureUrls[f.key].trim()) actions.import.mutate(fixtureUrls[f.key].trim());
+						}}
+					>
+						<input
+							type="url"
+							placeholder={f.importLabel}
+							bind:value={fixtureUrls[f.key]}
+							disabled={actions.import.isPending}
+						/>
+						<button type="submit" class="primary" disabled={actions.import.isPending || !fixtureUrls[f.key].trim()}>
+							{actions.import.isPending ? 'Importing…' : 'Import'}
+						</button>
+					</form>
+					{#if actions.import.isError}<p class="error">{actions.import.error.message}</p>{/if}
+				{/if}
+			</section>
+		{:else}
+			<section class="panel items">
+				<p class="muted">{fixturesQuery.isError ? fixturesQuery.error.message : 'Loading…'}</p>
+			</section>
+		{/each}
 
 		<section class="panel items">
 			<button
@@ -1012,51 +964,20 @@
 		background: color-mix(in srgb, var(--app-error) 55%, transparent);
 	}
 
-	.tv-models {
-		display: grid;
-		gap: 0.25rem;
-		margin: 0;
-		padding: 0;
-		list-style: none;
-	}
-
-	.tv-models li {
-		display: grid;
-		grid-template-columns: auto 1fr auto;
-		gap: 0.5rem;
-		align-items: center;
-	}
-
-	.tv-models a {
-		overflow: hidden;
-		color: var(--app-text);
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.tv-models .pick {
-		min-width: 3.4rem;
-		padding: 0.2rem 0.4rem;
-	}
-
-	.tv-models li.current .pick {
-		border-color: var(--app-accent);
-		background: var(--app-accent);
-		color: var(--app-accent-ink);
-	}
-
-	.tv-models .remove {
+	.fixture-option .remove {
 		padding: 0 0.4rem;
 		border: none;
 		color: var(--app-muted);
 		font-size: 1.1rem;
 	}
 
-	.items li.bed-option {
-		grid-template-columns: 1fr auto;
+	.items li.fixture-option {
+		grid-template-columns: 1fr;
+		grid-auto-columns: auto;
+		grid-auto-flow: column;
 	}
 
-	.bed-option .pick {
+	.fixture-option .pick {
 		display: grid;
 		grid-template-columns: 3rem 1fr;
 		gap: 0.6rem;
@@ -1068,22 +989,22 @@
 		text-align: left;
 	}
 
-	.bed-option.current .pick {
+	.fixture-option.current .pick {
 		border-color: var(--app-accent);
 	}
 
-	.bed-option .text {
+	.fixture-option .text {
 		display: grid;
 		min-width: 0;
 	}
 
-	.bed-option .text strong {
+	.fixture-option .text strong {
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 
-	.bed-option a {
+	.fixture-option a {
 		padding: 0 0.4rem;
 		color: var(--app-muted);
 		text-decoration: none;

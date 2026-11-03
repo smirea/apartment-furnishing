@@ -25,7 +25,9 @@ const failure = await importTextures(urls, console.log).then(
 const textures = (await (await fetch(new URL('/api/textures', env.SERVER_URL))).json()) as WallTextureEntry[];
 for (const texture of textures) {
 	if (texture.textureJob || (texture.texture && !(rebuild && imported.includes(texture.id)))) continue;
-	const res = await fetch(new URL(`/api/textures/${texture.id}/generate`, env.SERVER_URL), { method: 'POST' });
+	const res = await fetch(new URL(`/api/fixtures/wallTexture/options/${texture.id}/build`, env.SERVER_URL), {
+		method: 'POST',
+	});
 	if (!res.ok) throw new Error(`queueing ${texture.id}: ${res.status} ${await res.text()}`);
 }
 if (failure) throw failure;

@@ -1,6 +1,6 @@
 // Wall textures: wall-panel products imported like furniture (page capture, grok, photos), then turned into a
-// seamless tile by Codex instead of a 3D model. Finishes record which texture each living-room surface wears.
-import type { Finishes, FinishSurface, Job, WallTexture } from '@repo/shared/items';
+// seamless tile by Codex instead of a 3D model. The wallTexture fixture (fixtures.ts) picks which one the living room wears.
+import type { Job, WallTexture } from '@repo/shared/items';
 import { copyFile, mkdir, mkdtemp, readdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -20,11 +20,8 @@ import { collectPhotos, runCodex } from './generate-model';
 const TEXTURE_DIR = join(DATA_DIR, 'textures');
 // Spec-sheet text saved next to the photos at import, so texture builds (and rebuilds) get exact slat sizes.
 const SPEC_FILE = 'spec.txt';
-const FINISHES_FILE = join(DATA_DIR, 'finishes.json');
 const PROMPT_FILE = Bun.file(join(import.meta.dir, 'texture-prompt.md'));
 if (!(await PROMPT_FILE.exists())) throw new Error(`missing ${PROMPT_FILE.name}`);
-
-export const FINISH_SURFACES: FinishSurface[] = ['tvWall', 'column'];
 
 export async function listTextures(): Promise<WallTexture[]> {
 	await mkdir(TEXTURE_DIR, { recursive: true });
@@ -37,15 +34,6 @@ export const readTexture = (id: string): Promise<WallTexture> => Bun.file(join(T
 
 const saveTexture = (texture: WallTexture) =>
 	writeFile(join(TEXTURE_DIR, `${texture.id}.json`), JSON.stringify(texture, null, '\t') + '\n');
-
-export async function readFinishes(): Promise<Finishes> {
-	const file = Bun.file(FINISHES_FILE);
-	return (await file.exists()) ? file.json() : { tvWall: null, column: null };
-}
-
-export async function saveFinishes(finishes: Finishes) {
-	await writeFile(FINISHES_FILE, JSON.stringify(finishes, null, '\t') + '\n');
-}
 
 const panelSchema = {
 	type: 'object',
