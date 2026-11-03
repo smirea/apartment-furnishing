@@ -10,6 +10,7 @@
 		type CatalogEntry,
 		type CatalogItem,
 		type FinishSurface,
+		type Job,
 		type Placement,
 		type WallTexture,
 		type WallTextureEntry,
@@ -53,7 +54,11 @@
 	const catalog = $derived(Object.fromEntries(catalogList.map(item => [item.id, item])));
 	const fixturesQuery = createQuery(() => ({
 		queryKey: ['fixtures'],
-		queryFn: () => api<Fixture[]>('/api/fixtures'),
+		// A poll answered while a pick is saving would show the old pick for a cycle.
+		queryFn: async () => {
+			const data = await api<Fixture[]>('/api/fixtures');
+			return picksSaving ? (queryClient.getQueryData<Fixture[]>(['fixtures']) ?? data) : data;
+		},
 		// The AR app switches fixtures too, and model and texture builds report progress through it.
 		refetchInterval: 3000,
 	}));
@@ -66,6 +71,24 @@
 		new Map(fixtureList.flatMap(f => (f.kind === 'item' ? [[f.category, f.key] as const] : []))),
 	);
 	const furnitureList = $derived(catalogList.filter(item => !fixtureCategories.has(item.category)));
+	let picksSaving = 0;
+	// The plan draws picks from the catalog and texture lists, which only refresh on their own while a build they know
+	// about runs. A pick or build started elsewhere, like the AR app importing a bed, has to refresh them from here.
+	$effect(() => {
+		const building = (job: Job | null | undefined) => job?.state === 'queued' || job?.state === 'running';
+		for (const f of fixtureList) {
+			const textures = f.kind === 'wallTexture';
+			if (!textures && f.kind !== 'item') continue;
+			const known = textures
+				? texturesQuery.data?.map(t => ({ id: t.id, job: t.textureJob }))
+				: catalogQuery.data?.map(item => ({ id: item.id, job: item.modelJob }));
+			if (!known) continue;
+			const stale =
+				(f.selected && !known.some(x => x.id === f.selected)) ||
+				f.options.some(o => building(o.job) && !building(known.find(x => x.id === o.id)?.job));
+			if (stale) void queryClient.invalidateQueries({ queryKey: [textures ? 'textures' : 'catalog'] });
+		}
+	});
 
 	function storeFixture(next: Fixture) {
 		void queryClient.cancelQueries({ queryKey: ['fixtures'] });
@@ -78,6 +101,7 @@
 				mutationFn: (selected: string | null) =>
 					api<Fixture>(`/api/fixtures/${key}`, { method: 'PUT', body: JSON.stringify({ selected }) }),
 				onMutate: async (selected: string | null) => {
+					picksSaving++;
 					if (key === 'tv') dropTvDraft();
 					await queryClient.cancelQueries({ queryKey: ['fixtures'] });
 					queryClient.setQueryData<Fixture[]>(['fixtures'], list =>
@@ -86,6 +110,7 @@
 				},
 				onSuccess: storeFixture,
 				onError: () => queryClient.invalidateQueries({ queryKey: ['fixtures'] }),
+				onSettled: () => picksSaving--,
 			})),
 			import: createMutation(() => ({
 				mutationFn: (url: string) =>
@@ -101,7 +126,7 @@
 				mutationFn: (id: string) => api<Fixture>(`/api/fixtures/${key}/options/${id}/build`, { method: 'POST' }),
 				onSuccess: async (next: Fixture) => {
 					storeFixture(next);
-					await queryClient.invalidateQueries({ queryKey: ['textures'] });
+					await queryClient.invalidateQueries({ queryKey: [next.kind === 'wallTexture' ? 'textures' : 'catalog'] });
 				},
 			})),
 			remove: createMutation(() => ({

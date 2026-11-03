@@ -81,7 +81,7 @@ The TV, the bed and the living-room wall texture are fixtures: built-in spots th
 - `POST /api/fixtures/:key/import` with `{ "url" }` imports a product link as a new option, and picks it when it can show right away.
 - `POST /api/fixtures/:key/options/:id/build` retries a failed model or texture build; `DELETE /api/fixtures/:key/options/:id` drops an option where the fixture allows it (TVs).
 
-The registry is `apps/server/src/fixtures.ts`. Bed and wall texture picks save to `data/fixtures.json`; the TV's lives in `data/tv.json` with its mount settings. A fixture of kind `item` is a catalog category standing at a wall spot: its back flush to a wall face and centered on it, facing into the room. Adding one, say nightstands or a desk, is one `FIXTURES` entry with its category and the wall face from `packages/shared/src/floorplan.ts`. The web plan gives it a panel and the AR app a picker and its model with no other code. Products of that category then leave the Furniture list, and a link for one pasted in the Furniture box becomes that fixture's pick.
+The registry is `apps/server/src/fixtures.ts`. Picks save to `data/fixtures.json`, and the TV's size and mount to `data/tv.json`. A fixture of kind `item` is a catalog category standing at a wall spot: its back flush to a wall face and centered on it, facing into the room. Adding one, say nightstands or a desk, is one `FIXTURES` entry with its category and the wall face from `packages/shared/src/floorplan.ts`. The web plan gives it a panel and the AR app a picker and its model with no other code. Products of that category then leave the Furniture list, and a link for one pasted in the Furniture box becomes that fixture's pick.
 
 ## TV
 

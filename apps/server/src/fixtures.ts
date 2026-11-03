@@ -12,7 +12,7 @@ import {
 	type WallSpot,
 } from '@repo/shared/fixtures';
 import { DEFAULT_TV, tvDiagonal, type CatalogItem, type TvSettings } from '@repo/shared/items';
-import { writeFile } from 'node:fs/promises';
+import { rename, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { DATA_DIR, importProducts, listCatalog, readItem } from './catalog';
 import { modelJobs, startModelJob } from './generate-model';
@@ -73,29 +73,34 @@ type Source = {
 	extra?(): Promise<Pick<Fixture, 'tv'>>;
 };
 
-// Bed and wall texture picks share one file; the TV's lives in tv.json with its mount settings.
+// Picks share one file; the TV's size and mount live in tv.json.
 type Selections = Partial<Record<FixtureKey, string | null>>;
-let selectionWrites: Promise<unknown> = Promise.resolve();
+
+// One queue for both files: a TV pick changes both, and the hand-set TV size can land at the same time. Writes go
+// through a rename, so the polls of both clients never read a half-written file.
+let writes: Promise<unknown> = Promise.resolve();
+function queued<T>(change: () => Promise<T>): Promise<T> {
+	const run = writes.catch(() => {}).then(change);
+	writes = run;
+	return run;
+}
+
+async function writeJson(path: string, value: unknown) {
+	await writeFile(`${path}.tmp`, JSON.stringify(value, null, '\t') + '\n');
+	await rename(`${path}.tmp`, path);
+}
 
 async function readSelections(): Promise<Selections> {
 	const file = Bun.file(SELECTIONS_FILE);
 	return (await file.exists()) ? file.json() : {};
 }
 
-function saveSelection(key: FixtureKey, id: string | null) {
-	const write = selectionWrites
-		.catch(() => {})
-		.then(async () => {
-			const selections = { ...(await readSelections()), [key]: id };
-			await writeFile(SELECTIONS_FILE, JSON.stringify(selections, null, '\t') + '\n');
-		});
-	selectionWrites = write;
-	return write;
-}
+const writeSelection = async (key: FixtureKey, id: string | null) =>
+	writeJson(SELECTIONS_FILE, { ...(await readSelections()), [key]: id });
 
 const stored = (key: FixtureKey) => ({
 	selected: async () => (await readSelections())[key] ?? null,
-	select: (id: string | null) => saveSelection(key, id),
+	select: (id: string | null) => queued(() => writeSelection(key, id)),
 });
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -143,10 +148,10 @@ async function readTv(): Promise<TvSettings> {
 	return (await file.exists()) ? file.json() : DEFAULT_TV;
 }
 
-export const saveTv = (tv: TvSettings) => Bun.write(TV_FILE, JSON.stringify(tv, null, '\t') + '\n');
+export const saveTv = (tv: TvSettings) => queued(() => writeJson(TV_FILE, tv));
 
-// The web plan can also size the TV by hand, so the selection is whichever imported TV matches the current size, or
-// a `custom` option standing for the hand-entered one.
+// The web plan can also size the TV by hand, so the selection is the picked TV while the size still matches it, else
+// another imported TV of that size, else a `custom` option standing for the hand-entered one.
 const CUSTOM_TV = 'custom';
 const tvDetail = (tv: Pick<TvSettings, 'widthIn' | 'heightIn'>) =>
 	`${round1(tvDiagonal(tv))}″ · ${round1(tv.widthIn)} × ${round1(tv.heightIn)}″`;
@@ -172,14 +177,24 @@ const tvSource: Source = {
 	selected: async options => {
 		const tv = await readTv();
 		if (!tv.visible) return null;
-		const tvs = await listTvs();
-		return tvs.find(m => tvMatches(m, tv))?.id ?? (options.some(o => o.id === CUSTOM_TV) ? CUSTOM_TV : null);
+		const [tvs, picked] = await Promise.all([listTvs(), readSelections().then(s => s.tv)]);
+		const matching = tvs.filter(m => tvMatches(m, tv));
+		return (
+			(matching.find(m => m.id === picked) ?? matching[0])?.id ??
+			(options.some(o => o.id === CUSTOM_TV) ? CUSTOM_TV : null)
+		);
 	},
-	select: async id => {
-		const tv = await readTv();
-		const model = id && (await listTvs()).find(m => m.id === id);
-		await saveTv({ ...tv, visible: id !== null, ...(model && { widthIn: model.widthIn, heightIn: model.heightIn }) });
-	},
+	select: id =>
+		queued(async () => {
+			const tv = await readTv();
+			const model = id && (await listTvs()).find(m => m.id === id);
+			await writeJson(TV_FILE, {
+				...tv,
+				visible: id !== null,
+				...(model && { widthIn: model.widthIn, heightIn: model.heightIn }),
+			});
+			if (model) await writeSelection('tv', model.id);
+		}),
 	import: async url => (await importTv(url)).id,
 	remove: removeTv,
 	extra: async () => ({ tv: await readTv() }),
@@ -191,7 +206,7 @@ const wallTextureSource: Source = {
 			id: t.id,
 			name: t.name,
 			url: t.url,
-			image: t.texture?.map ?? t.image,
+			image: t.image ?? t.texture?.map ?? null,
 			detail: facts(
 				t.brand,
 				money(t.price, t.currency) &&

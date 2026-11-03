@@ -49,8 +49,10 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
     // What each fixture currently draws, keyed by fixture; the signature changes when its pick or size does.
     @ObservationIgnored private var shownFixtures: [String: (signature: String, entity: Entity)] = [:]
     @ObservationIgnored private var textures: [WallTexture] = []
-    // Bumped by every pick, so a fixtures poll that left before it can't put the old pick back.
+    // Bumped by every pick, so a fixtures poll that left before it can't put the old pick back, and polls answered
+    // while picks are still saving are dropped.
     @ObservationIgnored private var fixtureEdits = 0
+    @ObservationIgnored private var picksSaving = 0
     @ObservationIgnored private var planAnchor: AnchorEntity?
     @ObservationIgnored private var marker: AnchorEntity?
     @ObservationIgnored private var catalog: [String: CatalogItem] = [:]
@@ -325,7 +327,7 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
                     let edits = fixtureEdits
                     let (incoming, available) = (try await API.fixtures(), try await API.textures())
                     textures = available
-                    if edits == fixtureEdits, incoming != fixtures { fixtures = incoming }
+                    if edits == fixtureEdits, picksSaving == 0, incoming != fixtures { fixtures = incoming }
                     applyFixtures()
                 }
                 let generation = saves
@@ -361,7 +363,9 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
         fixtureEdits += 1
         fixtures[index].selected = option
         applyFixtures()
+        picksSaving += 1
         Task {
+            defer { picksSaving -= 1 }
             do {
                 let saved = try await API.select(fixture.key, option)
                 fixtureEdits += 1
@@ -377,9 +381,10 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
     func importOption(_ fixture: Fixture, url: String) async throws {
         let saved = try await API.importOption(fixture.key, url: url)
         fixtureEdits += 1
-        // The new option's model or texture comes with the catalog or the texture list.
-        catalog = Dictionary(try await API.catalog().map { ($0.id, $0) }) { a, _ in a }
-        textures = try await API.textures()
+        // The new option's model or texture comes with the catalog or the texture list; if they don't load now, the
+        // next poll brings them.
+        if let items = try? await API.catalog() { catalog = Dictionary(items.map { ($0.id, $0) }) { a, _ in a } }
+        if let available = try? await API.textures() { textures = available }
         store(saved)
     }
 

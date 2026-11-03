@@ -543,6 +543,10 @@ export function createViewer(
 		group.clear();
 		group.add(model, label);
 		entry.shown = shown;
+		// Measured unturned, so a turned spot doesn't swap width and depth.
+		group.position.set(0, 0, 0);
+		group.rotation.y = 0;
+		group.updateMatrixWorld(true);
 		const size = new Box3().setFromObject(model).getSize(new Vector3());
 		const yaw = spot.yaw * DEG;
 		group.rotation.y = yaw;

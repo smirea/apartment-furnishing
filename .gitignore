@@ -21,3 +21,6 @@ build
 # other
 .DS_Store
 data/items/*/model.usdz
+
+# Atomic JSON writes (apps/server/src/fixtures.ts) leave these only if the server dies mid-write.
+data/*.tmp

@@ -13,7 +13,7 @@ struct FixturePicker: View {
 
     private var fixture: Fixture? { scene.fixtures.first { $0.key == key } }
     private var canImport: Bool {
-        !importing && URL(string: link.trimmingCharacters(in: .whitespaces))?.scheme?.hasPrefix("http") == true
+        !importing && URL(string: link.trimmingCharacters(in: .whitespacesAndNewlines))?.scheme?.hasPrefix("http") == true
     }
 
     var body: some View {
@@ -115,7 +115,7 @@ struct FixturePicker: View {
     }
 
     private func submit(_ fixture: Fixture) {
-        let url = link.trimmingCharacters(in: .whitespaces)
+        let url = link.trimmingCharacters(in: .whitespacesAndNewlines)
         importing = true
         error = nil
         Task {
