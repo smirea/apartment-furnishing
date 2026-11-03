@@ -66,12 +66,18 @@ struct FixturePicker: View {
     @ViewBuilder private func mount(_ tv: TVSettings) -> some View {
         let ceiling = Double(scene.plan?.ceiling ?? 10) * 12
         let half = tv.heightIn / 2
+        let lowest = half.rounded(.up), highest = (ceiling - half).rounded(.down)
         VStack(alignment: .leading, spacing: 4) {
             LabeledContent("Height", value: String(format: "%.1f″ to the center", tv.centerIn))
-            Slider(value: binding(tv, \.centerIn), in: half.rounded(.up)...(ceiling - half).rounded(.down), step: 0.5)
-                .accessibilityLabel("TV height")
-            Text(String(format: "Bottom edge %.1f″ off the floor, top %.1f″", tv.centerIn - half, tv.centerIn + half))
-                .font(.caption).foregroundStyle(.secondary)
+            // The web plan's size fields allow a TV taller than the room, which leaves no height to slide through.
+            if lowest < highest {
+                Slider(value: binding(tv, \.centerIn), in: lowest...highest, step: 0.5).accessibilityLabel("TV height")
+                Text(String(format: "Bottom edge %.1f″ off the floor, top %.1f″", tv.centerIn - half, tv.centerIn + half))
+                    .font(.caption).foregroundStyle(.secondary)
+            } else {
+                Text(String(format: "At %.1f″ tall the TV doesn't fit under the %.0f″ ceiling.", tv.heightIn, ceiling))
+                    .font(.caption).foregroundStyle(.red)
+            }
         }
         VStack(alignment: .leading, spacing: 4) {
             LabeledContent("Tilt", value: String(format: "%.0f°", tv.tiltDeg))

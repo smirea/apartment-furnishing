@@ -368,6 +368,13 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
 
     func select(_ fixture: Fixture, _ option: String?) {
         guard let index = fixtures.firstIndex(where: { $0.key == fixture.key }), fixtures[index].selected != option else { return }
+        // A height drag still waiting to save carries the old TV's size and visibility, which would undo this pick.
+        if fixture.kind == .tv, tvSave != nil {
+            tvSave?.cancel()
+            tvSave = nil
+            tvSaveID = nil
+            picksSaving -= 1
+        }
         fixtureEdits += 1
         fixtures[index].selected = option
         applyFixtures()
