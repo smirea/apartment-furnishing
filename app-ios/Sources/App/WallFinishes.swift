@@ -23,12 +23,17 @@ final class WallFinishes {
     let root = Entity()
     private var shown: [Surface: (tile: WallTexture.Tile, entity: Entity?)] = [:]
     private var textures: [String: Task<TextureResource, Error>] = [:]
+    // The room of the latest apply. An older apply for another room stops before its next surface, so a download it
+    // was waiting on can't carry its room into the new one.
+    private var room: [Float]?
 
     // Surfaces outside `room` stay bare, so only the room you're standing in shows its textures.
     func apply(_ finishes: Finishes, _ catalog: [WallTexture], plan: Plan, room: [Float]?) async throws {
         let tiles = Dictionary(catalog.compactMap { texture in texture.texture.map { (texture.id, $0) } }) { a, _ in a }
         var failure: Error?
+        self.room = room
         for surface in Surface.allCases {
+            guard self.room == room else { break }
             let inRoom = room.map { Plan.contains($0, surface.spot(in: plan)) } ?? false
             let tile = inRoom ? (surface == .tvWall ? finishes.tvWall : finishes.column).flatMap { tiles[$0] } : nil
             guard tile != shown[surface]?.tile else { continue }
