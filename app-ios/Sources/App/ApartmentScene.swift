@@ -13,6 +13,7 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
     enum Phase: Equatable {
         case loading
         case failed(String)
+        case choosingRoom
         // A saved world map is loaded and ARKit is still recognizing the room.
         case relocalizing
         case aligning(AlignmentDraft)
@@ -23,6 +24,10 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
 
     var phase = Phase.loading
     var plan: Plan?
+    // Only this room's furniture and wall textures show, aligned with this room's own world map.
+    private(set) var room = UserDefaults.standard.string(forKey: "room").flatMap(ARRoom.init(rawValue:)) {
+        didSet { UserDefaults.standard.set(room?.rawValue, forKey: "room") }
+    }
     var note: String?
     var showsOutline = true { didSet { outline.isEnabled = showsOutline } }
     var showsTextures = UserDefaults.standard.object(forKey: "showsTextures") as? Bool ?? true {
@@ -51,6 +56,13 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
     @ObservationIgnored private var saves = 0
     @ObservationIgnored private var tracking = false
     @ObservationIgnored private var syncTask: Task<Void, Never>?
+    @ObservationIgnored private var phaseBeforeChoosing: Phase?
+    // The save of the room being left, which the next room's session reset would otherwise cut off.
+    @ObservationIgnored private var leaving: Task<Void, Never>?
+    // Bumped by every session reset, so a world map taken before a room change is never saved under the new room.
+    @ObservationIgnored private var session = 0
+    @ObservationIgnored private var finishChoice: (Finishes, [WallTexture])?
+    @ObservationIgnored private var previewCamera: PerspectiveCamera?
 
     private struct PlacedItem {
         let entity: ModelEntity
@@ -82,6 +94,8 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
             async let finishes = API.finishes()
             async let textures = API.textures()
             let loaded = try await plan
+            let missing = ARRoom.allCases.filter { loaded.rect(of: $0) == nil }.map(\.rawValue)
+            guard missing.isEmpty else { throw URLError(.cannotParseResponse, userInfo: [NSLocalizedDescriptionKey: "the plan has no \(missing.joined(separator: ", "))"]) }
             self.plan = loaded
             buildOutline(loaded)
             self.catalog = Dictionary(try await catalog.map { ($0.id, $0) }) { a, _ in a }
@@ -94,14 +108,57 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
         }
         syncTask?.cancel()
         syncTask = Task { await sync() }
+        WorldMapStore.removeLegacy()
         #if targetEnvironment(simulator)
         showPreview()
+        #endif
+        if let room { enter(room) } else { phase = .choosingRoom }
+    }
+
+    func chooseRoom() {
+        if phase == .placed { leaving = Task { await saveWorldMap(attempts: 1) } }
+        phaseBeforeChoosing = phase
+        phase = .choosingRoom
+    }
+
+    var canCancelRoomChoice: Bool { phaseBeforeChoosing != nil }
+
+    func cancelChoosingRoom() {
+        guard let previous = phaseBeforeChoosing else { return }
+        phaseBeforeChoosing = nil
+        // Tracking and the anchor may have settled while the picker was up.
+        phase = previous == .relocalizing && planAnchor != nil && tracking ? .placed : previous
+    }
+
+    // Shows the room's furniture and textures, then relocalizes with its saved map, or asks for two corners without one.
+    func enter(_ room: ARRoom) {
+        self.room = room
+        phaseBeforeChoosing = nil
+        for (key, item) in placed { remove(key, item) }
+        apply(placements)
+        if let (finishes, textures) = finishChoice { Task { await applyFinishes(finishes, textures) } }
+        #if targetEnvironment(simulator)
+        if let rect = plan?.rect(of: room) {
+            let center = SIMD3((rect[0] + rect[2]) / 2, 0, (rect[1] + rect[3]) / 2)
+            previewCamera?.look(at: center * metersPerFoot, from: (center + [0, 22, 16]) * metersPerFoot, relativeTo: nil)
+        }
+        phase = .placed
         #else
-        runSession()
+        let leaving = self.leaving
+        self.leaving = nil
+        Task {
+            await leaving?.value
+            guard self.room == room else { return }
+            planAnchor?.removeFromParent()
+            planAnchor = nil
+            marker?.removeFromParent()
+            runSession(map: WorldMapStore.load(room))
+        }
         #endif
     }
 
-    private func runSession(map: ARWorldMap? = WorldMapStore.load()) {
+    private func runSession(map: ARWorldMap?) {
+        session += 1
         let config = ARWorldTrackingConfiguration()
         config.planeDetection = [.horizontal]
         config.environmentTexturing = .automatic
@@ -119,18 +176,18 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
 
     // The simulator has no camera tracking, so it shows the plan from above the living room to check models and layout.
     private func showPreview() {
+        guard previewCamera == nil else { return }
         let anchor = AnchorEntity(world: .zero)
         anchor.addChild(planRoot)
         let camera = PerspectiveCamera()
-        camera.look(at: SIMD3(16, 0, 29) * metersPerFoot, from: SIMD3(16, 22, 45) * metersPerFoot, relativeTo: nil)
         anchor.addChild(camera)
+        previewCamera = camera
         let light = DirectionalLight()
         light.light.intensity = 600
         light.look(at: .zero, from: [-2, 6, 4], relativeTo: nil)
         anchor.addChild(light)
         view.environment.background = .color(.darkGray)
         view.scene.addAnchor(anchor)
-        phase = .placed
     }
 
     // MARK: Alignment
@@ -191,7 +248,8 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
     // ARKit refuses to snapshot a map until it has seen enough of the room, so right after aligning this retries.
     func saveWorldMap(attempts: Int) async {
         #if !targetEnvironment(simulator)
-        guard tracking else { return }
+        guard tracking, let room else { return }
+        let generation = session
         for attempt in 1...attempts {
             do {
                 let data: Data = try await withCheckedThrowingContinuation { continuation in
@@ -202,7 +260,8 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
                         })
                     }
                 }
-                try WorldMapStore.write(data)
+                guard generation == session else { return }
+                try WorldMapStore.write(data, for: room)
                 return
             } catch where attempt < attempts {
                 try? await Task.sleep(for: .seconds(2))
@@ -274,8 +333,11 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
         placements = incoming.map { moving[$0.key] != nil ? local[$0.key] ?? $0 : $0 }
         let keys = Set(placements.map(\.key))
         for (key, item) in placed where !keys.contains(key) { remove(key, item) }
+        let area = room.flatMap { plan?.rect(of: $0) }
         for placement in placements {
-            guard let item = catalog[placement.itemId] else { continue }
+            // Room membership is decided when an item first shows, so dragging it through a doorway doesn't hide it.
+            let inRoom = area.map { Plan.contains($0, [Float(placement.position[0]), Float(placement.position[2])]) } ?? false
+            guard placed[placement.key] != nil || inRoom, let item = catalog[placement.itemId] else { continue }
             if let existing = placed[placement.key], existing.signature != item.signature { remove(placement.key, existing) }
             if placed[placement.key] == nil { add(placement, item) }
             if moving[placement.key] == nil { placed[placement.key]?.entity.transform = placement.transform }
@@ -283,9 +345,10 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
     }
 
     private func applyFinishes(_ finishes: Finishes, _ textures: [WallTexture]) async {
+        finishChoice = (finishes, textures)
         guard let plan else { return }
         do {
-            try await wallFinishes.apply(finishes, textures, plan: plan)
+            try await wallFinishes.apply(finishes, textures, plan: plan, room: room.flatMap(plan.rect(of:)))
         } catch {
             note = "Wall texture: \(error.localizedDescription)"
         }
