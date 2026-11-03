@@ -49,7 +49,11 @@ const panelSchema = {
 	additionalProperties: false,
 	required: ['name', 'brand', 'price', 'currency', 'panelsPerPack', 'panel', 'summary', 'imageUrl'],
 	properties: {
-		name: { type: 'string', description: 'Short product name a person would say, without retailer noise' },
+		name: {
+			type: 'string',
+			description:
+				'Short product name a person would say, without retailer noise or the panel height. Include the product line, the wood or face finish and the backing color when the store sells several, e.g. "Ultralight White Oak Slats, Beige Felt"',
+		},
 		brand: { type: ['string', 'null'] },
 		price: { type: ['number', 'null'], description: 'Current selling price of the listing as sold (the whole pack)' },
 		currency: { type: 'string' },
@@ -69,32 +73,71 @@ const panelSchema = {
 
 type Panel = Omit<WallTexture, 'id' | 'url' | 'importedAt' | 'image' | 'texture'> & { imageUrl: string | null };
 
-export async function importTexture(url: string, log: (line: string) => void = () => {}): Promise<WallTexture> {
-	await mkdir(TEXTURE_DIR, { recursive: true });
-	log(`capturing ${url}…`);
-	const [page] = await fetchPages([url]);
-	const { imageUrl, ...panel } = await grokStructured<Panel>(
-		`Extract wall-panel product information from this retailer page capture. Use only facts in the input. Convert sizes to inches. Pick imageUrl from the image candidates exactly as written.\n\n${pageContext(page!)}`,
-		panelSchema,
-	);
-	const existing = (await listTextures()).find(t => productKey(t.url) === productKey(page!.url));
-	const brandPrefix =
-		panel.brand && !panel.name.toLowerCase().startsWith(panel.brand.toLowerCase()) ? `${panel.brand} ` : '';
-	const id = existing?.id ?? slug(brandPrefix + panel.name);
-	const texture: WallTexture = {
-		id,
-		url: page!.url.split('?')[0]!,
-		importedAt: new Date().toISOString(),
-		...panel,
-		image: await downloadPhotos(id, imageUrl, page!.images),
-		texture: existing?.texture ?? null,
+// Parallel grok calls per batch: each takes 10 to 20 s and a store import can be dozens of pages.
+const PARSE_CONCURRENCY = 6;
+
+async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+	const results: R[] = [];
+	let next = 0;
+	const worker = async () => {
+		while (next < items.length) {
+			const i = next++;
+			results[i] = await fn(items[i]!);
+		}
 	};
-	await saveTexture(texture);
-	log(
-		`  saved texture ${id}: ${panel.price ?? '?'} ${panel.currency} for ${panel.panelsPerPack}, panel ${JSON.stringify(panel.panel)}`,
-	);
-	return texture;
+	await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+	return results;
 }
+
+export async function importTextures(urls: string[], log: (line: string) => void = () => {}): Promise<WallTexture[]> {
+	await mkdir(TEXTURE_DIR, { recursive: true });
+	log(`capturing ${urls.length} page(s)…`);
+	const pages = await fetchPages(urls);
+	// One unreadable page shouldn't throw away the rest of a store import: keep the others, report it at the end.
+	const parsed = await mapLimit(pages, PARSE_CONCURRENCY, page =>
+		grokStructured<Panel>(
+			`Extract wall-panel product information from this retailer page capture. Use only facts in the input. Convert sizes to inches. Pick imageUrl from the image candidates exactly as written.\n\n${pageContext(page)}`,
+			panelSchema,
+		).catch((error: unknown) => (error instanceof Error ? error : new Error(String(error)))),
+	);
+	const failures: string[] = [];
+	const known = await listTextures();
+	const imported: WallTexture[] = [];
+	for (const [i, page] of pages.entries()) {
+		const result = parsed[i]!;
+		if (result instanceof Error) {
+			failures.push(`${page.url}: ${result.message}`);
+			continue;
+		}
+		const { imageUrl, ...panel } = result;
+		const existing = known.find(t => productKey(t.url) === productKey(page.url));
+		const brandPrefix =
+			panel.brand && !panel.name.toLowerCase().startsWith(panel.brand.toLowerCase()) ? `${panel.brand} ` : '';
+		let id = existing?.id ?? slug(brandPrefix + panel.name);
+		// Colorways of one product line can come back with the same name; never let one overwrite another.
+		for (let n = 2; !existing && known.some(t => t.id === id); n++) id = `${slug(brandPrefix + panel.name)}-${n}`;
+		const texture: WallTexture = {
+			id,
+			url: page.url.split('?')[0]!,
+			importedAt: new Date().toISOString(),
+			...panel,
+			image: await downloadPhotos(id, imageUrl, page.images),
+			texture: existing?.texture ?? null,
+		};
+		await saveTexture(texture);
+		known.push(texture);
+		imported.push(texture);
+		log(
+			`  saved texture ${id}: ${panel.price ?? '?'} ${panel.currency} for ${panel.panelsPerPack}, panel ${JSON.stringify(panel.panel)}, ${page.images.length} photo(s)`,
+		);
+	}
+	if (failures.length)
+		throw new Error(`Imported ${imported.length}, failed ${failures.length}:\n${failures.join('\n')}`);
+	return imported;
+}
+
+export const importTexture = async (url: string, log?: (line: string) => void) =>
+	(await importTextures([url], log))[0]!;
 
 async function prompt(texture: WallTexture, photos: string[]) {
 	const p = texture.panel;
@@ -144,14 +187,38 @@ export async function generateTexture(texture: WallTexture, log: (line: string) 
 
 export const textureJobs = new Map<string, Job>();
 
+// Each job is a Codex session; a store import can queue dozens, so only a few run at once.
+const TEXTURE_CONCURRENCY = 3;
+const queue: WallTexture[] = [];
+let active = 0;
+
 export function startTextureJob(texture: WallTexture) {
-	if (textureJobs.get(texture.id)?.state === 'running') return;
-	textureJobs.set(texture.id, { state: 'running' });
-	generateTexture(texture, console.log).then(
-		() => textureJobs.delete(texture.id),
-		(error: unknown) => {
-			console.error(error);
-			textureJobs.set(texture.id, { state: 'failed', error: error instanceof Error ? error.message : String(error) });
-		},
-	);
+	const state = textureJobs.get(texture.id)?.state;
+	if (state === 'running' || state === 'queued') return;
+	textureJobs.set(texture.id, { state: 'queued' });
+	queue.push(texture);
+	runQueue();
+}
+
+function runQueue() {
+	while (active < TEXTURE_CONCURRENCY && queue.length) {
+		const texture = queue.shift()!;
+		active++;
+		textureJobs.set(texture.id, { state: 'running' });
+		generateTexture(texture, console.log)
+			.then(
+				() => textureJobs.delete(texture.id),
+				(error: unknown) => {
+					console.error(error);
+					textureJobs.set(texture.id, {
+						state: 'failed',
+						error: error instanceof Error ? error.message : String(error),
+					});
+				},
+			)
+			.finally(() => {
+				active--;
+				runQueue();
+			});
+	}
 }

@@ -1,4 +1,11 @@
-import type { CatalogItem, FinishSurface, Placement, WallTexture } from '@repo/shared/items';
+import {
+	tvDiagonal,
+	type CatalogItem,
+	type FinishSurface,
+	type Placement,
+	type TvSettings,
+	type WallTexture,
+} from '@repo/shared/items';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {
@@ -6,6 +13,7 @@ import {
 	Box3,
 	BoxGeometry,
 	BoxHelper,
+	CanvasTexture,
 	CylinderGeometry,
 	Color,
 	DirectionalLight,
@@ -38,6 +46,7 @@ import {
 	fixtures,
 	footprint,
 	ft,
+	finishAreasIn,
 	PX_PER_FT,
 	rooms,
 	tvWallFace,
@@ -300,6 +309,8 @@ export function createViewer(
 			wallFinish.position.x = ft(tvWallFace.x) - depth;
 			// Wall-mounted items snap to the panels' face instead of the plaster behind them.
 			tvWallSnap.x1 = ft(tvWallFace.x) - depth;
+			tvWallDepthFt = depth;
+			placeTv();
 			for (const f of tvWallFixtures) f.mesh.position.x = f.x - depth;
 		},
 	);
@@ -318,6 +329,79 @@ export function createViewer(
 		},
 		depth => columnFinish.scale.set(ft(column.r) + depth, columnFinish.scale.y, ft(column.r) + depth),
 	);
+
+	// The TV hangs on a tilting mount centered on the TV wall's measured span, out from any wall texture.
+	const TV_DEPTH_IN = 1.2;
+	const TV_MOUNT_IN = 2.5;
+	const TV_BEZEL_IN = 0.3;
+	let tvWallDepthFt = 0;
+	let tvSettings: TvSettings | null = null;
+	const tvGroup = new Group();
+	tvGroup.visible = false;
+	scene.add(tvGroup);
+	const tvBody = new Mesh(
+		new BoxGeometry(1, 1, 1),
+		new MeshStandardMaterial({ color: 0x141518, roughness: 0.4, metalness: 0.3 }),
+	);
+	const tvScreenMat = new MeshStandardMaterial({ color: 0xffffff, roughness: 0.25, metalness: 0.1 });
+	const tvScreen = new Mesh(new PlaneGeometry(1, 1), tvScreenMat);
+	// Faces west, into the living room.
+	tvScreen.rotation.y = -Math.PI / 2;
+	tvGroup.add(tvBody, tvScreen);
+
+	function tvLabel({ widthIn, heightIn }: TvSettings) {
+		const canvas = document.createElement('canvas');
+		canvas.width = 1024;
+		canvas.height = Math.round((1024 * heightIn) / widthIn);
+		const ctx = canvas.getContext('2d')!;
+		const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+		gradient.addColorStop(0, '#1d2633');
+		gradient.addColorStop(1, '#0b0e13');
+		ctx.fillStyle = gradient;
+		ctx.fillRect(0, 0, canvas.width, canvas.height);
+		ctx.fillStyle = '#e8edf3';
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+		const unit = canvas.height / 10;
+		ctx.font = `600 ${unit * 2.4}px system-ui, sans-serif`;
+		ctx.fillText(`${Math.round(tvDiagonal({ widthIn, heightIn }) * 10) / 10}″`, canvas.width / 2, canvas.height * 0.42);
+		ctx.font = `400 ${unit * 0.9}px system-ui, sans-serif`;
+		ctx.fillStyle = '#9aa7b6';
+		const round = (n: number) => Math.round(n * 10) / 10;
+		ctx.fillText(`${round(widthIn)}″ × ${round(heightIn)}″`, canvas.width / 2, canvas.height * 0.66);
+		const texture = new CanvasTexture(canvas);
+		texture.colorSpace = SRGBColorSpace;
+		return texture;
+	}
+
+	function placeTv() {
+		const tv = tvSettings;
+		tvGroup.visible = !!tv?.visible;
+		if (!tv) return;
+		const [w, h, d] = [tv.widthIn / 12, tv.heightIn / 12, TV_DEPTH_IN / 12];
+		tvBody.scale.set(d, h, w);
+		tvScreen.scale.set(w - (2 * TV_BEZEL_IN) / 12, h - (2 * TV_BEZEL_IN) / 12, 1);
+		tvScreen.position.x = -d / 2 - 0.002;
+		// Rotating about the wall-parallel axis through the screen center tips the top out and the screen down.
+		tvGroup.rotation.z = tv.tiltDeg * DEG;
+		tvGroup.position.set(
+			// Tilting about the center swings the bottom edge toward the wall; the mount holds it out by that much.
+			ft(tvWallFace.x) - tvWallDepthFt - TV_MOUNT_IN / 12 - d / 2 - (h / 2) * Math.sin(tv.tiltDeg * DEG),
+			tv.centerIn / 12,
+			ft(tvWallFace.y2) - finishAreasIn.tvWall.width / 24,
+		);
+	}
+
+	function setTv(tv: TvSettings) {
+		const resized = tv.widthIn !== tvSettings?.widthIn || tv.heightIn !== tvSettings?.heightIn;
+		tvSettings = tv;
+		if (resized) {
+			tvScreenMat.map?.dispose();
+			tvScreenMat.map = tvLabel(tv);
+			tvScreenMat.needsUpdate = true;
+		}
+		placeTv();
+	}
 
 	const textureLoader = new TextureLoader();
 	const textureCache = new Map<string, Promise<Texture>>();
@@ -721,6 +805,7 @@ export function createViewer(
 		setCutaway,
 		setLabels,
 		setPlacements,
+		setTv,
 		setFinishes: (textures: Record<FinishSurface, WallTexture | null>) => {
 			void setFinish('tvWall', textures.tvWall);
 			void setFinish('column', textures.column);

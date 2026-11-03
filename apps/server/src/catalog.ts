@@ -221,7 +221,7 @@ ${pageContext(page)}`,
 }
 
 export async function grokStructured<T>(prompt: string, schema: object): Promise<T> {
-	const promptFile = join(ROOT, '.cache', `grok-prompt-${Date.now()}.txt`);
+	const promptFile = join(ROOT, '.cache', `grok-prompt-${crypto.randomUUID()}.txt`);
 	await mkdir(join(ROOT, '.cache'), { recursive: true });
 	await writeFile(promptFile, prompt);
 	const proc = Bun.spawn(

@@ -1,6 +1,21 @@
-import type { CatalogEntry, Finishes, Placement, WallTextureEntry } from '@repo/shared/items';
+import {
+	DEFAULT_TV,
+	type CatalogEntry,
+	type Finishes,
+	type Placement,
+	type TvSettings,
+	type WallTextureEntry,
+} from '@repo/shared/items';
 import { join, normalize } from 'node:path';
-import { ASSET_DIR, importProducts, listCatalog, readItem, readPlacements, updatePlacements } from './catalog';
+import {
+	ASSET_DIR,
+	DATA_DIR,
+	importProducts,
+	listCatalog,
+	readItem,
+	readPlacements,
+	updatePlacements,
+} from './catalog';
 import { modelJobs, startModelJob } from './generate-model';
 import { planGeometry } from '@repo/shared/plan';
 import { usdzPath } from './usdz';
@@ -19,6 +34,8 @@ import {
 
 const isVec3 = (v: unknown): v is [number, number, number] =>
 	Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
+
+const TV_FILE = join(DATA_DIR, 'tv.json');
 
 const uiBuildPath = new URL('../../ui/build/', import.meta.url);
 
@@ -100,6 +117,36 @@ const server = Bun.serve({
 				}
 				await saveFinishes(finishes);
 				return Response.json(finishes);
+			},
+		},
+		'/api/tv': {
+			GET: async () => {
+				const file = Bun.file(TV_FILE);
+				return Response.json((await file.exists()) ? await file.json() : DEFAULT_TV);
+			},
+			PUT: async request => {
+				const tv = (await request.json()) as Partial<TvSettings>;
+				const sizes = [tv.widthIn, tv.heightIn, tv.centerIn];
+				if (
+					typeof tv.visible !== 'boolean' ||
+					!sizes.every(n => typeof n === 'number' && n > 0 && n < 240) ||
+					typeof tv.tiltDeg !== 'number' ||
+					tv.tiltDeg < 0 ||
+					tv.tiltDeg > 30
+				)
+					return Response.json(
+						{ error: 'Expected visible, widthIn, heightIn, centerIn and a 0–30° tiltDeg' },
+						{ status: 400 },
+					);
+				const saved: TvSettings = {
+					visible: tv.visible,
+					widthIn: tv.widthIn!,
+					heightIn: tv.heightIn!,
+					centerIn: tv.centerIn!,
+					tiltDeg: tv.tiltDeg,
+				};
+				await Bun.write(TV_FILE, JSON.stringify(saved, null, '\t') + '\n');
+				return Response.json(saved);
 			},
 		},
 		'/api/plan': Response.json(planGeometry()),

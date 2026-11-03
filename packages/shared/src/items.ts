@@ -27,7 +27,7 @@ export type CatalogItem = {
 	modelSource: 'listing' | 'generated' | null;
 };
 
-export type Job = { state: 'running' } | { state: 'failed'; error: string };
+export type Job = { state: 'queued' } | { state: 'running' } | { state: 'failed'; error: string };
 
 // What GET /api/catalog returns: the stored item plus any in-flight model generation.
 export type CatalogEntry = CatalogItem & { modelJob: Job | null };
@@ -84,3 +84,30 @@ export function panelsNeeded(panel: { width: number; height: number }, area: { w
 	if (rest < 0.5) return columns * full;
 	return columns * full + Math.ceil(columns / Math.floor(panel.height / rest));
 }
+
+// The living-room TV: always wall-mounted on the TV wall, centered on its measured span. Width and height are the
+// source of truth; the diagonal and the aspect ratio are derived from them.
+export type TvSettings = {
+	visible: boolean;
+	widthIn: number;
+	heightIn: number;
+	// Height of the screen's center above the floor.
+	centerIn: number;
+	// Forward tilt of the mount, top away from the wall.
+	tiltDeg: number;
+};
+
+export const TV_RATIOS = [
+	[16, 9],
+	[21, 9],
+	[4, 3],
+] as const;
+
+export const tvDiagonal = (tv: Pick<TvSettings, 'widthIn' | 'heightIn'>) => Math.hypot(tv.widthIn, tv.heightIn);
+
+export function tvSize(diagonalIn: number, [w, h]: readonly [number, number]) {
+	const k = diagonalIn / Math.hypot(w, h);
+	return { widthIn: k * w, heightIn: k * h };
+}
+
+export const DEFAULT_TV: TvSettings = { visible: true, ...tvSize(98, [16, 9]), centerIn: 48, tiltDeg: 0 };

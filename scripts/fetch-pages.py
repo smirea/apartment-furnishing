@@ -9,7 +9,7 @@ from camoufox.sync_api import Camoufox
 
 SETTLE_MS = 6000
 
-EXTRACT = r"""() => {
+EXTRACT = r"""async () => {
 	const html = document.documentElement.outerHTML;
 	const meta = (p) => document.querySelector(`meta[property="${p}"],meta[name="${p}"]`)?.content ?? null;
 	const uniq = (a) => [...new Set(a)];
@@ -40,9 +40,30 @@ EXTRACT = r"""() => {
 		if (next) return JSON.parse(next.textContent).props.pageProps.initialData.data.product.imageInfo.allImages.map((i) => i.url);
 		return [];
 	};
+	// Shopify stores serve the whole product, gallery included, at <product path>.js. Camoufox evaluates in an
+	// isolated world without the page's globals, so detect the store from its CDN instead of window.Shopify.
+	const shopify = async () =>
+		html.includes('cdn.shopify.com') && location.pathname.includes('/products/')
+			? (await (await fetch(`${location.pathname}.js`)).json()).images.map((u) => (u.startsWith('//') ? `https:${u}` : u))
+			: [];
+	// Any other store: the schema.org Product's images.
+	const ldImages = () =>
+		[...document.querySelectorAll('script[type="application/ld+json"]')]
+			.flatMap((s) => {
+				try {
+					return [JSON.parse(s.textContent)].flat();
+				} catch {
+					return [];
+				}
+			})
+			.filter((d) => d['@type'] === 'Product')
+			.flatMap((d) => [d.image].flat().map((i) => (typeof i === 'string' ? i : i?.url)))
+			.filter(Boolean);
 	let images = [];
 	try {
 		images = uniq(gallery());
+		if (!images.length) images = uniq(await shopify());
+		if (!images.length) images = uniq(ldImages());
 	} catch {}
 	const jsonLd = [...document.querySelectorAll('script[type="application/ld+json"]')].map((s) => s.textContent).join('\n').slice(0, 15000);
 	return {
