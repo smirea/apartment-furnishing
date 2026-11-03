@@ -1,5 +1,4 @@
 import { Database } from 'bun:sqlite';
-import { statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const FILE = join(import.meta.dir, '../../../data/app.db');
@@ -67,8 +66,8 @@ CREATE TABLE IF NOT EXISTS settings (
 ) STRICT;
 `;
 
-// Before fixtures, the bed and the wall texture picks had settings rows of their own. A database from then, such as one
-// kept locally across a pull, moves them into the fixtures row; a fixtures row already there wins.
+// Before fixtures, the bed and the wall texture picks had settings rows of their own. A database from then moves them
+// into the fixtures row; a fixtures row already there wins.
 const MIGRATIONS = `
 INSERT OR IGNORE INTO settings (key, value)
 SELECT 'fixtures', json_object(
@@ -80,28 +79,16 @@ DELETE FROM settings WHERE key IN ('bed', 'finishes');
 `;
 
 function open() {
-	// The file is committed like the JSON it replaced, so it keeps SQLite's default rollback journal: in WAL mode
-	// recent writes would sit in a -wal file that git doesn't track.
 	const db = new Database(FILE, { create: true, strict: true });
 	db.run('PRAGMA foreign_keys = ON');
 	// The import scripts write from their own process while the server's model and texture jobs write too.
 	db.run('PRAGMA busy_timeout = 5000');
 	db.run(SCHEMA);
 	db.run(MIGRATIONS);
-	return { db, inode: statSync(FILE).ino };
+	return db;
 }
 
-let current = open();
-
-// A pull or checkout replaces data/app.db with a new file while the dev server holds the old one open, which would
-// keep serving stale data and send every write to the deleted file. Reopen whenever the path points somewhere new.
-function db() {
-	if (statSync(FILE, { throwIfNoEntry: false })?.ino !== current.inode) {
-		current.db.close();
-		current = open();
-	}
-	return current.db;
-}
+const db = open();
 
 type Row = Record<string, unknown>;
 
@@ -109,7 +96,7 @@ export function table<T extends object>(
 	name: string,
 	{ key, json, order }: { key: keyof T & string; json: (keyof T & string)[]; order: string },
 ) {
-	const columns = db()
+	const columns = db
 		.query<{ name: string }, [string]>('SELECT name FROM pragma_table_info(?)')
 		.all(name)
 		.map(c => c.name);
@@ -132,31 +119,31 @@ export function table<T extends object>(
 		) as Record<string, string | number | null>;
 
 	const get = (id: string) => {
-		const row = db().query<Row, [string]>(`SELECT * FROM ${name} WHERE "${key}" = ?`).get(id);
+		const row = db.query<Row, [string]>(`SELECT * FROM ${name} WHERE "${key}" = ?`).get(id);
 		return row ? decode(row) : null;
 	};
 
 	return {
-		all: () => db().query<Row, []>(`SELECT * FROM ${name} ORDER BY ${order}`).all().map(decode),
+		all: () => db.query<Row, []>(`SELECT * FROM ${name} ORDER BY ${order}`).all().map(decode),
 		get,
 		read: (id: string) => {
 			const row = get(id);
 			if (!row) throw new Error(`No ${name} row ${id}`);
 			return row;
 		},
-		put: (value: T) => void db().query(upsert).run(encode(value)),
-		remove: (id: string) => void db().query(`DELETE FROM ${name} WHERE "${key}" = ?`).run(id),
+		put: (value: T) => void db.query(upsert).run(encode(value)),
+		remove: (id: string) => void db.query(`DELETE FROM ${name} WHERE "${key}" = ?`).run(id),
 	};
 }
 
 export function setting<T>(key: string, fallback: () => T) {
 	return {
 		get: (): T => {
-			const row = db().query<{ value: string }, [string]>('SELECT value FROM settings WHERE key = ?').get(key);
+			const row = db.query<{ value: string }, [string]>('SELECT value FROM settings WHERE key = ?').get(key);
 			return row ? JSON.parse(row.value) : fallback();
 		},
 		set: (value: T) =>
-			void db()
+			void db
 				.query('INSERT INTO settings (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = ?2')
 				.run(key, JSON.stringify(value)),
 	};
