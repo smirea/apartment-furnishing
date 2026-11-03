@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { finishAreasIn } from '@repo/shared/floorplan';
+	import { bedWallFace, finishAreasIn, ft } from '@repo/shared/floorplan';
 	import {
 		panelsNeeded,
+		type BedSettings,
 		TV_RATIOS,
 		tvDiagonal,
 		tvSize,
@@ -29,10 +30,11 @@
 	const saved = JSON.parse(localStorage.getItem(OPTIONS_KEY) ?? '{}');
 	let cutaway = $state<boolean>(saved.cutaway ?? true);
 	let labels = $state<boolean>(saved.labels ?? false);
-	let open = $state<{ furniture: boolean; textures: boolean; tv: boolean; ideas: boolean }>({
+	let open = $state<{ furniture: boolean; textures: boolean; tv: boolean; bed: boolean; ideas: boolean }>({
 		furniture: true,
 		textures: true,
 		tv: true,
+		bed: true,
 		ideas: false,
 		...saved.open,
 	});
@@ -53,6 +55,38 @@
 	}));
 	const catalogList = $derived(catalogQuery.data ?? []);
 	const catalog = $derived(Object.fromEntries(catalogList.map(item => [item.id, item])));
+	const furnitureList = $derived(catalogList.filter(item => item.category !== 'bed'));
+	const beds = $derived(catalogList.filter(item => item.category === 'bed'));
+
+	const bedQuery = createQuery(() => ({ queryKey: ['bed'], queryFn: () => api<BedSettings>('/api/bed') }));
+	const bed = $derived(bedQuery.data?.itemId ? (catalog[bedQuery.data.itemId] ?? null) : null);
+	const BED_SPAN_IN = ft(bedWallFace.x2 - bedWallFace.x1) * 12;
+	const bedFacts = (item: CatalogItem) => {
+		const d = item.dimensions;
+		return [d && `${round1(d.width)} × ${round1(d.depth)} × ${round1(d.height)}″`, money(item)]
+			.filter(Boolean)
+			.join(' · ');
+	};
+	const sideRoom = (item: CatalogItem) => (item.dimensions ? (BED_SPAN_IN - item.dimensions.width) / 2 : null);
+	// Narrow nightstands start around 18 in; less than that beside the bed is a squeeze.
+	const NIGHTSTAND_MIN_IN = 18;
+	const bedPick = createMutation(() => ({
+		mutationFn: (itemId: string | null) =>
+			api<BedSettings>('/api/bed', { method: 'PUT', body: JSON.stringify({ itemId }) }),
+		onMutate: (itemId: string | null) => queryClient.setQueryData(['bed'], { itemId }),
+		onError: () => queryClient.invalidateQueries({ queryKey: ['bed'] }),
+	}));
+	let bedUrl = $state('');
+	// Adding a bed link also switches to it, since that is why it was pasted.
+	const bedImport = createMutation(() => ({
+		mutationFn: (url: string) =>
+			api<CatalogItem>('/api/catalog/import', { method: 'POST', body: JSON.stringify({ url, category: 'bed' }) }),
+		onSuccess: async (item: CatalogItem) => {
+			bedUrl = '';
+			await queryClient.invalidateQueries({ queryKey: ['catalog'] });
+			bedPick.mutate(item.id);
+		},
+	}));
 
 	const ideasQuery = createQuery(() => ({
 		queryKey: ['ideas'],
@@ -172,6 +206,14 @@
 	const inches = (n: number) => `${Math.round(n * 10) / 10}"`;
 	const money = (item: CatalogItem) =>
 		item.price === null ? null : item.price.toLocaleString('en-US', { style: 'currency', currency: item.currency });
+	const furnitureFacts = (item: CatalogEntry) =>
+		[
+			money(item),
+			item.modelSource === 'generated' ? 'AI 3D' : item.model ? '3D' : item.modelJob ? null : 'no 3D',
+			placedCount(item.id) ? `${placedCount(item.id)} placed` : null,
+		]
+			.filter(Boolean)
+			.join(' · ');
 
 	async function addToRoom(itemId: string) {
 		const key = crypto.randomUUID();
@@ -209,7 +251,9 @@
 		onSuccess: async (item: CatalogItem) => {
 			importUrl = '';
 			await queryClient.invalidateQueries({ queryKey: ['catalog'] });
-			await addToRoom(item.id);
+			if (item.category !== 'bed') return addToRoom(item.id);
+			open.bed = true;
+			bedPick.mutate(item.id);
 		},
 	}));
 
@@ -290,6 +334,9 @@
 	$effect(() => viewer?.setLabels(labels));
 	$effect(() => {
 		if (viewer && tv) viewer.setTv($state.snapshot(tv));
+	});
+	$effect(() => {
+		if (viewer && bedQuery.data) viewer.setBed(bed);
 	});
 	$effect(() => {
 		if (viewer && (placementsLoaded || placements.length)) viewer.setPlacements($state.snapshot(placements), catalog);
@@ -520,6 +567,82 @@
 			{/if}
 		</section>
 
+		<section class="panel items bed">
+			<button type="button" class="section-toggle" aria-expanded={open.bed} onclick={() => (open.bed = !open.bed)}>
+				Bed <span class="muted"
+					>{bed?.dimensions ? `${round1(bed.dimensions.width)}″ × ${round1(bed.dimensions.depth)}″` : ''}</span
+				>
+			</button>
+			{#if open.bed}
+				<ul>
+					{#if bedImport.isPending}
+						<li class="bed-option">
+							<span class="pick">
+								<span class="thumb"></span>
+								<span class="text">
+									<strong>{new URL(bedImport.variables).hostname.replace('www.', '')} link</strong>
+									<span class="status busy">Importing · reading the page (about a minute)</span>
+								</span>
+							</span>
+						</li>
+					{/if}
+					{#each beds as item (item.id)}
+						{@const side = sideRoom(item)}
+						<li class="bed-option" class:current={item.id === bed?.id}>
+							<button
+								type="button"
+								class="pick"
+								aria-pressed={item.id === bed?.id}
+								onclick={() => bedPick.mutate(item.id === bed?.id ? null : item.id)}
+							>
+								{#if item.image}<img src={item.image} alt="" />{:else}<span class="thumb"></span>{/if}
+								<span class="text">
+									<strong>{item.name}</strong>
+									<span class="muted">{bedFacts(item)}</span>
+									{#if side !== null}<span
+											class:muted={side >= NIGHTSTAND_MIN_IN}
+											class:error={side < NIGHTSTAND_MIN_IN}>{round1(side)}″ each side</span
+										>{/if}
+									{#if item.modelJob?.state === 'running'}
+										<span class="status busy">Building 3D model · 2–5 min</span>
+									{:else if item.modelJob?.state === 'failed'}
+										<span class="status failed" title={item.modelJob.error}>3D model failed</span>
+									{/if}
+								</span>
+							</button>
+							{#if item.modelJob?.state === 'failed'}
+								<button type="button" onclick={() => generateMutation.mutate(item.id)}>Retry 3D</button>
+							{:else}
+								<a href={item.url} target="_blank" rel="noreferrer" aria-label="Open {item.name} listing">↗</a>
+							{/if}
+						</li>
+					{:else}
+						{#if !bedImport.isPending}
+							<li class="muted">{catalogQuery.isPending ? 'Loading…' : 'No beds yet. Paste a link below.'}</li>
+						{/if}
+					{/each}
+				</ul>
+				<p class="muted">
+					Headboard flush to the north wall, centered on its {round1(BED_SPAN_IN)}″. Click a bed to switch, click it
+					again to clear the room.
+				</p>
+				{#if bedPick.isError}<p class="error">{bedPick.error.message}</p>{/if}
+				<form
+					class="import"
+					onsubmit={e => {
+						e.preventDefault();
+						if (bedUrl.trim()) bedImport.mutate(bedUrl.trim());
+					}}
+				>
+					<input type="url" placeholder="Paste a bed link" bind:value={bedUrl} disabled={bedImport.isPending} />
+					<button type="submit" class="primary" disabled={bedImport.isPending || !bedUrl.trim()}>
+						{bedImport.isPending ? 'Importing…' : 'Import'}
+					</button>
+				</form>
+				{#if bedImport.isError}<p class="error">{bedImport.error.message}</p>{/if}
+			{/if}
+		</section>
+
 		<section class="panel items">
 			<button
 				type="button"
@@ -527,7 +650,7 @@
 				aria-expanded={open.furniture}
 				onclick={() => (open.furniture = !open.furniture)}
 			>
-				Furniture <span class="muted">{catalogList.length}</span>
+				Furniture <span class="muted">{furnitureList.length}</span>
 			</button>
 			{#if open.furniture}
 				<form
@@ -561,7 +684,7 @@
 							</div>
 						</li>
 					{/if}
-					{#each catalogList as item (item.id)}
+					{#each furnitureList as item (item.id)}
 						<li>
 							{#if item.image}<img src={item.image} alt="" />{:else}<span class="thumb"></span>{/if}
 							<div>
@@ -571,13 +694,7 @@
 								{:else if item.modelJob?.state === 'failed'}
 									<span class="status failed" title={item.modelJob.error}>3D model failed · select it to retry</span>
 								{/if}
-								<span class="muted">
-									{money(item) ?? ''}{#if item.modelSource === 'generated'}
-										· AI 3D{:else if item.model}
-										· 3D{:else if !item.modelJob}
-										· no 3D{/if}{#if placedCount(item.id)}
-										· {placedCount(item.id)} placed{/if}
-								</span>
+								<span class="muted">{furnitureFacts(item)}</span>
 							</div>
 							<button type="button" onclick={() => addToRoom(item.id)}>Add</button>
 						</li>
@@ -929,6 +1046,43 @@
 		border: none;
 		color: var(--app-muted);
 		font-size: 1.1rem;
+	}
+
+	.items li.bed-option {
+		grid-template-columns: 1fr auto;
+	}
+
+	.bed-option .pick {
+		display: grid;
+		grid-template-columns: 3rem 1fr;
+		gap: 0.6rem;
+		align-items: center;
+		min-width: 0;
+		padding: 0.3rem;
+		border: 1px solid transparent;
+		font-weight: inherit;
+		text-align: left;
+	}
+
+	.bed-option.current .pick {
+		border-color: var(--app-accent);
+	}
+
+	.bed-option .text {
+		display: grid;
+		min-width: 0;
+	}
+
+	.bed-option .text strong {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.bed-option a {
+		padding: 0 0.4rem;
+		color: var(--app-muted);
+		text-decoration: none;
 	}
 
 	.tip {

@@ -1,0 +1,31 @@
+{
+	"id": "garveehome-king-wood-platform-bed-frame",
+	"url": "https://www.amazon.com/GarveeHome-Platform-Without-Headboard-Assembly/dp/B0DZ6WDR8T",
+	"importedAt": "2026-11-03T18:10:26.120Z",
+	"name": "GarveeHome King Wood Platform Bed Frame",
+	"brand": "GarveeHome",
+	"price": 152.99,
+	"currency": "USD",
+	"category": "bed",
+	"dimensions": {
+		"width": 77.2,
+		"height": 7.7,
+		"depth": 81
+	},
+	"dimensionsNote": "The gallery dimension chart's King row gives 81 inches long by 77.2 inches wide by 7.7 inches high, confirming all three values on record. These dimensions describe the bare bed frame; the staged mattress and bedding are excluded.",
+	"weightLb": null,
+	"summary": "King engineered-wood platform bed frame with no headboard, a 7.7-inch floor-standing profile, and wood slats so a mattress sits on the frame without a box spring.",
+	"highlights": [
+		"King size with no headboard",
+		"Floor-standing low profile, 7.7 inches high",
+		"Wood slat support; no box spring needed",
+		"Engineered wood, walnut, modern style",
+		"Tools, hardware, and instructions included"
+	],
+	"mount": "floor",
+	"defaultElevationIn": 0,
+	"removeNodes": [],
+	"image": "/api/assets/garveehome-king-wood-platform-bed-frame/image.jpg",
+	"model": "/api/assets/garveehome-king-wood-platform-bed-frame/model.glb?v=1793729580998",
+	"modelSource": "generated"
+}

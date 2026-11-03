@@ -321,7 +321,12 @@ export async function downloadPhotos(id: string, imageUrl: string | null, galler
 	return `/api/assets/${id}/image.${ext}`;
 }
 
-export async function importProducts(urls: string[], log: (line: string) => void = () => {}): Promise<CatalogItem[]> {
+// `category` limits an import to one kind of product, so a link pasted in the Bed panel can't add a lamp nobody sees.
+export async function importProducts(
+	urls: string[],
+	log: (line: string) => void = () => {},
+	category?: string,
+): Promise<CatalogItem[]> {
 	await mkdir(CATALOG_DIR, { recursive: true });
 	log(`capturing ${urls.length} page(s)…`);
 	const imported: CatalogItem[] = [];
@@ -331,6 +336,8 @@ export async function importProducts(urls: string[], log: (line: string) => void
 		// TVs are built into the plan; the TV panel only needs their size.
 		if (product.category === 'tv')
 			throw new Error(`${product.name} is a TV: paste its link in the TV panel, which reads its size`);
+		if (category && product.category !== category)
+			throw new Error(`${product.name} is not a ${category} (read as ${product.category})`);
 		const brandPrefix =
 			product.brand && !product.name.toLowerCase().startsWith(product.brand.toLowerCase()) ? `${product.brand} ` : '';
 		const existing = (await listCatalog()).find(item => productKey(item.url) === productKey(page.url));

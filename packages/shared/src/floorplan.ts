@@ -164,6 +164,10 @@ export const ft = (px: number) => px / PX_PER_FT;
 // Living-room face of the TV wall (x) and its run from the office-wall corner to the south pier (y1..y2), in plan px.
 export const tvWallFace = { x: 578, y1: 641, y2: 893 };
 
+// Primary bedroom's north wall face (y) and its run between the west and east wall faces (x1..x2), in plan px; the
+// 162" between them is the tape-measured 13'6".
+export const bedWallFace = { y: 45, x1: 58, x2: 378 };
+
 // Tape-measured surfaces a wall texture can cover, in inches: the TV wall from the living room and the column's
 // circumference, both floor to ceiling.
 export const finishAreasIn = {

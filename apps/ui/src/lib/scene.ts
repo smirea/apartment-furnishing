@@ -21,6 +21,7 @@ import {
 	Group,
 	HemisphereLight,
 	Mesh,
+	MeshBasicMaterial,
 	Object3D,
 	MeshStandardMaterial,
 	PerspectiveCamera,
@@ -40,6 +41,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
 import { CSS2DObject, CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import {
+	bedWallFace,
 	CEILING_FT,
 	columns,
 	doors,
@@ -68,6 +70,7 @@ const FRAME_IN = 2;
 const SNAP_FT = 0.6;
 const WALL_MOUNT_SNAP_FT = 2;
 const DEG = Math.PI / 180;
+const round1 = (n: number) => Math.round(n * 10) / 10;
 
 const floorColors: Record<FloorKind, number> = { wood: 0xc9a672, tile: 0xe6e6e2, concrete: 0x9a9a98 };
 
@@ -364,11 +367,10 @@ export function createViewer(
 		ctx.textBaseline = 'middle';
 		const unit = canvas.height / 10;
 		ctx.font = `600 ${unit * 2.4}px system-ui, sans-serif`;
-		ctx.fillText(`${Math.round(tvDiagonal({ widthIn, heightIn }) * 10) / 10}″`, canvas.width / 2, canvas.height * 0.42);
+		ctx.fillText(`${round1(tvDiagonal({ widthIn, heightIn }))}″`, canvas.width / 2, canvas.height * 0.42);
 		ctx.font = `400 ${unit * 0.9}px system-ui, sans-serif`;
 		ctx.fillStyle = '#9aa7b6';
-		const round = (n: number) => Math.round(n * 10) / 10;
-		ctx.fillText(`${round(widthIn)}″ × ${round(heightIn)}″`, canvas.width / 2, canvas.height * 0.66);
+		ctx.fillText(`${round1(widthIn)}″ × ${round1(heightIn)}″`, canvas.width / 2, canvas.height * 0.66);
 		const texture = new CanvasTexture(canvas);
 		texture.colorSpace = SRGBColorSpace;
 		return texture;
@@ -468,6 +470,93 @@ export function createViewer(
 		const center = box.getCenter(new Vector3());
 		object.position.sub(new Vector3(center.x, box.min.y, center.z));
 		return object;
+	}
+
+	// The bed is built in like the TV: headboard (the model's back, -z) flush to the primary bedroom's north wall and
+	// centered between the side walls, with its size written across the top.
+	const bedWallSnap = wallBoxes.find(
+		b => b.z2 === ft(bedWallFace.y) && b.x1 <= ft(bedWallFace.x1) && b.x2 >= ft(bedWallFace.x2),
+	);
+	if (!bedWallSnap) throw new Error('Bed wall face does not match a wall run in the floor plan');
+	const bedSpanIn = ft(bedWallFace.x2 - bedWallFace.x1) * 12;
+	const bedGroup = new Group();
+	bedGroup.position.x = ft((bedWallFace.x1 + bedWallFace.x2) / 2);
+	scene.add(bedGroup);
+	const bedModels = new Map<string, Promise<Object3D>>();
+	const bedLabelMat = new MeshBasicMaterial({ transparent: true, depthWrite: false });
+	const bedLabel = new Mesh(new PlaneGeometry(1, 1), bedLabelMat);
+	// Lies flat with the text's top toward the headboard, so it reads from the foot of the bed.
+	bedLabel.rotation.x = -Math.PI / 2;
+	let bedVersion = 0;
+	let shownBedKey: string | null = null;
+
+	function bedLabelTexture(lines: [string, string]) {
+		const canvas = document.createElement('canvas');
+		canvas.width = 1024;
+		canvas.height = 400;
+		const ctx = canvas.getContext('2d')!;
+		ctx.fillStyle = 'rgba(15, 18, 24, 0.72)';
+		ctx.beginPath();
+		ctx.roundRect(0, 0, canvas.width, canvas.height, 48);
+		ctx.fill();
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+		ctx.fillStyle = '#f2f5f8';
+		ctx.font = '600 150px system-ui, sans-serif';
+		ctx.fillText(lines[0], canvas.width / 2, 150);
+		ctx.fillStyle = '#b4bfcc';
+		ctx.font = '400 64px system-ui, sans-serif';
+		ctx.fillText(lines[1], canvas.width / 2, 300);
+		const texture = new CanvasTexture(canvas);
+		texture.colorSpace = SRGBColorSpace;
+		return texture;
+	}
+
+	async function setBed(item: CatalogItem | null) {
+		const version = ++bedVersion;
+		if (!item) {
+			bedGroup.clear();
+			shownBedKey = null;
+			return;
+		}
+		const key = `${signature(item)}|${JSON.stringify(item.dimensions)}`;
+		if (key === shownBedKey) return;
+		if (!bedModels.has(key)) bedModels.set(key, buildItem(item));
+		const model = await bedModels.get(key)!.catch(error => {
+			bedModels.delete(key);
+			throw error;
+		});
+		if (version !== bedVersion) return;
+		bedGroup.clear();
+		bedGroup.add(model, bedLabel);
+		shownBedKey = key;
+		const size = new Box3().setFromObject(model).getSize(new Vector3());
+		bedGroup.position.z = ft(bedWallFace.y) + size.z / 2;
+		bedGroup.updateMatrixWorld(true);
+
+		const { width, height, depth } = item.dimensions ?? { width: size.x * 12, height: size.y * 12, depth: size.z * 12 };
+		bedLabelMat.map?.dispose();
+		bedLabelMat.map = bedLabelTexture([
+			`${round1(width)}″ × ${round1(depth)}″`,
+			`${round1(height)}″ high · ${round1((bedSpanIn - size.x * 12) / 2)}″ each side`,
+		]);
+		bedLabelMat.needsUpdate = true;
+		const labelWidth = Math.min(size.x * 0.8, size.z * 0.45 * (1024 / 400));
+		const labelDepth = (labelWidth * 400) / 1024;
+		bedLabel.scale.set(labelWidth, labelDepth, 1);
+
+		// The label rests on the highest thing under it (mattress, slats or platform); one ray down the middle can pass
+		// between slats and leave the text buried under them.
+		const ray = new Raycaster();
+		const down = new Vector3(0, -1, 0);
+		let top = 0;
+		const STEP_FT = 2 / 12;
+		for (let dx = -labelWidth / 2; dx <= labelWidth / 2; dx += STEP_FT)
+			for (let dz = -labelDepth / 2; dz <= labelDepth / 2; dz += STEP_FT) {
+				ray.set(new Vector3(bedGroup.position.x + dx, CEILING_FT, bedGroup.position.z + dz), down);
+				top = Math.max(top, ray.intersectObject(model, true)[0]?.point.y ?? 0);
+			}
+		bedLabel.position.y = (top || size.y) + 0.03;
 	}
 
 	function placeRoot(root: Group, p: Placement) {
@@ -806,6 +895,7 @@ export function createViewer(
 		setLabels,
 		setPlacements,
 		setTv,
+		setBed: (item: CatalogItem | null) => setBed(item).catch(error => console.error('Bed model failed to load', error)),
 		setFinishes: (textures: Record<FinishSurface, WallTexture | null>) => {
 			void setFinish('tvWall', textures.tvWall);
 			void setFinish('column', textures.column);

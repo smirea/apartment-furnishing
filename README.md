@@ -78,6 +78,12 @@ The **TV** panel sets the living-room TV, which is built in rather than imported
 
 Paste a TV's product link under it to keep that TV as a candidate: grok reads only its name, the diagonal it is sold as and its aspect ratio (`apps/server/src/tvs.ts`, saved to `data/tvs.json`). The list shows each one's diagonal and a link to the listing; click the diagonal to switch to that size, × to drop it.
 
+## Bed
+
+The **Bed** panel picks the primary bedroom's bed from the imported beds (catalog items grok files under `bed`). The bed is not placed by hand. Its headboard sits flush to the bedroom's north wall, and it is centered on that wall's measured 162", so both sides keep the same room for a nightstand. Each bed in the list shows its size, its price and the room left on each side (red under 18"). The bed in the plan has its width, length, height and side room written across its top. Click a bed to switch to it, or click it again to leave the room empty. The choice saves to `data/bed.json`.
+
+Paste a bed link at the bottom of the panel to import it the same way as furniture (photos, dimensions, a generated 3D model) and switch to it. That box refuses anything grok doesn't read as a bed. A bed link pasted in the Furniture box lands in the Bed panel too. The AR app doesn't show the bed, as with the TV.
+
 ## Living room wall texture
 
 The **Living room wall texture** panel (under the furniture list; both panels collapse) imports wall-panel products such as wood slats on acoustic felt, and dresses the TV wall and the column with them. Paste a product link and the server:

@@ -117,3 +117,7 @@ export const DEFAULT_TV: TvSettings = { visible: true, ...tvSize(98, [16, 9]), c
 
 // A TV whose size was read off a product page, kept so the TV panel can switch between candidates.
 export type TvModel = { id: string; url: string; name: string; widthIn: number; heightIn: number };
+
+// The primary bedroom's bed, picked from the imported beds (catalog items in the `bed` category). It is built in like
+// the TV: headboard flush to the bedroom's north wall and centered on it, so both sides keep the same nightstand room.
+export type BedSettings = { itemId: string | null };

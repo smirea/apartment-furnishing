@@ -1,5 +1,6 @@
 import {
 	DEFAULT_TV,
+	type BedSettings,
 	type CatalogEntry,
 	type Finishes,
 	type Placement,
@@ -37,6 +38,7 @@ const isVec3 = (v: unknown): v is [number, number, number] =>
 	Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
 
 const TV_FILE = join(DATA_DIR, 'tv.json');
+const BED_FILE = join(DATA_DIR, 'bed.json');
 
 const uiBuildPath = new URL('../../ui/build/', import.meta.url);
 
@@ -63,10 +65,10 @@ const server = Bun.serve({
 		},
 		'/api/catalog/import': {
 			POST: async request => {
-				const { url } = (await request.json()) as { url?: string };
+				const { url, category } = (await request.json()) as { url?: string; category?: string };
 				if (!url || !/^https?:\/\//.test(url)) return Response.json({ error: 'Paste a product URL' }, { status: 400 });
 				try {
-					const [item] = await importProducts([url], console.log);
+					const [item] = await importProducts([url], console.log, category);
 					if (!item!.model) startModelJob(item!);
 					return Response.json(item);
 				} catch (error) {
@@ -166,6 +168,23 @@ const server = Bun.serve({
 					tiltDeg: tv.tiltDeg,
 				};
 				await Bun.write(TV_FILE, JSON.stringify(saved, null, '\t') + '\n');
+				return Response.json(saved);
+			},
+		},
+		'/api/bed': {
+			GET: async () => {
+				const file = Bun.file(BED_FILE);
+				if (await file.exists()) return Response.json(await file.json());
+				const newest = (await listCatalog()).find(item => item.category === 'bed');
+				return Response.json({ itemId: newest?.id ?? null } satisfies BedSettings);
+			},
+			PUT: async request => {
+				const { itemId } = (await request.json()) as Partial<BedSettings>;
+				const item = typeof itemId === 'string' ? await readItem(itemId).catch(() => null) : null;
+				if (itemId !== null && item?.category !== 'bed')
+					return Response.json({ error: `No bed ${itemId}` }, { status: 400 });
+				const saved: BedSettings = { itemId: item?.id ?? null };
+				await Bun.write(BED_FILE, JSON.stringify(saved, null, '\t') + '\n');
 				return Response.json(saved);
 			},
 		},
