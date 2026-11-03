@@ -1,0 +1,28 @@
+{
+	"id": "slats-co-ultralight-grey-oak-full-panel-black-felt",
+	"url": "https://slats.co/products/ultralight-flexible-lightweight-full-grey-oak-accent-wall-panels-with-black-felt-backing",
+	"importedAt": "2026-11-03T17:25:05.405Z",
+	"name": "Ultralight Grey Oak Accent, Black Felt",
+	"brand": "SLATS.CO",
+	"price": 229,
+	"currency": "USD",
+	"panelsPerPack": 5,
+	"panel": {
+		"width": 11.81,
+		"height": 94.49,
+		"depth": 0.35
+	},
+	"summary": "Grey oak real wood veneer laminated on black recycled felt, 9mm thick, with a continuous face and no rigid core.",
+	"image": "/api/assets/slats-co-ultralight-grey-oak-full-panel-black-felt/image.jpg",
+	"group": "Full accent panels",
+	"texture": {
+		"map": "/api/assets/slats-co-ultralight-grey-oak-full-panel-black-felt/texture.png?v=1793727007009",
+		"normalMap": "/api/assets/slats-co-ultralight-grey-oak-full-panel-black-felt/texture-normal.png?v=1793727007009",
+		"repeat": {
+			"width": 23.62204724409449,
+			"height": 29.52755905511811
+		},
+		"depthIn": 0.35433070866141736,
+		"note": "Manufacturer spec overrides photo estimates: two 300mm (11.811in) pitches, each a continuous 297mm (11.693in) veneer face with no internal slats and a 3mm (0.118in) wide, 1.5mm deep 90-degree V reveal at joins, on 9mm black felt; the tile spans 600 x 750mm without horizontal end joints. Grey oak tone is sampled from main.jpg, rather than the spec's White Oak/Walnut finish names or other gallery colors; the spec says Accent cannot wrap a column (standard UltraLight Slat is required), and 94.49in panels do not span a 10ft wall height."
+	}
+}

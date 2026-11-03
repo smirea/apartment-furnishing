@@ -1,0 +1,28 @@
+{
+	"id": "slats-co-ultralight-wide-dark-smoke-oak-slats-brown-felt",
+	"url": "https://slats.co/products/118-tall-ultralight-wide-flexible-lightweight-dark-smoke-oak-acoustic-wood-slat-wall-panels-with-brown-felt-backing",
+	"importedAt": "2026-11-03T17:25:12.154Z",
+	"name": "Ultralight Wide Dark Smoke Oak Slats, Brown Felt",
+	"brand": "Slats.co",
+	"price": 499,
+	"currency": "USD",
+	"panelsPerPack": 5,
+	"panel": {
+		"width": 11.81,
+		"height": 118.11,
+		"depth": 0.35
+	},
+	"summary": "Dark Smoke Oak oak veneer laminated directly onto 9mm recycled brown acoustic felt, with no MDF or other rigid core.",
+	"image": "/api/assets/slats-co-ultralight-wide-dark-smoke-oak-slats-brown-felt/image.jpg",
+	"group": "Ultralight wide slats",
+	"texture": {
+		"map": "/api/assets/slats-co-ultralight-wide-dark-smoke-oak-slats-brown-felt/texture.png?v=1793726789402",
+		"normalMap": "/api/assets/slats-co-ultralight-wide-dark-smoke-oak-slats-brown-felt/texture-normal.png?v=1793726789402",
+		"repeat": {
+			"width": 23.62204724409449,
+			"height": 29.52755905511811
+		},
+		"depthIn": 0.35433070866141736,
+		"note": "Exact manufacturer spec dimensions override photo estimates: three 97 mm (3.82 in) faces per 300 mm panel, 3 mm wide 90-degree V-reveals cut 1.5 mm deep, half-reveals at panel edges, and 9 mm total veneer-on-brown-felt thickness; this tile spans six 100 mm pitches by 750 mm, with oak tone sampled from the first listing photo and brown felt per the spec. The 3000 mm panel is shorter than a true 10 ft wall, and the manufacturer explicitly prohibits wrapping this Wide profile around columns; column mapping is a visual simulation only."
+	}
+}

@@ -1,0 +1,364 @@
+Document https://cdn.shopify.com/s/files/1/0755/3843/2303/files/Slats_Paint-Ready_Fluted_-_Spec_Sheet_Installation_Guide.pdf?v=1792045693:
+S P E C IFIC AT IO N S H E E T & IN S TA LLAT IO N G U ID E
+
+Paint-Ready Fluted
+Slat · Ridge · Valley
+MDF with the profile routed into the face and about five coats of primer sanded
+flat, so paint goes straight on with no prep. A PVC film on the back keeps the
+panel rigid. Three profiles share one panel width, one box size and one install
+method — what changes is the depth of the cut and the shape it leaves. This
+guide covers what an installer or specifier needs to measure a wall, price the
+job, put it up and paint it.
+
+  Slat                                             Ridge                                         Valley
+  Flat-topped slats with square                    Raised convex half-rounds on a 1.31″          Sculpted concave scoops with a
+  channels between them. The                       repeat. 0.35″ deep, and the only              narrow flat peak between them. The
+  shallowest of the three at 0.20″, and            profile without a 118″ length.                deepest cut at 0.31″, on a 0.37″ panel.
+  the one that bends hardest.
+
+ 3                            Primed                      118″                        4                         47.2″
+ profiles                     five coats, sanded flat     tallest (Slat & Valley)     panels per box            of wall per box
+
+02 Specifications   03 Profiles   04 Estimating   05–07 Installation   08 Ordering & Trade                              Rev. October 2026
+      PA I N T - R E A D Y F L U T E D    ·   S P E C S H E E T & I N S TA L L AT I O N G U I D E                               S P E C I F I C AT I O N S
+
+S P E C IFIC AT IO N S
+
+The three profiles compared
+One build, one panel width, one box. The differences that matter on site are the cut depth, the
+panel thickness, what happens at a join, and the fact that Ridge stops at 106″.
+
+                                  S L AT                                        R I D GE                      VA L L E Y
+
+ C O N S T R UC T I O N
+
+ Build                            MDF with the profile routed into the face. About five coats of primer on the front, sanded flat — paint
+                                  goes straight on. A PVC film on the back only, for rigidity. No veneer, no felt
+
+ Finish as supplied               Primed white. The customer paints; colour is not a Slats finish
+ Profile                          Flat-topped slats with square                 Convex half-rounds            Concave scoops with a narrow
+                                  channels                                                                    flat peak
+
+ Repeat                           1.66″ — 1.11″ face + 0.55″ gap                1.31″                         1.31″ — 1.18″ scoop + 0.13″ flat
+                                                                                                              peak
+
+ Repeats per panel                7                                             9                             9
+
+ Cut depth                        0.14″                                         0.29″                         0.31″
+ Total thickness                  0.20″                                         0.35″                         0.37″
+
+ Board under the cut              0.06″ on all three, measured under the deepest point
+ PA N E L & B O X
+
+ Panel width                      11.80″
+ Panels per box                   4
+
+ Coverage per box                 47.2″ of wall
+
+ Lengths                          94.49″ · 106″ · 118.11″                       94.49″ · 106″ only            94.49″ · 106″ · 118.11″
+ Box weight                       26 · 30 · 37 lb                               35 · 45 lb                    26 · 30 · 37 lb
+
+ Panel join                       Seam falls on the slat shoulder               Cut at the lowest point       Cut at the scoop bottom — fill
+                                                                                                              and sand
+ US E & P E R FO R MA N C E
+
+ Flexibility                      Bends to follow a column, an arch or a curved wall. Fix one end and work along the curve
+
+ Acoustic performance             Not an acoustic panel. No felt backing and no NRC rating. If sound matters, specify UltraLight or
+                                  TrueWood
+
+ Moisture                         Indoor, dry areas only. The PVC film is on the back, for rigidity. The face is primed MDF with no moisture
+                                  protection of its own — whatever resistance the finished wall has comes from the paint chosen and
+                                  applied on site, not from the panel. We don’t rate it for bathrooms, wet areas or outdoors
+
+ VOC                              Low-VOC
+ Fire rating                      Not fire rated*
+ I N S TA L L
+
+ Fixing                           Construction adhesive and finishing nails, straight onto drywall, plaster or timber. No battens needed
+
+ Cutting                          Handsaw, jigsaw or circular saw. A fine-tooth blade leaves the cleanest edge on primed MDF
+
+ Painting                         Roller or spray. On Valley a brush reaches into the trough where a roller skips
+
+* Our panels are not fire rated. If your project needs one, check with your contractor or local building code before ordering. Lengths are actual
+measurements, sold by the wall height they suit (8, 9 and 10 ft), the way lumber is.
+
+slats.co · hello@slats.co · (833) 657-7116                                                                                 Rev. October 2026 · 2 / 8
+      PA I N T - R E A D Y F L U T E D       ·   S P E C S H E E T & I N S TA L L AT I O N G U I D E                                                                P RO F I LE S
+
+P R O FILE S · D R AW N T O S C A LE
+
+What the cut leaves
+Each profile is routed into the face of the board. All three stop at the same place: 0.06″ of
+board under the deepest point of the cut. That is what is left holding the panel together, and
+it is why the deeper profiles are the thicker panels rather than the thinner ones.
+
+                                     1.11″                      0.55″
+
+                                     face                        gap
+                                         1.66″ repeat
+
+          0.14″ cut                                                                                                                             0.20″ total
+                                                                                                                                                         PVC film
+
+                                                                                                       0.06″ of board under the deepest point
+
+                         Slat · 7 repeats per 11.80″ panel · drawn to scale
+
+                                  1.31″ repeat
+
+          0.29″ cut                                                                                                                             0.35″ total
+                                                                                                                                                         PVC film
+
+                                                                                                       0.06″ of board under the deepest point
+
+                        Ridge · 9 repeats per 11.80″ panel · drawn to scale
+
+                                    1.18″               0.13″
+                                   scoop            flat peak
+                                  1.31″ repeat
+
+          0.31″ cut                                                                                                                             0.37″ total
+                                                                                                                                                         PVC film
+
+                                                                                                       0.06″ of board under the deepest point
+
+                        Valley · 9 repeats per 11.80″ panel · drawn to scale
+
+slats.co · hello@slats.co · (833) 657-7116                                                                                                      Rev. October 2026 · 3 / 8
+        PA I N T - R E A D Y F L U T E D   ·   S P E C S H E E T & I N S TA L L AT I O N G U I D E                                               E S T I M AT I N G
+
+E S T IM AT IN G & LAY O U T
+
+How many boxes?
+Panels are sold four to a box. Divide the wall width by what one box covers, round up, then
+pick the length that suits the wall height.
+
+   PA I N T - R E A D Y F L U T E D
+                                                                                             Worked example: a 12′-0″ wide wall
+                                                                                             Wall width                                                       144″
+   Wall width ÷ 47.2″
+                                                                                             144 ÷ 47.2 = 3.05                                           4 boxes
+   = boxes (round up)
+                                                                                             Rounding up leaves most of a box in hand for cuts and offcuts.
+   One box covers 47.2″ of wall — four panels at 11.80″,                                     Because panels butt, there is no overlap to subtract — the
+   butted.                                                                                   arithmetic is the wall width and nothing else.
+
+Choosing a length                                                                                                                                118.11″
+                                                                                                                                               10 ft nominal
+ LE N GT H                       S O LD A S                  C O V E R A GE / B O X
+
+ 94.49″                          8 ft                        30.97 sq ft                                                           106″
+                                                                                                                                9 ft nominal
+ 106″                            9 ft                        34.74 sq ft
+                                                                                                                  94.49″
+ 118.11″ no Ridge                10 ft                       38.71 sq ft                                         8 ft nominal
+Ridge is made in 94.49″ and 106″ only. For a wall taller than 106″ in Ridge, talk to us before
+you bid — there is no 118″ panel to cut down.
+
+Start at a corner
+Corners are what people look at, so start at one and work away from it,
+letting the cut panel land at the far end — ideally the end that dies into
+another corner, a cabinet or trim.
+A cut edge has no profile running off it, so on Ridge and Valley it shows a
+plain flat edge rather than a half trough or scoop. Plan for that edge to finish
+into something rather than meet another panel.
+
+                                                                                                                                           Slat & Valley only
+
+                                                                                                                    One panel shown · four per box
+                                                                                                                         47.2″ of wall per box
+
+  Store the boxes flat, in the room. Leave it lying flat rather than stood on edge, somewhere dry, and give it a day in the room before you
+  fix anything. Panels stood up or left damp fight you on the wall.
+
+slats.co · hello@slats.co · (833) 657-7116                                                                                          Rev. October 2026 · 4 / 8
+      PA I N T - R E A D Y F L U T E D   ·    S P E C S H E E T & I N S TA L L AT I O N G U I D E                                             I N S TA L L AT I O N · 1
+
+IN S TA LLAT IO N · T H E W H O LE J O B IN FO U R M O V E S
+
+01 G L U E                                   02 P R E S S                             03 N A I L                               04 PA I N T
+Face-down. One S-bead down the               To your plumb line. Brace it until the   Into the low point only, never a face.   Two thin coats. Spray is best; brush
+back, 2″ in from every edge.                 adhesive grabs.                          Fill and sand flush.                     the Valley first.
+
+Before you start
+ Construction adhesive                        Caulk gun                                Finishing nails                          Level & pencil
+ Rated for wood and your wall                 For the bead                             To pin a panel while it grabs            A 4 ft level or a laser
+
+ Handsaw or jigsaw                            Filler & sandpaper                       Caulk                                    Roller, brush or sprayer
+ Fine-tooth blade, primed MDF                 Nail holes, and Valley joins             Where the run meets trim                 For the paint
+
+  1      Prep the wall
+         Start with a clean, dry, flat wall. Take off outlet covers and switch plates and pull any nails or hooks. The panel
+         follows the wall rather than straightening it, so fill or sand anything that would telegraph through — and on a
+         profile this shallow, a bump shows. Adhesive needs a sound surface: scrape loose paint and let fresh plaster
+         cure.
+
+  2      Mark your layout
+         Start at the corner you chose on page 4. Draw a plumb line on the first panel’s leading edge — corners are rarely
+         plumb, so trust the line, not the wall. Everything else follows it, so check it twice.
+
+  3      Which way round
+         Ridge and Valley are symmetrical — both panel edges are cut at the lowest point, so either end can lead and a
+         panel can be turned end for end without anything showing.
+         Slat is not. One edge is the top outer corner of a slat and the other is the groove floor, so the two edges are not
+         the same. Keep every Slat panel the same way round as you work across the wall. Turn one and you will either
+         butt two slat faces together with no channel between them, or open a channel twice the width of the rest — and
+         on a painted wall both read instantly.
+
+  4      No battens
+         These go straight onto drywall, plaster or timber. There is nothing to build out first, and no cavity to leave — the
+         panel is fixed flat to the wall with adhesive and held while it grabs. That keeps the finished face at 0.20″ to 0.37″
+         off the wall depending on profile, so skirting, architrave and outlet plates mostly still sit right.
+
+slats.co · hello@slats.co · (833) 657-7116                                                                                              Rev. October 2026 · 5 / 8
+      PA I N T - R E A D Y F L U T E D   ·   S P E C S H E E T & I N S TA L L AT I O N G U I D E                                                                            I N S TA L L AT I O N · 2
+
+  5      Fix the panel
+         Hold the panel to the plumb line and check it with your level. Adhesive carries the panel; nails only hold it still
+         while the adhesive takes.
+
+  Use a construction adhesive rated for wood and for
+                                                                                                 P INNING
+  your wall surface.
+  Lay the panel face-down on a clean surface and run                                             Finishing nails
+  one continuous S-bead down the back.                                                           Drive nails into the low point of the profile — the
+  Keep the bead about 2″ back from the ends and edges                                            channel on Slat, the trough on Ridge, the scoop on
+  so nothing squeezes out at a join.                                                             Valley — never through a face or a peak. That is where
+  Press it onto the wall, check level and plumb, and brace                                       the shadow is, and where filler disappears. Set the
+  it until the adhesive grabs.                                                                   heads just below the surface, fill them, and sand flush
+  Follow the adhesive maker’s cure time before filling or                                        before you paint.
+  painting.
+
+                        THE BACK OF THE PANEL — FACE-DOWN
+                           2″ keep the bead back from every edge
+
+                                                                                                                                                            11.80″
+                                                                                                                                                            panel width
+
+                                                                     94.49″ panel shown
+                        One continuous S-bead snaking down the length, kept about 2″ back from the ends and edges so nothing squeezes out at a join.
+
+  6      Cut to fit
+         Primed MDF cuts with a handsaw, jigsaw or circular saw. Cutting to length is a plain crosscut. Cutting to width is
+         a choice, because where you rip decides what the new edge can do.
+         Rip at a low point — the channel, the trough, the scoop bottom — and you reproduce the edge the factory puts
+         on a panel, so the cut panel still butts cleanly against the next one. Only 0.06″ of board sits on that line, so back it
+         up and use a fine blade. Rip at a high point for a stronger, full-thickness edge — but the profile will not line up
+         against another panel, so send that edge into a corner. Either way the cut edge is raw MDF: prime it before
+         painting.
+
+                                                                                                            CUT TO WIDTH
+                                                                   CUT TO LENGTH                            Where you rip decides what the new edge can do.
+                                                                   Track saw, circular saw or handsaw,
+                                                                                                            Rip at a LOW point and you reproduce a factory
+                                                                   fine-tooth blade. Clamp a straightedge
+                                                                                                            edge, so the cut panel still butts cleanly to the
+                                                                   and support the panel full length.
+                                                                                                            next one. Only 0.06″ of board sits on that line,
+                                                                   Cut face up with a handsaw, face down    so back it up and use a fine blade.
+                                                                   with a circular saw, so any breakout
+                                                                                                            Rip at a HIGH point for a stronger, full-thickness
+                                                                   lands on the back.
+                                                                                                            edge — but the profile will not line up against
+                                                                   A cut end is raw MDF — prime it          another panel, so send that edge into a corner.
+                                                                   before painting.
+
+                                                                                                                   low point     high point
+                                                                                                                    0.06″ here
+
+                                                                                                            Valley shown — the same choice applies on all three profiles.
+
+slats.co · hello@slats.co · (833) 657-7116                                                                                                                        Rev. October 2026 · 6 / 8
+       PA I N T - R E A D Y F L U T E D        ·   S P E C S H E E T & I N S TA L L AT I O N G U I D E                                                                 I N S TA L L AT I O N · 3
+
+  7       Close the joins
+          What happens at a join depends on the profile, and only one of the three needs anything done to it.
+
+                                                                                                 panel join
+
+                Slat
+                0.20″
+                        Seam on the slat shoulder, inside the channel shadow. Nothing to do.
+
+                                                                                                 panel join
+
+                              Ridge
+                                0.35″
+
+                                        Two halves close into one whole trough. Nothing to do.
+
+                                                                                                 panel join
+
+                             Valley
+                                0.37″
+
+                                        Two halves close into one whole scoop — a continuous curve shows any step, so fill, sand, then paint.
+
+                 Sections through a join, all three drawn at the same scale. Red marks the only one that needs work.
+
+Slat                                                                Ridge                                                                       Valley
+One panel edge is the top outer corner of a                         Both edges are cut at the lowest point, so                                  Both edges are cut at the scoop bottom. The
+slat, the next is the groove floor, so the seam                     two half profiles close into one whole trough.                              two halves make one whole scoop — but a
+lands on the slat shoulder with the channel                         The seam sits in the deepest shadow on the                                  continuous curve shows any step, so fill the
+shadow beside it. Butt them tight and leave                         panel. Butt them tight and leave it.                                        join, sand it flush and paint over it.
+it.
+
+  8       Paint
+          The panel arrives with about five coats of primer, sanded flat, so there is no sanding or priming to do on the
+          factory face — only on cut edges and anything you have filled. Paint after the panels are up, the nail holes are
+          filled and the Valley joins are sanded; painting first means touching in every one of those afterwards.
+
+   Spray gives the best result on all three — it reaches the
+                                                                                                              W O RT H KNO W ING
+   full depth of the cut without loading the edges.
+   Rolling works on Slat and Ridge. Use a short-nap roller                                                    Sheen
+   and lay off in one direction.                                                                              The whole point of the profile is the shadow it casts,
+   On Valley, cut in with a brush first. A roller bridges the                                                 and sheen decides how much of that you keep. A flat
+   trough and leaves the deepest part of the scoop                                                            or matt finish reads the profile as shape. The higher
+   starved.                                                                                                   the gloss, the more the surface reflects and the more
+   Two coats over the factory primer, thin rather than                                                        the shadow flattens out. If you want the relief to carry
+   thick. Heavy coats pool in the low points and soften the                                                   across a room, keep the sheen low.
+   profile.
+   The paint is the only protection the face gets. Choose
+   the coating for the room it is going into, and treat cut
+   edges as carefully as the face — bare MDF edges are
+   where moisture gets in, so prime them before the first
+   coat.
+
+slats.co · hello@slats.co · (833) 657-7116                                                                                                                         Rev. October 2026 · 7 / 8
+       PA I N T - R E A D Y F L U T E D   ·   S P E C S H E E T & I N S TA L L AT I O N G U I D E                          ORDE RI NG & TRADE
+
+FO R IN S TA LLE R S , D E S IG N E R S & B U ILD E R S
+
+Slats.co Trade Program
+Pricing isn’t printed in this guide. Trade partners are quoted per job, on project scope
+and volume, and get:
+
+   Dedicated account manager                                  Project planning support                     Free sample kit & priority
+   Recommendations, quotes and order                          Measurements, box counts and layout          shipping
+   coordination                                               help on your drawings                        For approved trade partners
+
+Apply at slats.co/pages/trade. You don’t need a business license or tax ID, and approval comes
+within one business day.
+
+BE FO RE YO U Q U O T E
+
+Stock & delivery                                           Allow for paint                                Returns
+In-stock orders ship the next                              The price of the panel is not the price        30 days from receipt. Cut or painted
+business day. A box runs 26–45 lb                          of the wall. Budget two coats plus             panels can’t be returned, so check
+depending on profile and length —                          filler, and a sprayer if the job is Valley     the length against the wall before
+Ridge is the heavy one — and up to                         or large.                                      trimming.
+118″ long, so plan for someone to
+receive the delivery.
+
+PA I N T - R E A D Y F L U T E D
+
+Slat                                                      Ridge                                         Valley
+
+           Questions on a project? Real humans, real answers.
+           hello@slats.co · text (833) 657-7116 · live chat at slats.co
+
+slats.co · hello@slats.co · (833) 657-7116                                                                                Rev. October 2026 · 8 / 8
+

@@ -1,0 +1,28 @@
+{
+	"id": "slats-co-ultralight-maple-slats-beige-felt",
+	"url": "https://slats.co/products/118-ultralight-flexible-lightweight-maple-acoustic-wood-slat-wall-panels-with-beige-felt-backing",
+	"importedAt": "2026-11-03T17:25:07.535Z",
+	"name": "Ultralight Maple Slats, Beige Felt",
+	"brand": "SLATS.CO",
+	"price": 499,
+	"currency": "USD",
+	"panelsPerPack": 5,
+	"panel": {
+		"width": 11.8,
+		"height": 118.11,
+		"depth": 0.35
+	},
+	"summary": "Real maple veneer laminated directly onto 9 mm recycled beige acoustic felt, with no MDF or other rigid core.",
+	"image": "/api/assets/slats-co-ultralight-maple-slats-beige-felt/image.jpg",
+	"group": "Ultralight slats",
+	"texture": {
+		"map": "/api/assets/slats-co-ultralight-maple-slats-beige-felt/texture.png?v=1793726948513",
+		"normalMap": "/api/assets/slats-co-ultralight-maple-slats-beige-felt/texture-normal.png?v=1793726948513",
+		"repeat": {
+			"width": 11.83,
+			"height": 23.66
+		},
+		"depthIn": 0.35,
+		"note": "Manufacturer spec sheet overrides photo estimates: seven 1.20 in slat faces on 1.69 in pitches with 0.49 in, 90-degree V-grooves cut 6.2 mm into 9 mm felt; these rounded widths total 11.83 in versus the listed 11.80 in panel. Muted ultralight maple veneer and beige felt colors follow main.jpg, with no MDF or rigid core; the tile covers seven pitches by 23.66 in."
+	}
+}

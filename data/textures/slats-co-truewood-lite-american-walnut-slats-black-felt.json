@@ -1,0 +1,28 @@
+{
+	"id": "slats-co-truewood-lite-american-walnut-slats-black-felt",
+	"url": "https://slats.co/products/118-american-walnut-truewood-lite-3-sided-veneer-acoustic-slat-panel",
+	"importedAt": "2026-11-03T17:24:53.403Z",
+	"name": "TrueWood Lite American Walnut Slats, Black Felt",
+	"brand": "SLATS.CO",
+	"price": 549,
+	"currency": "USD",
+	"panelsPerPack": 4,
+	"panel": {
+		"width": 12.01,
+		"height": 118,
+		"depth": 0.39
+	},
+	"summary": "Solid rubberwood slats wrapped in real American walnut veneer on three sides, stapled to a black acoustic felt backing.",
+	"image": "/api/assets/slats-co-truewood-lite-american-walnut-slats-black-felt/image.jpg",
+	"group": "Truewood Lite slats",
+	"texture": {
+		"map": "/api/assets/slats-co-truewood-lite-american-walnut-slats-black-felt/texture.png?v=1793727473476",
+		"normalMap": "/api/assets/slats-co-truewood-lite-american-walnut-slats-black-felt/texture-normal.png?v=1793727473476",
+		"repeat": {
+			"width": 11.811023622047244,
+			"height": 23.62204724409449
+		},
+		"depthIn": 0.3937007874015748,
+		"note": "Manufacturer spec sheet dimensions override photo estimates: 8 slats, each 27 mm (1.063 in) wide with a 10.5 mm (0.413 in) square felt gap, on a 37.5 mm pitch; the tile spans the 300 mm installed panel width by 600 mm, with 5 mm slats over 5 mm felt (10 mm total). Muted American walnut tones and per-slat variation are sampled from the main listing photo; grain and black acoustic felt are synthesized periodically without baked lighting."
+	}
+}

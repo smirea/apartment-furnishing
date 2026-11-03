@@ -1,4 +1,11 @@
-import type { CatalogItem, FinishSurface, Placement, WallTexture } from '@repo/shared/items';
+import {
+	tvDiagonal,
+	type CatalogItem,
+	type FinishSurface,
+	type Placement,
+	type TvSettings,
+	type WallTexture,
+} from '@repo/shared/items';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {
@@ -6,6 +13,7 @@ import {
 	Box3,
 	BoxGeometry,
 	BoxHelper,
+	CanvasTexture,
 	CylinderGeometry,
 	Color,
 	DirectionalLight,
@@ -13,6 +21,7 @@ import {
 	Group,
 	HemisphereLight,
 	Mesh,
+	MeshBasicMaterial,
 	Object3D,
 	MeshStandardMaterial,
 	PerspectiveCamera,
@@ -32,12 +41,14 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
 import { CSS2DObject, CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import {
+	bedWallFace,
 	CEILING_FT,
 	columns,
 	doors,
 	fixtures,
 	footprint,
 	ft,
+	finishAreasIn,
 	PX_PER_FT,
 	rooms,
 	tvWallFace,
@@ -59,6 +70,7 @@ const FRAME_IN = 2;
 const SNAP_FT = 0.6;
 const WALL_MOUNT_SNAP_FT = 2;
 const DEG = Math.PI / 180;
+const round1 = (n: number) => Math.round(n * 10) / 10;
 
 const floorColors: Record<FloorKind, number> = { wood: 0xc9a672, tile: 0xe6e6e2, concrete: 0x9a9a98 };
 
@@ -300,6 +312,8 @@ export function createViewer(
 			wallFinish.position.x = ft(tvWallFace.x) - depth;
 			// Wall-mounted items snap to the panels' face instead of the plaster behind them.
 			tvWallSnap.x1 = ft(tvWallFace.x) - depth;
+			tvWallDepthFt = depth;
+			placeTv();
 			for (const f of tvWallFixtures) f.mesh.position.x = f.x - depth;
 		},
 	);
@@ -318,6 +332,78 @@ export function createViewer(
 		},
 		depth => columnFinish.scale.set(ft(column.r) + depth, columnFinish.scale.y, ft(column.r) + depth),
 	);
+
+	// The TV hangs on a tilting mount centered on the TV wall's measured span, out from any wall texture.
+	const TV_DEPTH_IN = 1.2;
+	const TV_MOUNT_IN = 2.5;
+	const TV_BEZEL_IN = 0.3;
+	let tvWallDepthFt = 0;
+	let tvSettings: TvSettings | null = null;
+	const tvGroup = new Group();
+	tvGroup.visible = false;
+	scene.add(tvGroup);
+	const tvBody = new Mesh(
+		new BoxGeometry(1, 1, 1),
+		new MeshStandardMaterial({ color: 0x141518, roughness: 0.4, metalness: 0.3 }),
+	);
+	const tvScreenMat = new MeshStandardMaterial({ color: 0xffffff, roughness: 0.25, metalness: 0.1 });
+	const tvScreen = new Mesh(new PlaneGeometry(1, 1), tvScreenMat);
+	// Faces west, into the living room.
+	tvScreen.rotation.y = -Math.PI / 2;
+	tvGroup.add(tvBody, tvScreen);
+
+	function tvLabel({ widthIn, heightIn }: TvSettings) {
+		const canvas = document.createElement('canvas');
+		canvas.width = 1024;
+		canvas.height = Math.round((1024 * heightIn) / widthIn);
+		const ctx = canvas.getContext('2d')!;
+		const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+		gradient.addColorStop(0, '#1d2633');
+		gradient.addColorStop(1, '#0b0e13');
+		ctx.fillStyle = gradient;
+		ctx.fillRect(0, 0, canvas.width, canvas.height);
+		ctx.fillStyle = '#e8edf3';
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+		const unit = canvas.height / 10;
+		ctx.font = `600 ${unit * 2.4}px system-ui, sans-serif`;
+		ctx.fillText(`${round1(tvDiagonal({ widthIn, heightIn }))}″`, canvas.width / 2, canvas.height * 0.42);
+		ctx.font = `400 ${unit * 0.9}px system-ui, sans-serif`;
+		ctx.fillStyle = '#9aa7b6';
+		ctx.fillText(`${round1(widthIn)}″ × ${round1(heightIn)}″`, canvas.width / 2, canvas.height * 0.66);
+		const texture = new CanvasTexture(canvas);
+		texture.colorSpace = SRGBColorSpace;
+		return texture;
+	}
+
+	function placeTv() {
+		const tv = tvSettings;
+		tvGroup.visible = !!tv?.visible;
+		if (!tv) return;
+		const [w, h, d] = [tv.widthIn / 12, tv.heightIn / 12, TV_DEPTH_IN / 12];
+		tvBody.scale.set(d, h, w);
+		tvScreen.scale.set(w - (2 * TV_BEZEL_IN) / 12, h - (2 * TV_BEZEL_IN) / 12, 1);
+		tvScreen.position.x = -d / 2 - 0.002;
+		// Rotating about the wall-parallel axis through the screen center tips the top out and the screen down.
+		tvGroup.rotation.z = tv.tiltDeg * DEG;
+		tvGroup.position.set(
+			// Tilting about the center swings the bottom edge toward the wall; the mount holds it out by that much.
+			ft(tvWallFace.x) - tvWallDepthFt - TV_MOUNT_IN / 12 - d / 2 - (h / 2) * Math.sin(tv.tiltDeg * DEG),
+			tv.centerIn / 12,
+			ft(tvWallFace.y2) - finishAreasIn.tvWall.width / 24,
+		);
+	}
+
+	function setTv(tv: TvSettings) {
+		const resized = tv.widthIn !== tvSettings?.widthIn || tv.heightIn !== tvSettings?.heightIn;
+		tvSettings = tv;
+		if (resized) {
+			tvScreenMat.map?.dispose();
+			tvScreenMat.map = tvLabel(tv);
+			tvScreenMat.needsUpdate = true;
+		}
+		placeTv();
+	}
 
 	const textureLoader = new TextureLoader();
 	const textureCache = new Map<string, Promise<Texture>>();
@@ -384,6 +470,97 @@ export function createViewer(
 		const center = box.getCenter(new Vector3());
 		object.position.sub(new Vector3(center.x, box.min.y, center.z));
 		return object;
+	}
+
+	// The bed is built in like the TV: headboard (the model's back, -z) flush to the primary bedroom's north wall and
+	// centered between the side walls, with its size written across the top.
+	const bedWallSnap = wallBoxes.find(
+		b => b.z2 === ft(bedWallFace.y) && b.x1 <= ft(bedWallFace.x1) && b.x2 >= ft(bedWallFace.x2),
+	);
+	if (!bedWallSnap) throw new Error('Bed wall face does not match a wall run in the floor plan');
+	const bedSpanIn = ft(bedWallFace.x2 - bedWallFace.x1) * 12;
+	const bedGroup = new Group();
+	bedGroup.position.x = ft((bedWallFace.x1 + bedWallFace.x2) / 2);
+	scene.add(bedGroup);
+	const bedModels = new Map<string, Promise<Object3D>>();
+	const bedLabelMat = new MeshBasicMaterial({ transparent: true, depthWrite: false });
+	const bedLabel = new Mesh(new PlaneGeometry(1, 1), bedLabelMat);
+	// Lies flat with the text's top toward the headboard, so it reads from the foot of the bed.
+	bedLabel.rotation.x = -Math.PI / 2;
+	let bedVersion = 0;
+	let shownBedKey: string | null = null;
+
+	function bedLabelTexture(lines: [string, string]) {
+		const canvas = document.createElement('canvas');
+		canvas.width = 1024;
+		canvas.height = 400;
+		const ctx = canvas.getContext('2d')!;
+		ctx.fillStyle = 'rgba(15, 18, 24, 0.72)';
+		ctx.beginPath();
+		ctx.roundRect(0, 0, canvas.width, canvas.height, 48);
+		ctx.fill();
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'middle';
+		ctx.fillStyle = '#f2f5f8';
+		ctx.font = '600 150px system-ui, sans-serif';
+		ctx.fillText(lines[0], canvas.width / 2, 150);
+		ctx.fillStyle = '#b4bfcc';
+		ctx.font = '400 64px system-ui, sans-serif';
+		ctx.fillText(lines[1], canvas.width / 2, 300);
+		const texture = new CanvasTexture(canvas);
+		texture.colorSpace = SRGBColorSpace;
+		return texture;
+	}
+
+	async function setBed(item: CatalogItem | null) {
+		const version = ++bedVersion;
+		if (!item) {
+			bedGroup.clear();
+			shownBedKey = null;
+			return;
+		}
+		const key = `${signature(item)}|${JSON.stringify(item.dimensions)}`;
+		if (key === shownBedKey) return;
+		if (!bedModels.has(key)) bedModels.set(key, buildItem(item));
+		const model = await bedModels.get(key)!.catch(error => {
+			bedModels.delete(key);
+			if (version === bedVersion) {
+				bedGroup.clear();
+				shownBedKey = null;
+			}
+			throw error;
+		});
+		if (version !== bedVersion) return;
+		bedGroup.clear();
+		bedGroup.add(model, bedLabel);
+		shownBedKey = key;
+		const size = new Box3().setFromObject(model).getSize(new Vector3());
+		bedGroup.position.z = ft(bedWallFace.y) + size.z / 2;
+		bedGroup.updateMatrixWorld(true);
+
+		const { width, height, depth } = item.dimensions ?? { width: size.x * 12, height: size.y * 12, depth: size.z * 12 };
+		bedLabelMat.map?.dispose();
+		bedLabelMat.map = bedLabelTexture([
+			`${round1(width)}″ × ${round1(depth)}″`,
+			`${round1(height)}″ high · ${round1((bedSpanIn - size.x * 12) / 2)}″ each side`,
+		]);
+		bedLabelMat.needsUpdate = true;
+		const labelWidth = Math.min(size.x * 0.8, size.z * 0.45 * (1024 / 400));
+		const labelDepth = (labelWidth * 400) / 1024;
+		bedLabel.scale.set(labelWidth, labelDepth, 1);
+
+		// The label rests on the highest thing under it (mattress, slats or platform); one ray down the middle can pass
+		// between slats and leave the text buried under them.
+		const ray = new Raycaster();
+		const down = new Vector3(0, -1, 0);
+		let top = 0;
+		const STEP_FT = 2 / 12;
+		for (let dx = -labelWidth / 2; dx <= labelWidth / 2; dx += STEP_FT)
+			for (let dz = -labelDepth / 2; dz <= labelDepth / 2; dz += STEP_FT) {
+				ray.set(new Vector3(bedGroup.position.x + dx, CEILING_FT, bedGroup.position.z + dz), down);
+				top = Math.max(top, ray.intersectObject(model, true)[0]?.point.y ?? 0);
+			}
+		bedLabel.position.y = (top || size.y) + 0.03;
 	}
 
 	function placeRoot(root: Group, p: Placement) {
@@ -721,6 +898,8 @@ export function createViewer(
 		setCutaway,
 		setLabels,
 		setPlacements,
+		setTv,
+		setBed: (item: CatalogItem | null) => setBed(item).catch(error => console.error('Bed model failed to load', error)),
 		setFinishes: (textures: Record<FinishSurface, WallTexture | null>) => {
 			void setFinish('tvWall', textures.tvWall);
 			void setFinish('column', textures.column);

@@ -13,7 +13,7 @@ export const GALLERY_DIR = 'gallery';
 const PLACEMENTS_FILE = join(DATA_DIR, 'placements.json');
 const GROK_MODEL = 'grok-4.7-build-fast';
 
-for (const bin of ['grok', 'uv']) if (!Bun.which(bin)) throw new Error(`${bin} CLI not found on PATH`);
+for (const bin of ['grok', 'uv', 'pdftotext']) if (!Bun.which(bin)) throw new Error(`${bin} CLI not found on PATH`);
 
 export async function listCatalog(): Promise<CatalogItem[]> {
 	await mkdir(CATALOG_DIR, { recursive: true });
@@ -143,6 +143,8 @@ type PageData = {
 	mainImage: string | null;
 	models: string[];
 	images: string[];
+	// Linked PDFs, spec sheets first.
+	documents: string[];
 	specs: string[];
 	jsonLd: string;
 	text: string;
@@ -221,7 +223,7 @@ ${pageContext(page)}`,
 }
 
 export async function grokStructured<T>(prompt: string, schema: object): Promise<T> {
-	const promptFile = join(ROOT, '.cache', `grok-prompt-${Date.now()}.txt`);
+	const promptFile = join(ROOT, '.cache', `grok-prompt-${crypto.randomUUID()}.txt`);
 	await mkdir(join(ROOT, '.cache'), { recursive: true });
 	await writeFile(promptFile, prompt);
 	const proc = Bun.spawn(
@@ -254,6 +256,29 @@ export async function grokStructured<T>(prompt: string, schema: object): Promise
 	const result = JSON.parse(out);
 	if (!result.structuredOutput) throw new Error(`grok returned no structured output: ${out.slice(0, 500)}`);
 	return result.structuredOutput;
+}
+
+// Text of the page's linked spec sheets, for prompts that need exact dimensions.
+export async function readDocuments(urls: string[]): Promise<string> {
+	const texts = await Promise.all(
+		urls.map(async url => {
+			const res = await fetch(url, { headers: { 'user-agent': 'Mozilla/5.0' } });
+			if (!res.ok) throw new Error(`${res.status} downloading ${url}`);
+			const proc = Bun.spawn(['pdftotext', '-layout', '-', '-'], {
+				stdin: new Uint8Array(await res.arrayBuffer()),
+				stdout: 'pipe',
+				stderr: 'pipe',
+			});
+			const [out, err, code] = await Promise.all([
+				new Response(proc.stdout).text(),
+				new Response(proc.stderr).text(),
+				proc.exited,
+			]);
+			if (code !== 0) throw new Error(`pdftotext failed on ${url}: ${err}`);
+			return `Document ${url}:\n${out.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n')}`;
+		}),
+	);
+	return texts.join('\n\n').slice(0, 30000);
 }
 
 async function download(url: string, path: string) {
@@ -296,13 +321,23 @@ export async function downloadPhotos(id: string, imageUrl: string | null, galler
 	return `/api/assets/${id}/image.${ext}`;
 }
 
-export async function importProducts(urls: string[], log: (line: string) => void = () => {}): Promise<CatalogItem[]> {
+// `category` limits an import to one kind of product, so a link pasted in the Bed panel can't add a lamp nobody sees.
+export async function importProducts(
+	urls: string[],
+	log: (line: string) => void = () => {},
+	category?: string,
+): Promise<CatalogItem[]> {
 	await mkdir(CATALOG_DIR, { recursive: true });
 	log(`capturing ${urls.length} page(s)…`);
 	const imported: CatalogItem[] = [];
 	for (const page of await fetchPages(urls)) {
 		log(`→ ${page.title.slice(0, 80)} (${page.models.length} model candidate(s))`);
 		const { imageUrl, modelUrl, ...product } = await parseWithGrok(page);
+		// TVs are built into the plan; the TV panel only needs their size.
+		if (product.category === 'tv')
+			throw new Error(`${product.name} is a TV: paste its link in the TV panel, which reads its size`);
+		if (category && product.category !== category)
+			throw new Error(`${product.name} is not a ${category} (read as ${product.category})`);
 		const brandPrefix =
 			product.brand && !product.name.toLowerCase().startsWith(product.brand.toLowerCase()) ? `${product.brand} ` : '';
 		const existing = (await listCatalog()).find(item => productKey(item.url) === productKey(page.url));

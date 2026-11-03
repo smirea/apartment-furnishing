@@ -1,10 +1,27 @@
-import type { CatalogEntry, Finishes, Placement, WallTextureEntry } from '@repo/shared/items';
+import {
+	DEFAULT_TV,
+	type BedSettings,
+	type CatalogEntry,
+	type Finishes,
+	type Placement,
+	type TvSettings,
+	type WallTextureEntry,
+} from '@repo/shared/items';
 import { join, normalize } from 'node:path';
-import { ASSET_DIR, importProducts, listCatalog, readItem, readPlacements, updatePlacements } from './catalog';
+import {
+	ASSET_DIR,
+	DATA_DIR,
+	importProducts,
+	listCatalog,
+	readItem,
+	readPlacements,
+	updatePlacements,
+} from './catalog';
 import { modelJobs, startModelJob } from './generate-model';
 import { planGeometry } from '@repo/shared/plan';
 import { usdzPath } from './usdz';
 import { config } from './config';
+import { importTv, listTvs, removeTv } from './tvs';
 import { ideaFile, ideasHtml } from './ideas';
 import {
 	FINISH_SURFACES,
@@ -19,6 +36,9 @@ import {
 
 const isVec3 = (v: unknown): v is [number, number, number] =>
 	Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
+
+const TV_FILE = join(DATA_DIR, 'tv.json');
+const BED_FILE = join(DATA_DIR, 'bed.json');
 
 const uiBuildPath = new URL('../../ui/build/', import.meta.url);
 
@@ -45,10 +65,10 @@ const server = Bun.serve({
 		},
 		'/api/catalog/import': {
 			POST: async request => {
-				const { url } = (await request.json()) as { url?: string };
+				const { url, category } = (await request.json()) as { url?: string; category?: string };
 				if (!url || !/^https?:\/\//.test(url)) return Response.json({ error: 'Paste a product URL' }, { status: 400 });
 				try {
-					const [item] = await importProducts([url], console.log);
+					const [item] = await importProducts([url], console.log, category);
 					if (!item!.model) startModelJob(item!);
 					return Response.json(item);
 				} catch (error) {
@@ -100,6 +120,72 @@ const server = Bun.serve({
 				}
 				await saveFinishes(finishes);
 				return Response.json(finishes);
+			},
+		},
+		'/api/tvs': { GET: async () => Response.json(await listTvs()) },
+		'/api/tvs/import': {
+			POST: async request => {
+				const { url } = (await request.json()) as { url?: string };
+				if (!url || !/^https?:\/\//.test(url)) return Response.json({ error: 'Paste a product URL' }, { status: 400 });
+				try {
+					return Response.json(await importTv(url));
+				} catch (error) {
+					console.error(error);
+					return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 502 });
+				}
+			},
+		},
+		'/api/tvs/:id': {
+			DELETE: async request => {
+				await removeTv(request.params.id);
+				return Response.json({ ok: true });
+			},
+		},
+		'/api/tv': {
+			GET: async () => {
+				const file = Bun.file(TV_FILE);
+				return Response.json((await file.exists()) ? await file.json() : DEFAULT_TV);
+			},
+			PUT: async request => {
+				const tv = (await request.json()) as Partial<TvSettings>;
+				const sizes = [tv.widthIn, tv.heightIn, tv.centerIn];
+				if (
+					typeof tv.visible !== 'boolean' ||
+					!sizes.every(n => typeof n === 'number' && n > 0 && n < 240) ||
+					typeof tv.tiltDeg !== 'number' ||
+					tv.tiltDeg < 0 ||
+					tv.tiltDeg > 30
+				)
+					return Response.json(
+						{ error: 'Expected visible, widthIn, heightIn, centerIn and a 0–30° tiltDeg' },
+						{ status: 400 },
+					);
+				const saved: TvSettings = {
+					visible: tv.visible,
+					widthIn: tv.widthIn!,
+					heightIn: tv.heightIn!,
+					centerIn: tv.centerIn!,
+					tiltDeg: tv.tiltDeg,
+				};
+				await Bun.write(TV_FILE, JSON.stringify(saved, null, '\t') + '\n');
+				return Response.json(saved);
+			},
+		},
+		'/api/bed': {
+			GET: async () => {
+				const file = Bun.file(BED_FILE);
+				if (await file.exists()) return Response.json(await file.json());
+				const newest = (await listCatalog()).find(item => item.category === 'bed');
+				return Response.json({ itemId: newest?.id ?? null } satisfies BedSettings);
+			},
+			PUT: async request => {
+				const { itemId } = ((await request.json().catch(() => null)) ?? {}) as Partial<BedSettings>;
+				const item = typeof itemId === 'string' ? await readItem(itemId).catch(() => null) : null;
+				if (itemId !== null && item?.category !== 'bed')
+					return Response.json({ error: `No bed ${itemId}` }, { status: 400 });
+				const saved: BedSettings = { itemId: item?.id ?? null };
+				await Bun.write(BED_FILE, JSON.stringify(saved, null, '\t') + '\n');
+				return Response.json(saved);
 			},
 		},
 		'/api/plan': Response.json(planGeometry()),

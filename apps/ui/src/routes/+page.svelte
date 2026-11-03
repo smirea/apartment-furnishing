@@ -1,7 +1,13 @@
 <script lang="ts">
-	import { finishAreasIn } from '@repo/shared/floorplan';
+	import { bedWallFace, finishAreasIn, ft } from '@repo/shared/floorplan';
 	import {
 		panelsNeeded,
+		type BedSettings,
+		TV_RATIOS,
+		tvDiagonal,
+		tvSize,
+		type TvModel,
+		type TvSettings,
 		type CatalogEntry,
 		type CatalogItem,
 		type Finishes,
@@ -24,9 +30,11 @@
 	const saved = JSON.parse(localStorage.getItem(OPTIONS_KEY) ?? '{}');
 	let cutaway = $state<boolean>(saved.cutaway ?? true);
 	let labels = $state<boolean>(saved.labels ?? false);
-	let open = $state<{ furniture: boolean; textures: boolean; ideas: boolean }>({
+	let open = $state<{ furniture: boolean; textures: boolean; tv: boolean; bed: boolean; ideas: boolean }>({
 		furniture: true,
 		textures: true,
+		tv: true,
+		bed: true,
 		ideas: false,
 		...saved.open,
 	});
@@ -47,6 +55,42 @@
 	}));
 	const catalogList = $derived(catalogQuery.data ?? []);
 	const catalog = $derived(Object.fromEntries(catalogList.map(item => [item.id, item])));
+	const furnitureList = $derived(catalogList.filter(item => item.category !== 'bed'));
+	const beds = $derived(catalogList.filter(item => item.category === 'bed'));
+
+	const bedQuery = createQuery(() => ({ queryKey: ['bed'], queryFn: () => api<BedSettings>('/api/bed') }));
+	const bed = $derived(bedQuery.data?.itemId ? (catalog[bedQuery.data.itemId] ?? null) : null);
+	const BED_SPAN_IN = ft(bedWallFace.x2 - bedWallFace.x1) * 12;
+	const bedFacts = (item: CatalogItem) => {
+		const d = item.dimensions;
+		return [d && `${round1(d.width)} × ${round1(d.depth)} × ${round1(d.height)}″`, money(item)]
+			.filter(Boolean)
+			.join(' · ');
+	};
+	const sideRoom = (item: CatalogItem) => (item.dimensions ? (BED_SPAN_IN - item.dimensions.width) / 2 : null);
+	// Narrow nightstands start around 18 in; less than that beside the bed is a squeeze.
+	const NIGHTSTAND_MIN_IN = 18;
+	const bedPick = createMutation(() => ({
+		mutationFn: (itemId: string | null) =>
+			api<BedSettings>('/api/bed', { method: 'PUT', body: JSON.stringify({ itemId }) }),
+		onMutate: async (itemId: string | null) => {
+			await queryClient.cancelQueries({ queryKey: ['bed'] });
+			queryClient.setQueryData(['bed'], { itemId });
+		},
+		onSuccess: (saved: BedSettings) => queryClient.setQueryData(['bed'], saved),
+		onError: () => queryClient.invalidateQueries({ queryKey: ['bed'] }),
+	}));
+	let bedUrl = $state('');
+	// Adding a bed link also switches to it, since that is why it was pasted.
+	const bedImport = createMutation(() => ({
+		mutationFn: (url: string) =>
+			api<CatalogItem>('/api/catalog/import', { method: 'POST', body: JSON.stringify({ url, category: 'bed' }) }),
+		onSuccess: async (item: CatalogItem) => {
+			bedUrl = '';
+			await queryClient.invalidateQueries({ queryKey: ['catalog'] });
+			bedPick.mutate(item.id);
+		},
+	}));
 
 	const ideasQuery = createQuery(() => ({
 		queryKey: ['ideas'],
@@ -61,7 +105,8 @@
 	const texturesQuery = createQuery(() => ({
 		queryKey: ['textures'],
 		queryFn: () => api<WallTextureEntry[]>('/api/textures'),
-		refetchInterval: query => (query.state.data?.some(t => t.textureJob?.state === 'running') ? 3000 : false),
+		refetchInterval: query =>
+			query.state.data?.some(t => t.textureJob && t.textureJob.state !== 'failed') ? 3000 : false,
 	}));
 	const textureList = $derived(texturesQuery.data ?? []);
 	const finishesQuery = createQuery(() => ({
@@ -74,8 +119,28 @@
 			api<Finishes>('/api/finishes', { method: 'PUT', body: JSON.stringify(patch) }),
 		onSuccess: (next: Finishes) => queryClient.setQueryData(['finishes'], next),
 	}));
-	const toggleFinish = (surface: FinishSurface, id: string) =>
-		finishMutation.mutate({ [surface]: finishes[surface] === id ? null : id });
+	// Swatches show the tile at a fixed scale so slat widths compare across products.
+	const SWATCH_PX_PER_FT = 40;
+	const textureGroups = $derived(
+		Object.entries(Object.groupBy(textureList, t => t.group ?? 'Other'))
+			.map(([group, items]) => [group, items!.toSorted((a, b) => a.name.localeCompare(b.name))] as const)
+			.toSorted(([a], [b]) => a.localeCompare(b)),
+	);
+	// One texture dresses both the TV wall and the column.
+	const applied = (t: WallTexture) => finishes.tvWall === t.id || finishes.column === t.id;
+	function clickSwatch(t: WallTextureEntry) {
+		if (t.texture && t.textureJob?.state !== 'failed') {
+			const id = applied(t) ? null : t.id;
+			finishMutation.mutate({ tvWall: id, column: id });
+		} else if (!t.textureJob || t.textureJob.state === 'failed') textureGenerate.mutate(t.id);
+	}
+	let tip = $state<{ texture: WallTextureEntry; x: number; y: number } | null>(null);
+	function showTip(texture: WallTextureEntry, el: HTMLElement) {
+		const r = el.getBoundingClientRect();
+		const width = 288;
+		const x = r.right + 8 + width > innerWidth ? Math.max(8, r.left - width - 8) : r.right + 8;
+		tip = { texture, x: Math.min(x, innerWidth - width - 8), y: Math.max(8, Math.min(r.top, innerHeight - 300)) };
+	}
 
 	let textureUrl = $state('');
 	const textureImport = createMutation(() => ({
@@ -145,6 +210,14 @@
 	const inches = (n: number) => `${Math.round(n * 10) / 10}"`;
 	const money = (item: CatalogItem) =>
 		item.price === null ? null : item.price.toLocaleString('en-US', { style: 'currency', currency: item.currency });
+	const furnitureFacts = (item: CatalogEntry) =>
+		[
+			money(item),
+			item.modelSource === 'generated' ? 'AI 3D' : item.model ? '3D' : item.modelJob ? null : 'no 3D',
+			placedCount(item.id) ? `${placedCount(item.id)} placed` : null,
+		]
+			.filter(Boolean)
+			.join(' · ');
 
 	async function addToRoom(itemId: string) {
 		const key = crypto.randomUUID();
@@ -182,7 +255,9 @@
 		onSuccess: async (item: CatalogItem) => {
 			importUrl = '';
 			await queryClient.invalidateQueries({ queryKey: ['catalog'] });
-			await addToRoom(item.id);
+			if (item.category !== 'bed') return addToRoom(item.id);
+			open.bed = true;
+			bedPick.mutate(item.id);
 		},
 	}));
 
@@ -190,6 +265,48 @@
 		mutationFn: (id: string) => api(`/api/catalog/${id}/model`, { method: 'POST' }),
 		onSuccess: () => queryClient.invalidateQueries({ queryKey: ['catalog'] }),
 	}));
+
+	let tv = $state<TvSettings | null>(null);
+	let tvError = $state<string | null>(null);
+	let tvSaveTimer: ReturnType<typeof setTimeout> | undefined;
+	function updateTv(patch: Partial<TvSettings>) {
+		if (!tv) return;
+		tv = { ...tv, ...patch };
+		clearTimeout(tvSaveTimer);
+		tvSaveTimer = setTimeout(() => {
+			api<TvSettings>('/api/tv', { method: 'PUT', body: JSON.stringify($state.snapshot(tv)) }).then(
+				() => (tvError = null),
+				(error: Error) => (tvError = error.message),
+			);
+		}, SAVE_DELAY_MS);
+	}
+	const round1 = (n: number) => Math.round(n * 10) / 10;
+	const tvModelsQuery = createQuery(() => ({ queryKey: ['tvs'], queryFn: () => api<TvModel[]>('/api/tvs') }));
+	const tvModels = $derived(tvModelsQuery.data ?? []);
+	let tvUrl = $state('');
+	// Adding a TV link also switches to its size, since that is why it was pasted.
+	const tvImport = createMutation(() => ({
+		mutationFn: (url: string) => api<TvModel>('/api/tvs/import', { method: 'POST', body: JSON.stringify({ url }) }),
+		onSuccess: async (m: TvModel) => {
+			tvUrl = '';
+			updateTv({ widthIn: m.widthIn, heightIn: m.heightIn });
+			await queryClient.invalidateQueries({ queryKey: ['tvs'] });
+		},
+	}));
+	const tvRemove = createMutation(() => ({
+		mutationFn: (id: string) => api(`/api/tvs/${id}`, { method: 'DELETE' }),
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tvs'] }),
+	}));
+	const positive = (value: string) => (Number(value) > 0 ? Number(value) : null);
+	const tvRatio = $derived(
+		tv ? TV_RATIOS.findIndex(([w, h]) => Math.abs(tv!.widthIn / tv!.heightIn - w / h) < 0.01) : -1,
+	);
+	function setDiagonal(value: string) {
+		const diagonal = positive(value);
+		if (!tv || !diagonal) return;
+		const k = diagonal / tvDiagonal(tv);
+		updateTv({ widthIn: tv.widthIn * k, heightIn: tv.heightIn * k });
+	}
 
 	function onKey(e: KeyboardEvent) {
 		if (!selectedKey || mode !== 'orbit' || (e.target as HTMLElement).closest('input, textarea')) return;
@@ -205,6 +322,7 @@
 			(key, position, rotation) => patchPlacement(key, { position, rotation }),
 		);
 		viewer = v;
+		void api<TvSettings>('/api/tv').then(data => (tv = data));
 		void api<Placement[]>('/api/placements').then(data => {
 			placements = data;
 			placementsLoaded = true;
@@ -219,6 +337,12 @@
 	$effect(() => viewer?.setCutaway(cutaway));
 	$effect(() => viewer?.setLabels(labels));
 	$effect(() => {
+		if (viewer && tv) viewer.setTv($state.snapshot(tv));
+	});
+	$effect(() => {
+		if (viewer && bedQuery.data) viewer.setBed(bed);
+	});
+	$effect(() => {
 		if (viewer && (placementsLoaded || placements.length)) viewer.setPlacements($state.snapshot(placements), catalog);
 	});
 	$effect(() => {
@@ -231,14 +355,14 @@
 <svelte:window onkeydown={onKey} />
 
 <svelte:head>
-	<title>84 East Ave #2209</title>
+	<title>Apartment</title>
 </svelte:head>
 
 <div class="viewer" bind:this={container}></div>
 
 <div class="left">
 	<header class="panel hud">
-		<h1>84 East Ave #2209 <span>Vesper B4 · 1,176 sqft</span></h1>
+		<h1>Apartment <span>2 bed · 2 bath · 1,176 sqft</span></h1>
 		<div class="actions">
 			<button type="button" class="primary" onclick={() => viewer?.setMode(mode === 'orbit' ? 'walk' : 'orbit')}>
 				{mode === 'orbit' ? 'Walk inside' : 'Back to overview'}
@@ -248,17 +372,281 @@
 				<label><input type="checkbox" bind:checked={labels} /> Room labels</label>
 			{/if}
 		</div>
-		<p class="help">
-			{#if mode === 'orbit'}
-				Drag the room to rotate, right-drag to pan, scroll to zoom. Drag an item to slide it, use its arrows to move it
-				along one axis and its ring to turn it. Items snap to walls, floors and surfaces.
-			{:else}
-				WASD or arrows to move, mouse to look, click to inspect, Shift to run, Esc to exit.
-			{/if}
-		</p>
+		{#if mode === 'walk'}
+			<p class="help">WASD or arrows to move, mouse to look, click to inspect, Shift to run, Esc to exit.</p>
+		{/if}
 	</header>
 
 	{#if mode === 'orbit'}
+		<section class="panel items textures">
+			<button
+				type="button"
+				class="section-toggle"
+				aria-expanded={open.textures}
+				onclick={() => (open.textures = !open.textures)}
+			>
+				Living room wall texture <span class="muted">{textureList.length}</span>
+			</button>
+			{#if open.textures}
+				{#if finishMutation.isError}
+					<p class="error">{finishMutation.error.message}</p>
+				{/if}
+				{#each textureGroups as [group, items] (group)}
+					<h3 class="group">{group} <span class="muted">{items.length}</span></h3>
+					<div class="swatches">
+						{#each items as t (t.id)}
+							<button
+								type="button"
+								class="swatch"
+								class:on-target={applied(t)}
+								class:busy={t.textureJob?.state === 'queued' || t.textureJob?.state === 'running'}
+								class:failed={t.textureJob?.state === 'failed'}
+								style:background-image="url({t.texture?.map ?? t.image})"
+								style:background-size={t.texture
+									? `${(t.texture.repeat.width / 12) * SWATCH_PX_PER_FT}px auto`
+									: 'cover'}
+								aria-label={t.name}
+								onclick={() => clickSwatch(t)}
+								onpointerenter={e => showTip(t, e.currentTarget)}
+								onpointerleave={() => (tip = null)}
+								onfocus={e => showTip(t, e.currentTarget)}
+								onblur={() => (tip = null)}
+							>
+							</button>
+						{/each}
+					</div>
+				{/each}
+				{#if textureImport.isPending}<div class="swatches">
+						<span class="swatch busy" aria-label="Importing"></span>
+					</div>{/if}
+				{#if !textureList.length && !textureImport.isPending}
+					<p class="muted">
+						{texturesQuery.isPending ? 'Loading…' : 'Paste a wall panel link to cover the TV wall and the column.'}
+					</p>
+				{/if}
+				<form
+					class="import"
+					onsubmit={e => {
+						e.preventDefault();
+						if (textureUrl.trim()) textureImport.mutate(textureUrl.trim());
+					}}
+				>
+					<input
+						type="url"
+						placeholder="Paste a wall panel link"
+						bind:value={textureUrl}
+						disabled={textureImport.isPending}
+					/>
+					<button type="submit" class="primary" disabled={textureImport.isPending || !textureUrl.trim()}>
+						{textureImport.isPending ? 'Importing…' : 'Import'}
+					</button>
+				</form>
+				{#if textureImport.isError}
+					<p class="error">{textureImport.error.message}</p>
+				{/if}
+			{/if}
+		</section>
+
+		<section class="panel items tv">
+			<button type="button" class="section-toggle" aria-expanded={open.tv} onclick={() => (open.tv = !open.tv)}>
+				TV <span class="muted">{tv ? `${round1(tvDiagonal(tv))}″` : ''}</span>
+			</button>
+			{#if open.tv && tv}
+				<label class="check"
+					><input type="checkbox" checked={tv.visible} onchange={e => updateTv({ visible: e.currentTarget.checked })} />
+					On the TV wall</label
+				>
+				<div class="tv-fields">
+					<label
+						>Diagonal
+						<input
+							type="number"
+							min="10"
+							step="1"
+							value={round1(tvDiagonal(tv))}
+							onchange={e => setDiagonal(e.currentTarget.value)}
+						/>
+					</label>
+					<label
+						>Ratio
+						<select
+							value={tvRatio}
+							onchange={e => updateTv(tvSize(tvDiagonal(tv!), TV_RATIOS[Number(e.currentTarget.value)]!))}
+						>
+							{#each TV_RATIOS as [w, h], i (i)}<option value={i}>{w}:{h}</option>{/each}
+							{#if tvRatio === -1}<option value={-1} disabled>{round1((tv.widthIn / tv.heightIn) * 9)}:9</option>{/if}
+						</select>
+					</label>
+					<label
+						>Width
+						<input
+							type="number"
+							min="1"
+							step="0.1"
+							value={round1(tv.widthIn)}
+							onchange={e => {
+								const widthIn = positive(e.currentTarget.value);
+								if (widthIn) updateTv({ widthIn });
+							}}
+						/>
+					</label>
+					<label
+						>Height
+						<input
+							type="number"
+							min="1"
+							step="0.1"
+							value={round1(tv.heightIn)}
+							onchange={e => {
+								const heightIn = positive(e.currentTarget.value);
+								if (heightIn) updateTv({ heightIn });
+							}}
+						/>
+					</label>
+					<label
+						>Center {round1(tv.centerIn)}″
+						<input
+							type="range"
+							min={Math.ceil(tv.heightIn / 2)}
+							max={Math.floor(120 - tv.heightIn / 2)}
+							step="0.5"
+							value={tv.centerIn}
+							oninput={e => updateTv({ centerIn: Number(e.currentTarget.value) })}
+						/>
+					</label>
+					<label
+						>Tilt {tv.tiltDeg}°
+						<input
+							type="range"
+							min="0"
+							max="15"
+							step="1"
+							value={tv.tiltDeg}
+							oninput={e => updateTv({ tiltDeg: Number(e.currentTarget.value) })}
+						/>
+					</label>
+				</div>
+				<p class="muted">
+					Inches. Bottom edge {round1(tv.centerIn - tv.heightIn / 2)}″ off the floor, top {round1(
+						tv.centerIn + tv.heightIn / 2,
+					)}″, centered on the wall.
+				</p>
+				{#if tvError}<p class="error">{tvError}</p>{/if}
+				{#if tvModels.length}
+					<ul class="tv-models">
+						{#each tvModels as m (m.id)}
+							<li class:current={Math.abs(m.widthIn - tv.widthIn) < 0.05 && Math.abs(m.heightIn - tv.heightIn) < 0.05}>
+								<button
+									type="button"
+									class="pick"
+									onclick={() => updateTv({ widthIn: m.widthIn, heightIn: m.heightIn })}
+									>{round1(tvDiagonal(m))}″</button
+								>
+								<a href={m.url} target="_blank" rel="noreferrer" title={m.name}>{m.name}</a>
+								<button type="button" class="remove" aria-label="Remove {m.name}" onclick={() => tvRemove.mutate(m.id)}
+									>×</button
+								>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+				<form
+					class="import"
+					onsubmit={e => {
+						e.preventDefault();
+						if (tvUrl.trim()) tvImport.mutate(tvUrl.trim());
+					}}
+				>
+					<input
+						type="url"
+						placeholder="Paste a TV link for its size"
+						bind:value={tvUrl}
+						disabled={tvImport.isPending}
+					/>
+					<button type="submit" class="primary" disabled={tvImport.isPending || !tvUrl.trim()}>
+						{tvImport.isPending ? 'Reading…' : 'Add'}
+					</button>
+				</form>
+				{#if tvImport.isError}<p class="error">{tvImport.error.message}</p>{/if}
+			{/if}
+		</section>
+
+		<section class="panel items bed">
+			<button type="button" class="section-toggle" aria-expanded={open.bed} onclick={() => (open.bed = !open.bed)}>
+				Bed <span class="muted"
+					>{bed?.dimensions ? `${round1(bed.dimensions.width)}″ × ${round1(bed.dimensions.depth)}″` : ''}</span
+				>
+			</button>
+			{#if open.bed}
+				<ul>
+					{#if bedImport.isPending}
+						<li class="bed-option">
+							<span class="pick">
+								<span class="thumb"></span>
+								<span class="text">
+									<strong>{new URL(bedImport.variables).hostname.replace('www.', '')} link</strong>
+									<span class="status busy">Importing · reading the page (about a minute)</span>
+								</span>
+							</span>
+						</li>
+					{/if}
+					{#each beds as item (item.id)}
+						{@const side = sideRoom(item)}
+						<li class="bed-option" class:current={item.id === bed?.id}>
+							<button
+								type="button"
+								class="pick"
+								aria-pressed={item.id === bed?.id}
+								onclick={() => bedPick.mutate(item.id === bed?.id ? null : item.id)}
+							>
+								{#if item.image}<img src={item.image} alt="" />{:else}<span class="thumb"></span>{/if}
+								<span class="text">
+									<strong>{item.name}</strong>
+									<span class="muted">{bedFacts(item)}</span>
+									{#if side !== null}<span
+											class:muted={side >= NIGHTSTAND_MIN_IN}
+											class:error={side < NIGHTSTAND_MIN_IN}>{round1(side)}″ each side</span
+										>{/if}
+									{#if item.modelJob?.state === 'running'}
+										<span class="status busy">Building 3D model · 2–5 min</span>
+									{:else if item.modelJob?.state === 'failed'}
+										<span class="status failed" title={item.modelJob.error}>3D model failed</span>
+									{/if}
+								</span>
+							</button>
+							{#if item.modelJob?.state === 'failed'}
+								<button type="button" onclick={() => generateMutation.mutate(item.id)}>Retry 3D</button>
+							{:else}
+								<a href={item.url} target="_blank" rel="noreferrer" aria-label="Open {item.name} listing">↗</a>
+							{/if}
+						</li>
+					{:else}
+						{#if !bedImport.isPending}
+							<li class="muted">{catalogQuery.isPending ? 'Loading…' : 'No beds yet. Paste a link below.'}</li>
+						{/if}
+					{/each}
+				</ul>
+				<p class="muted">
+					Headboard flush to the north wall, centered on its {round1(BED_SPAN_IN)}″. Click a bed to switch, click it
+					again to clear the room.
+				</p>
+				{#if bedPick.isError}<p class="error">{bedPick.error.message}</p>{/if}
+				<form
+					class="import"
+					onsubmit={e => {
+						e.preventDefault();
+						if (bedUrl.trim()) bedImport.mutate(bedUrl.trim());
+					}}
+				>
+					<input type="url" placeholder="Paste a bed link" bind:value={bedUrl} disabled={bedImport.isPending} />
+					<button type="submit" class="primary" disabled={bedImport.isPending || !bedUrl.trim()}>
+						{bedImport.isPending ? 'Importing…' : 'Import'}
+					</button>
+				</form>
+				{#if bedImport.isError}<p class="error">{bedImport.error.message}</p>{/if}
+			{/if}
+		</section>
+
 		<section class="panel items">
 			<button
 				type="button"
@@ -266,7 +654,7 @@
 				aria-expanded={open.furniture}
 				onclick={() => (open.furniture = !open.furniture)}
 			>
-				Furniture <span class="muted">{catalogList.length}</span>
+				Furniture <span class="muted">{furnitureList.length}</span>
 			</button>
 			{#if open.furniture}
 				<form
@@ -300,7 +688,7 @@
 							</div>
 						</li>
 					{/if}
-					{#each catalogList as item (item.id)}
+					{#each furnitureList as item (item.id)}
 						<li>
 							{#if item.image}<img src={item.image} alt="" />{:else}<span class="thumb"></span>{/if}
 							<div>
@@ -310,13 +698,7 @@
 								{:else if item.modelJob?.state === 'failed'}
 									<span class="status failed" title={item.modelJob.error}>3D model failed · select it to retry</span>
 								{/if}
-								<span class="muted">
-									{money(item) ?? ''}{#if item.modelSource === 'generated'}
-										· AI 3D{:else if item.model}
-										· 3D{:else if !item.modelJob}
-										· no 3D{/if}{#if placedCount(item.id)}
-										· {placedCount(item.id)} placed{/if}
-								</span>
+								<span class="muted">{furnitureFacts(item)}</span>
 							</div>
 							<button type="button" onclick={() => addToRoom(item.id)}>Add</button>
 						</li>
@@ -327,105 +709,6 @@
 								: importMutation.isPending
 									? ''
 									: 'No items yet. Paste a link above.'}
-						</li>
-					{/each}
-				</ul>
-			{/if}
-		</section>
-
-		<section class="panel items textures">
-			<button
-				type="button"
-				class="section-toggle"
-				aria-expanded={open.textures}
-				onclick={() => (open.textures = !open.textures)}
-			>
-				Living room wall texture <span class="muted">{textureList.length}</span>
-			</button>
-			{#if open.textures}
-				<form
-					class="import"
-					onsubmit={e => {
-						e.preventDefault();
-						if (textureUrl.trim()) textureImport.mutate(textureUrl.trim());
-					}}
-				>
-					<input
-						type="url"
-						placeholder="Paste a wall panel link"
-						bind:value={textureUrl}
-						disabled={textureImport.isPending}
-					/>
-					<button type="submit" class="primary" disabled={textureImport.isPending || !textureUrl.trim()}>
-						{textureImport.isPending ? 'Importing…' : 'Import'}
-					</button>
-				</form>
-				{#if textureImport.isError}
-					<p class="error">{textureImport.error.message}</p>
-				{/if}
-				{#if finishMutation.isError}
-					<p class="error">{finishMutation.error.message}</p>
-				{/if}
-
-				<ul>
-					{#if textureImport.isPending}
-						<li>
-							<span class="thumb"></span>
-							<div>
-								<strong>{new URL(textureImport.variables).hostname.replace('www.', '')} link</strong>
-								<span class="status busy">Importing · reading the page (about a minute)</span>
-							</div>
-						</li>
-					{/if}
-					{#each textureList as t (t.id)}
-						<li>
-							{#if t.texture}<span class="swatch" style:background-image="url({t.texture.map})"></span>
-							{:else if t.image}<img src={t.image} alt="" />{:else}<span class="thumb"></span>{/if}
-							<div>
-								<strong title={t.name}>{t.name}</strong>
-								{#if t.textureJob?.state === 'running'}
-									<span class="status busy">Building texture · 2–5 min</span>
-								{:else if t.textureJob?.state === 'failed'}
-									<span class="status failed" title={t.textureJob.error}>Texture failed</span>
-								{:else if !t.texture}
-									<span class="muted">No texture yet</span>
-								{/if}
-								<span class="muted">
-									{t.price === null ? '' : t.price.toLocaleString('en-US', { style: 'currency', currency: t.currency })}
-									{#if t.panelsPerPack > 1}· {t.panelsPerPack} panels{/if}
-									{#if t.panel}· {t.panel.width}" × {t.panel.height}"{/if}
-								</span>
-								{#if t.panel}
-									<span class="muted">Wall {estimate(t, 'tvWall')} · column {estimate(t, 'column')}</span>
-								{/if}
-							</div>
-							<div class="apply">
-								{#if t.texture}
-									<button
-										type="button"
-										aria-pressed={finishes.tvWall === t.id}
-										onclick={() => toggleFinish('tvWall', t.id)}>Wall</button
-									>
-									<button
-										type="button"
-										aria-pressed={finishes.column === t.id}
-										onclick={() => toggleFinish('column', t.id)}>Column</button
-									>
-								{/if}
-								{#if t.textureJob?.state !== 'running' && (!t.texture || t.textureJob?.state === 'failed')}
-									<button type="button" onclick={() => textureGenerate.mutate(t.id)}
-										>{t.textureJob ? 'Retry' : 'Build'}</button
-									>
-								{/if}
-							</div>
-						</li>
-					{:else}
-						<li class="muted">
-							{texturesQuery.isPending
-								? 'Loading…'
-								: textureImport.isPending
-									? ''
-									: 'Paste a wood slat (or other) wall panel link to cover the TV wall and the column.'}
 						</li>
 					{/each}
 				</ul>
@@ -456,6 +739,36 @@
 				{/if}
 			{/if}
 		</section>
+	{/if}
+
+	{#if tip}
+		{@const t = textureList.find(x => x.id === tip?.texture.id) ?? tip.texture}
+		<div class="tip panel" role="tooltip" style:left="{tip.x}px" style:top="{tip.y}px">
+			{#if t.texture}<span class="tip-swatch" style:background-image="url({t.texture.map})"></span>{/if}
+			<strong>{t.name}</strong>
+			{#if t.textureJob?.state === 'queued'}
+				<span class="status busy">Waiting for a texture builder</span>
+			{:else if t.textureJob?.state === 'running'}
+				<span class="status busy">Building texture · 2–5 min</span>
+			{:else if t.textureJob?.state === 'failed'}
+				<span class="error">Texture failed: {t.textureJob.error.slice(0, 160)} · click to retry</span>
+			{:else if !t.texture}
+				<span class="muted">No texture yet · click to build it</span>
+			{/if}
+			<span>
+				{t.price === null ? 'No price' : t.price.toLocaleString('en-US', { style: 'currency', currency: t.currency })}
+				{#if t.panelsPerPack > 1}for {t.panelsPerPack} panels{/if}{#if t.brand}
+					· {t.brand}{/if}
+			</span>
+			{#if t.panel}
+				<span class="muted">Panel {t.panel.width}" × {t.panel.height}" × {t.panel.depth}"</span>
+				<span>TV wall: {estimate(t, 'tvWall')}</span>
+				<span>Column: {estimate(t, 'column')}</span>
+			{/if}
+			<p class="muted">{t.summary}</p>
+			{#if t.texture}<p class="note">{t.texture.note}</p>{/if}
+			{#if applied(t)}<span class="applied">On the TV wall and column</span>{/if}
+		</div>
 	{/if}
 
 	{#if selected && selectedPlacement}
@@ -549,16 +862,23 @@
 		background: var(--app-bg);
 	}
 
+	/* Sized to its panels and scrolled as a whole, so no panel gets squeezed and the plan stays clickable below. */
 	.left {
 		position: fixed;
 		top: 1rem;
 		left: 1rem;
-		bottom: 1rem;
 		display: flex;
 		flex-direction: column;
 		gap: 0.75rem;
 		width: 22rem;
-		pointer-events: none;
+		max-height: calc(100vh - 2rem);
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		scrollbar-width: thin;
+	}
+
+	.left > * {
+		flex-shrink: 0;
 	}
 
 	.panel {
@@ -583,10 +903,32 @@
 		font-size: 0.85rem;
 	}
 
-	/* Furniture lists grow long; the few wall textures keep their room and the furniture list scrolls instead. */
-	.items.textures {
-		flex-shrink: 0;
-		max-height: 45%;
+	.tv-fields {
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		gap: 0.5rem 0.75rem;
+	}
+
+	.tv-fields label {
+		display: grid;
+		gap: 0.2rem;
+		color: var(--app-muted);
+	}
+
+	.tv-fields input[type='number'],
+	.tv-fields select {
+		width: 100%;
+		border: 1px solid var(--app-border);
+		border-radius: 0.375rem;
+		padding: 0.4rem 0.5rem;
+		background: var(--app-bg);
+		color: var(--app-text);
+	}
+
+	.check {
+		display: flex;
+		gap: 0.4rem;
+		align-items: center;
 	}
 
 	.import {
@@ -616,22 +958,165 @@
 		transform: rotate(-90deg);
 	}
 
-	.items .swatch {
-		width: 3rem;
-		height: 3rem;
-		border-radius: 0.25rem;
-		background-size: 1.5rem auto;
+	.items h3.group {
+		margin: 0.2rem 0 -0.2rem;
+		font-size: 0.75rem;
+		font-weight: 600;
 	}
 
-	.items .apply {
+	.swatches {
 		display: grid;
-		gap: 0.3rem;
+		grid-template-columns: repeat(auto-fill, minmax(2.6rem, 1fr));
+		gap: 0.35rem;
+		min-height: 0;
+		overflow-y: auto;
 	}
 
-	.items .apply button[aria-pressed='true'] {
+	.swatch {
+		position: relative;
+		aspect-ratio: 1;
+		padding: 0;
+		border: 2px solid transparent;
+		border-radius: 0.3rem;
+		background-color: #fff;
+		background-position: center;
+		background-repeat: repeat;
+		box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.25);
+	}
+
+	.swatch.on-target {
+		border-color: var(--app-accent);
+	}
+
+	.swatch.busy::after,
+	.swatch.failed::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: 0.2rem;
+		background: rgb(0 0 0 / 0.45);
+	}
+
+	.swatch.busy::before {
+		content: '';
+		position: absolute;
+		z-index: 1;
+		inset: 30%;
+		border: 2px solid #fff;
+		border-right-color: transparent;
+		border-radius: 50%;
+		animation: spin 0.8s linear infinite;
+	}
+
+	.swatch.failed::after {
+		background: color-mix(in srgb, var(--app-error) 55%, transparent);
+	}
+
+	.tv-models {
+		display: grid;
+		gap: 0.25rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.tv-models li {
+		display: grid;
+		grid-template-columns: auto 1fr auto;
+		gap: 0.5rem;
+		align-items: center;
+	}
+
+	.tv-models a {
+		overflow: hidden;
+		color: var(--app-text);
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.tv-models .pick {
+		min-width: 3.4rem;
+		padding: 0.2rem 0.4rem;
+	}
+
+	.tv-models li.current .pick {
 		border-color: var(--app-accent);
 		background: var(--app-accent);
 		color: var(--app-accent-ink);
+	}
+
+	.tv-models .remove {
+		padding: 0 0.4rem;
+		border: none;
+		color: var(--app-muted);
+		font-size: 1.1rem;
+	}
+
+	.items li.bed-option {
+		grid-template-columns: 1fr auto;
+	}
+
+	.bed-option .pick {
+		display: grid;
+		grid-template-columns: 3rem 1fr;
+		gap: 0.6rem;
+		align-items: center;
+		min-width: 0;
+		padding: 0.3rem;
+		border: 1px solid transparent;
+		font-weight: inherit;
+		text-align: left;
+	}
+
+	.bed-option.current .pick {
+		border-color: var(--app-accent);
+	}
+
+	.bed-option .text {
+		display: grid;
+		min-width: 0;
+	}
+
+	.bed-option .text strong {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.bed-option a {
+		padding: 0 0.4rem;
+		color: var(--app-muted);
+		text-decoration: none;
+	}
+
+	.tip {
+		position: fixed;
+		z-index: 10;
+		display: grid;
+		gap: 0.3rem;
+		width: 18rem;
+		font-size: 0.8rem;
+		pointer-events: none;
+	}
+
+	.tip p {
+		margin: 0;
+	}
+
+	.tip .note {
+		font-size: 0.72rem;
+		color: var(--app-muted);
+	}
+
+	.tip-swatch {
+		height: 4.5rem;
+		border-radius: 0.3rem;
+		background-size: 3rem auto;
+	}
+
+	.tip .applied {
+		color: var(--app-accent);
+		font-weight: 600;
 	}
 
 	.import input {
@@ -1021,19 +1506,13 @@
 		.left {
 			top: 0.5rem;
 			right: 0.5rem;
-			bottom: auto;
 			left: 0.5rem;
 			width: auto;
+			max-height: 55vh;
 		}
 
 		.help {
 			display: none;
-		}
-
-		.items,
-		.items.textures {
-			max-height: 26vh;
-			overflow-y: auto;
 		}
 
 		.right {

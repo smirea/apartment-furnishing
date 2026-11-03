@@ -1,26 +1,8 @@
 [
 	{
-		"key": "c0b94027-0b4a-4fda-a6e8-8aefd0100b11",
-		"itemId": "tcl-98-inch-qm7l-sqd-mini-led-qled-4k-tv",
-		"position": [23.67, 2.0300000000000002, 32.59],
-		"rotation": [0, -90, 0]
-	},
-	{
-		"key": "2210ac08-69fb-429f-a537-91eba53f90d8",
-		"itemId": "sha-cerlin-king-size-velvet-bed-frame-with-adjustable-headbo",
-		"position": [8.67, 0, 5.32],
-		"rotation": [0, 0, 0]
-	},
-	{
-		"key": "34cd66e4-5caa-4aa6-8a2e-09e392dde899",
-		"itemId": "keiki-king-size-platform-bed-frame",
-		"position": [8.75, 0, 5.68],
-		"rotation": [0, 0, 0]
-	},
-	{
 		"key": "1eea3040-7f33-49d0-96db-a3ff81c57b7c",
 		"itemId": "amerlife-5-seater-power-reclining-sectional",
-		"position": [15.5, 0, 28],
-		"rotation": [0, 0, 0]
+		"position": [15.91, 0, 29.91],
+		"rotation": [0, 90, 0]
 	}
 ]

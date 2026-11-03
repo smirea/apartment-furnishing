@@ -4,7 +4,7 @@ Helps me furnish my apartment: what fits, where it goes, and what to buy.
 
 ## The apartment
 
-[84 East Ave #2209, Austin, TX 78701](https://www.zillow.com/homedetails/84-East-Ave-2209-Austin-TX-78701/446364037_zpid/) — The Vesper, 22nd floor, plan **B4**.
+A high-rise rental, floor plan **B4**.
 
 |            |                                                                                                                                |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------ |
@@ -15,9 +15,9 @@ Helps me furnish my apartment: what fits, where it goes, and what to buy.
 | Laundry    | In-unit washer and dryer                                                                                                       |
 | Appliances | Bosch dishwasher, oven, cooktop, microwave drawer, fridge/freezer                                                              |
 | Floors     | Wide-plank hardwood, tile in baths                                                                                             |
-| Ceilings   | 10 ft. Not on this listing or the floor plan; from listings for #3909, the same B4 plan in the same stack                      |
+| Ceilings   | 10 ft. Not on this listing or the floor plan; from listings for another unit with the same B4 plan in the same stack           |
 | Pets       | Cats and dogs under 40 lb                                                                                                      |
-| Views      | Hotel Van Zandt, Lady Bird Lake, sunset from the primary suite                                                                 |
+| Views      | Lake and downtown, sunset from the primary suite                                                                               |
 | Building   | 24-hour concierge, 41st-floor pool and sky lounge, gym with yoga and spin studios, co-working lounge, sky dog run and dog wash |
 
 Listing data and photos were captured on 2026-10-30; the listing may have changed since.
@@ -72,12 +72,26 @@ New imports drop into the living room. Select an item for three move arrows and 
 
 Walmart products with "View in 3D" come with a real GLB model. When a listing has none, the server has `codex exec` study the main photo and the gallery and write a procedural [trimesh](https://trimesh.org) script that exports a GLB (prompt in `apps/server/src/model-prompt.md`). Retail spec tables are often wrong (Amazon lists the AMERLIFE corner sectional as 22.5" deep, its seat depth), so Codex reads the size and layout off the gallery's dimension diagrams. It writes the overall size it modeled to `dimensions.json`, and that replaces the catalog's dimensions, with a note on where each number came from. Re-importing keeps those corrected dimensions while it keeps the generated model. The script is kept as `data/items/<id>/model.py`. This runs in the background after the import (2–5 minutes). The item list shows a spinner while it runs, and the item is a box until the model is ready. The card has a **Regenerate 3D model** button. Jobs live in server memory, so restarting the server drops a running job and the item shows "no 3D" until you regenerate it.
 
+## TV
+
+The **TV** panel sets the living-room TV, which is built in rather than imported. It hangs on the TV wall, centered on the wall's measured 122" span, on a tilting mount 2.5" out from the wall or its panels, with no stand. Type a diagonal and pick a ratio, or type the width and height directly; the others follow. The **Center** slider moves it up and down, **Tilt** tips the top out by up to 15°, and the size is written on the screen. The settings save to `data/tv.json`.
+
+Paste a TV's product link under it to keep that TV as a candidate: grok reads only its name, the diagonal it is sold as and its aspect ratio (`apps/server/src/tvs.ts`, saved to `data/tvs.json`). The list shows each one's diagonal and a link to the listing; click the diagonal to switch to that size, × to drop it.
+
+## Bed
+
+The **Bed** panel picks the primary bedroom's bed from the imported beds (catalog items grok files under `bed`). The bed is not placed by hand. Its headboard sits flush to the bedroom's north wall, and it is centered on that wall's measured 162", so both sides keep the same room for a nightstand. Each bed in the list shows its size, its price and the room left on each side (red under 18"). The bed in the plan has its width, length, height and side room written across its top. Click a bed to switch to it, or click it again to leave the room empty. The choice saves to `data/bed.json`.
+
+Paste a bed link at the bottom of the panel to import it the same way as furniture (photos, dimensions, a generated 3D model) and switch to it. That box refuses anything grok doesn't read as a bed. A bed link pasted in the Furniture box lands in the Bed panel too. The AR app doesn't show the bed, as with the TV.
+
 ## Living room wall texture
 
 The **Living room wall texture** panel (under the furniture list; both panels collapse) imports wall-panel products such as wood slats on acoustic felt, and dresses the TV wall and the column with them. Paste a product link and the server:
 
 1. Captures the page and has grok read the panel: name, price, panels per pack, and one panel's width, height and thickness (`apps/server/src/textures.ts`).
 2. Downloads the main photo and gallery into `data/items/<id>/` and writes `data/textures/<id>.json`.
-3. Has `codex exec` study the photos and write a Pillow/numpy script that synthesizes a seamless tile at real scale (prompt in `apps/server/src/texture-prompt.md`): `texture.png`, a matching `texture-normal.png` for the slat relief, the inches of wall one tile covers, and the panel thickness. The script is kept as `texture.py`, with a 3 × 3 tiling check in `texture-preview.png`. This takes 2–5 minutes, in the background like 3D models.
+3. Has `codex exec` study the photos and write a Pillow/numpy script that synthesizes a seamless tile at real scale (prompt in `apps/server/src/texture-prompt.md`): `texture.png`, a matching `texture-normal.png` for the slat relief, the inches of wall one tile covers, and the panel thickness. The script is kept as `texture.py`, with a 3 × 3 tiling check in `texture-preview.png`. This takes 2–5 minutes, in the background like 3D models; three run at a time and the rest queue.
 
-Each texture gets **Wall** and **Column** toggles. The wall texture covers the TV wall's whole living-room face, floor to ceiling. The column texture wraps the column in a sleeve, using whole tiles so the seam matches. Both stand out by the panel thickness. The switch, data jack, outlet and smoke alarm move out onto the panels. Wall-mounted items snap to the panel face; a TV placed before the panels went up re-seats the next time you drag it. The choice saves to `data/finishes.json`. The list estimates panels and cost for both surfaces from the measured TV wall (122" × 120") and the column (104" around). Shorter panels count the top-up strips as cut from shared panels.
+`bun run import-textures <url> [...]` imports many at once in one browser session and queues their textures on the running server. The swatches hold every [slats.co](https://slats.co) finish, imported that way: samples, kits and end pieces left out, and each finish at the height that best fits the 120" ceiling (118" where sold, else 141" cut down rather than 106" plus a seam). Page captures read the full product gallery from Amazon, Walmart and Shopify stores, and the schema.org product images elsewhere. They also pick up the PDFs a page links (spec sheets first), whose text `pdftotext` saves as `data/items/<id>/spec.txt`. Grok reads it for panel sizes and Codex for exact slat geometry, since stores publish no 3D models or texture files (slats.co offers only these spec sheets) and photo estimates of slat and groove widths drift. `--rebuild` rebuilds textures the products already have, after a prompt or spec change.
+
+Textures show as swatches at a common scale, so slat widths compare at a glance, in rows by product type (grok names the types in one pass over the whole collection, so every colorway of a line lands together). Hovering one shows its price, pack, panel size, panels and cost for the TV wall and the column, the material, and how Codex sized the tile. Click a swatch to put it on both the TV wall and the column, and again to take it off. A dimmed swatch with a spinner is queued or building, a red one failed (click it to retry), and the import bar sits under the swatches. It covers the TV wall's whole living-room face, floor to ceiling, and wraps the column in a sleeve, using whole tiles so the seam matches. Both stand out by the panel thickness. The switch, data jack, outlet and smoke alarm move out onto the panels. Wall-mounted items snap to the panel face; a TV placed before the panels went up re-seats the next time you drag it. The choice saves to `data/finishes.json`. The list estimates panels and cost for both surfaces from the measured TV wall (122" × 120") and the column (104" around). Shorter panels count the top-up strips as cut from shared panels.

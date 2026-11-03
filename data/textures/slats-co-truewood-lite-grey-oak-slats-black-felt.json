@@ -1,0 +1,28 @@
+{
+	"id": "slats-co-truewood-lite-grey-oak-slats-black-felt",
+	"url": "https://slats.co/products/118-grey-oak-truewood-lite-3-sided-veneer-acoustic-slat-panel",
+	"importedAt": "2026-11-03T17:24:56.895Z",
+	"name": "TrueWood Lite Grey Oak Slats, Black Felt",
+	"brand": "Slats.co",
+	"price": 549,
+	"currency": "USD",
+	"panelsPerPack": 4,
+	"panel": {
+		"width": 12.01,
+		"height": 118,
+		"depth": 0.39
+	},
+	"summary": "Solid rubberwood slats wrapped in real grey oak veneer on three sides, stapled to a black acoustic felt backing.",
+	"image": "/api/assets/slats-co-truewood-lite-grey-oak-slats-black-felt/image.jpg",
+	"group": "Truewood Lite slats",
+	"texture": {
+		"map": "/api/assets/slats-co-truewood-lite-grey-oak-slats-black-felt/texture.png?v=1793727312108",
+		"normalMap": "/api/assets/slats-co-truewood-lite-grey-oak-slats-black-felt/texture-normal.png?v=1793727312108",
+		"repeat": {
+			"width": 11.811023622047244,
+			"height": 23.62204724409449
+		},
+		"depthIn": 0.3937007874015748,
+		"note": "Manufacturer spec sheet dimensions override photo estimates and rounded inch figures: 8 slats, each 27 mm (1.063 in) wide with 10.5 mm (0.413 in) gaps, on a 37.5 mm (1.476 in) pitch; the tile covers the 300 mm installed panel width by 600 mm tall, with 5 mm slats on 5 mm felt (10 mm total depth). Grey oak face colors are sampled from the main listing photo, with synthesized wrapping veneer grain and black felt; the 305 mm overall panel width includes the overlapping joint and is not the installed repeat."
+	}
+}

@@ -1,0 +1,24 @@
+{
+	"id": "slats-co-walnut-hexagon-black-felt",
+	"url": "https://slats.co/products/walnut-acoustic-hexagon-wood-panel-with-black-felt-backing",
+	"importedAt": "2026-11-03T17:25:14.344Z",
+	"name": "Walnut Hexagon Panels, Black Felt",
+	"brand": "SLATS.CO",
+	"price": 50,
+	"currency": "USD",
+	"panelsPerPack": 2,
+	"panel": null,
+	"summary": "Walnut acoustic hexagon wood panel with a black felt backing.",
+	"image": "/api/assets/slats-co-walnut-hexagon-black-felt/image.jpg",
+	"group": "Hexagon tiles",
+	"texture": {
+		"map": "/api/assets/slats-co-walnut-hexagon-black-felt/texture.png?v=1793727615438",
+		"normalMap": "/api/assets/slats-co-walnut-hexagon-black-felt/texture-normal.png?v=1793727615438",
+		"repeat": {
+			"width": 14.981630859375,
+			"height": 25.98
+		},
+		"depthIn": 0.4,
+		"note": "No manufacturer specs were published; the diagram’s 22.48 × 25.98 in felt backing with nine staggered hexagons gives approximately 7.49 in column spacing and 8.66 in vertical pitch, with this tile spanning two columns and three pitches (width rounded to preserve pixel aspect). Regular hexagon faces about 9.30 × 8.05 in, 0.40 in total thickness and 0.24 in face relief are estimates; walnut color is sampled from the main photo and gaps are black felt."
+	}
+}

@@ -27,7 +27,7 @@ export type CatalogItem = {
 	modelSource: 'listing' | 'generated' | null;
 };
 
-export type Job = { state: 'running' } | { state: 'failed'; error: string };
+export type Job = { state: 'queued' } | { state: 'running' } | { state: 'failed'; error: string };
 
 // What GET /api/catalog returns: the stored item plus any in-flight model generation.
 export type CatalogEntry = CatalogItem & { modelJob: Job | null };
@@ -57,6 +57,9 @@ export type WallTexture = {
 	// One panel as installed, in inches; height runs floor to ceiling for vertical slats.
 	panel: { width: number; height: number; depth: number } | null;
 	summary: string;
+	// Product type the swatches group under, e.g. "Ultralight slats" or "Hexagon tiles"; one grok call names them
+	// across the whole collection so colorways of a line land together.
+	group: string | null;
 	image: string | null;
 	texture: {
 		map: string;
@@ -84,3 +87,37 @@ export function panelsNeeded(panel: { width: number; height: number }, area: { w
 	if (rest < 0.5) return columns * full;
 	return columns * full + Math.ceil(columns / Math.floor(panel.height / rest));
 }
+
+// The living-room TV: always wall-mounted on the TV wall, centered on its measured span. Width and height are the
+// source of truth; the diagonal and the aspect ratio are derived from them.
+export type TvSettings = {
+	visible: boolean;
+	widthIn: number;
+	heightIn: number;
+	// Height of the screen's center above the floor.
+	centerIn: number;
+	// Forward tilt of the mount, top away from the wall.
+	tiltDeg: number;
+};
+
+export const TV_RATIOS = [
+	[16, 9],
+	[21, 9],
+	[4, 3],
+] as const;
+
+export const tvDiagonal = (tv: Pick<TvSettings, 'widthIn' | 'heightIn'>) => Math.hypot(tv.widthIn, tv.heightIn);
+
+export function tvSize(diagonalIn: number, [w, h]: readonly [number, number]) {
+	const k = diagonalIn / Math.hypot(w, h);
+	return { widthIn: k * w, heightIn: k * h };
+}
+
+export const DEFAULT_TV: TvSettings = { visible: true, ...tvSize(98, [16, 9]), centerIn: 48, tiltDeg: 0 };
+
+// A TV whose size was read off a product page, kept so the TV panel can switch between candidates.
+export type TvModel = { id: string; url: string; name: string; widthIn: number; heightIn: number };
+
+// The primary bedroom's bed, picked from the imported beds (catalog items in the `bed` category). It is built in like
+// the TV: headboard flush to the bedroom's north wall and centered on it, so both sides keep the same nightstand room.
+export type BedSettings = { itemId: string | null };

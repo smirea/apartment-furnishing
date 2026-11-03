@@ -1,0 +1,28 @@
+{
+	"id": "slats-co-ultralight-walnut-slats-brown-felt",
+	"url": "https://slats.co/products/118-tall-ultralight-flexible-lightweight-walnut-acoustic-wood-slat-wall-panels-with-brown-felt-backing",
+	"importedAt": "2026-11-03T17:25:08.541Z",
+	"name": "Ultralight Walnut Slats, Brown Felt",
+	"brand": "SLATS.CO",
+	"price": 499,
+	"currency": "USD",
+	"panelsPerPack": 5,
+	"panel": {
+		"width": 11.8,
+		"height": 118.11,
+		"depth": 0.35
+	},
+	"summary": "Real walnut veneer laminated onto 9 mm recycled acoustic felt, with a brown felt backing and no rigid core.",
+	"image": "/api/assets/slats-co-ultralight-walnut-slats-brown-felt/image.jpg",
+	"group": "Ultralight slats",
+	"texture": {
+		"map": "/api/assets/slats-co-ultralight-walnut-slats-brown-felt/texture.png?v=1793726927651",
+		"normalMap": "/api/assets/slats-co-ultralight-walnut-slats-brown-felt/texture-normal.png?v=1793726927651",
+		"repeat": {
+			"width": 11.83,
+			"height": 23.66
+		},
+		"depthIn": 0.35,
+		"note": "Manufacturer spec overrides photo estimates: seven 1.20 in walnut faces on 1.69 in pitches with 0.49 in, 90-degree V-grooves cut 6.2 mm into 9 mm felt; these pitches total 11.83 in versus the nominal 11.80 in panel width. The tile is 23.66 in tall, and muted walnut and brown felt colors are sampled from the main listing photo."
+	}
+}

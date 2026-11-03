@@ -1,0 +1,28 @@
+{
+	"id": "slats-co-truewood-natural-oak-slats-grey-felt",
+	"url": "https://slats.co/products/natural-oak-truewood-3-sided-veneer-acoustic-slat-panel-with-grey-felt-backing",
+	"importedAt": "2026-11-03T17:24:58.120Z",
+	"name": "TrueWood Natural Oak Slats, Grey Felt",
+	"brand": "SLATS.CO",
+	"price": 329,
+	"currency": "USD",
+	"panelsPerPack": 4,
+	"panel": {
+		"width": 11.8,
+		"height": 94.49,
+		"depth": 0.75
+	},
+	"summary": "Solid rubberwood slats wrapped in real white oak veneer on the front and both edges, in a natural oak finish with grey acoustic felt behind the slats.",
+	"image": "/api/assets/slats-co-truewood-natural-oak-slats-grey-felt/image.jpg",
+	"group": "Truewood slats",
+	"texture": {
+		"map": "/api/assets/slats-co-truewood-natural-oak-slats-grey-felt/texture.png?v=1793727768798",
+		"normalMap": "/api/assets/slats-co-truewood-natural-oak-slats-grey-felt/texture-normal.png?v=1793727768798",
+		"repeat": {
+			"width": 11.8,
+			"height": 23.6
+		},
+		"depthIn": 0.75,
+		"note": "No manufacturer spec sheet was published; photos suggest 7 slats per recorded 11.8 in panel, with estimated 1.18 in faces, 0.506 in grey-felt gaps and 1.686 in pitch, lightly rounded edges, and recorded 0.75 in total thickness (0.30 in felt / 0.45 in wood relief estimated). Tile is 7 pitches wide by 23.6 in tall; natural oak tones and grey felt were sampled from the main listing photo, with gallery photos used only for structure."
+	}
+}
