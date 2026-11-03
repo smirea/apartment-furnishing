@@ -12,8 +12,9 @@ To point the app at another server, set `serverURL` in its defaults, for example
 
 ## Use it
 
-- **Align.** The first launch asks for two corners. Tap a corner on the plan (taps snap to wall-face corners), aim the crosshair at that corner on the real floor, and tap **Set point**. Repeat for a second corner far from the first. The caption compares the plan distance with the distance you marked, which shows how well the two agree.
-- **Relaunch.** The app saves ARKit's world map with the alignment anchor. On the next launch, look around the room and the furniture reappears without marking points again. **Realign** starts over.
+- **Rooms.** The app works one room at a time: Bedroom, Living room, or Office / guest. The first launch asks you to tap the room you're in on the plan. Only that room's furniture and wall textures show. The room button (it shows the room's name) brings the plan back to switch rooms. Each room keeps its own alignment, and the app reopens in the last room.
+- **Align.** A room without an alignment asks for two corners, with the plan zoomed to that room. Tap a corner on the plan (taps snap to wall-face corners), aim the crosshair at that corner on the real floor, and tap **Set point**. Repeat for a second corner far from the first. The caption compares the plan distance with the distance you marked, which shows how well the two agree.
+- **Relaunch.** The app saves each room's ARKit world map with its alignment anchor. On the next launch or when you switch back to a room, look around and the furniture reappears without marking points again. **Realign** starts over.
 - **Move furniture.** Drag an item to slide it across the floor and twist with two fingers to turn it. The move saves to `data/placements.json` through the server, so the web plan shows it too.
 - **Live updates.** The app polls placements every second, and the catalog and wall textures every 5 seconds, so items you move or import and textures you pick on the laptop appear on the phone.
 - **Outline.** The wall footprints are drawn on the floor (glass in cyan) so you can check the alignment against the real walls.

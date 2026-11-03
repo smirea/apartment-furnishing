@@ -5,7 +5,17 @@ import RealityKit
 // face and a sleeve around the column, standing out by the panel depth, with the tile repeating at real scale.
 @MainActor
 final class WallFinishes {
-    enum Surface: CaseIterable { case tvWall, column }
+    enum Surface: CaseIterable {
+        case tvWall, column
+
+        // A point on the surface, for telling which room it's in.
+        func spot(in plan: Plan) -> SIMD2<Float> {
+            switch self {
+            case .tvWall: let face = plan.finishSurfaces.tvWall; return [face.x, (face.z1 + face.z2) / 2]
+            case .column: let column = plan.finishSurfaces.column; return [column.x, column.z]
+            }
+        }
+    }
 
     // Past the panel face, so LiDAR occlusion of the real wall, a centimeter or two noisy, can't hide the panels.
     private static let standoffFeet: Float = 1 / 12
@@ -14,11 +24,13 @@ final class WallFinishes {
     private var shown: [Surface: (tile: WallTexture.Tile, entity: Entity?)] = [:]
     private var textures: [String: Task<TextureResource, Error>] = [:]
 
-    func apply(_ finishes: Finishes, _ catalog: [WallTexture], plan: Plan) async throws {
+    // Surfaces outside `room` stay bare, so only the room you're standing in shows its textures.
+    func apply(_ finishes: Finishes, _ catalog: [WallTexture], plan: Plan, room: [Float]?) async throws {
         let tiles = Dictionary(catalog.compactMap { texture in texture.texture.map { (texture.id, $0) } }) { a, _ in a }
         var failure: Error?
         for surface in Surface.allCases {
-            let tile = (surface == .tvWall ? finishes.tvWall : finishes.column).flatMap { tiles[$0] }
+            let inRoom = room.map { Plan.contains($0, surface.spot(in: plan)) } ?? false
+            let tile = inRoom ? (surface == .tvWall ? finishes.tvWall : finishes.column).flatMap { tiles[$0] } : nil
             guard tile != shown[surface]?.tile else { continue }
             shown[surface]?.entity?.removeFromParent()
             shown[surface] = nil
