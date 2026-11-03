@@ -1,4 +1,4 @@
-import type { CatalogItem, Placement } from '@repo/shared/items';
+import type { CatalogItem, FinishSurface, Placement, WallTexture } from '@repo/shared/items';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {
@@ -17,8 +17,13 @@ import {
 	MeshStandardMaterial,
 	PerspectiveCamera,
 	Plane,
+	PlaneGeometry,
 	Raycaster,
+	RepeatWrapping,
 	Scene,
+	SRGBColorSpace,
+	Texture,
+	TextureLoader,
 	Vector2,
 	Vector3,
 	WebGLRenderer,
@@ -35,6 +40,7 @@ import {
 	ft,
 	PX_PER_FT,
 	rooms,
+	tvWallFace,
 	walls,
 	type FloorKind,
 	type Rect,
@@ -99,7 +105,14 @@ export function createViewer(
 	// Snap targets: wall faces for flush placement, fixture tops (counters, vanities) for surface items.
 	const wallBoxes: Box[] = [];
 	const surfaces: (Box & { top: number })[] = [];
-	const cutawayWalls: { mesh: Mesh; fullHeight: number; y: number; glass: boolean; lintel?: boolean }[] = [];
+	const cutawayWalls: {
+		mesh: Mesh;
+		fullHeight: number;
+		y: number;
+		glass: boolean;
+		lintel?: boolean;
+		onHeight?: (height: number) => void;
+	}[] = [];
 
 	function addBox(parent: Object3D, rect: Rect, y: number, height: number, material: MeshStandardMaterial) {
 		const [x1, z1, x2, z2] = rect.map(ft) as Rect;
@@ -190,10 +203,12 @@ export function createViewer(
 		buildWall({ ...wall, height: h });
 	});
 
+	const tvWallFixtures: { mesh: Mesh; x: number }[] = [];
 	for (const f of fixtures) {
 		const y = f.y ?? 0;
 		const mesh = addBox(wallGroup, f.rect, y, f.height, new MeshStandardMaterial({ color: f.color, roughness: 0.6 }));
 		cutawayWalls.push({ mesh, fullHeight: f.height, y, glass: false });
+		if (f.tvWall) tvWallFixtures.push({ mesh, x: mesh.position.x });
 		if (f.solid || (y === 0 && f.height > 1)) {
 			const [x1, z1, x2, z2] = f.rect.map(ft) as Rect;
 			colliders.push({ x1, z1, x2, z2 });
@@ -220,6 +235,125 @@ export function createViewer(
 		wallGroup.add(mesh);
 		cutawayWalls.push({ mesh, fullHeight: CEILING_FT, y: 0, glass: false });
 		colliders.push({ x1: ft(c.x - c.r), z1: ft(c.y - c.r), x2: ft(c.x + c.r), z2: ft(c.y + c.r) });
+	}
+
+	// Wall textures cover the TV wall's living-room face and sleeve the column, standing out from them by the panel
+	// thickness. Each surface keeps its own copy of the tile so it can repeat at real scale for its width and for the
+	// height the cutaway currently shows.
+	type Finish = {
+		group: Group;
+		material: MeshStandardMaterial;
+		widthFt: () => number;
+		setDepth: (ft: number) => void;
+		heightFt: number;
+		repeat: { width: number; height: number } | null;
+		version: number;
+	};
+	const finishes = {} as Record<FinishSurface, Finish>;
+	function addFinish(surface: FinishSurface, mesh: Mesh, widthFt: () => number, setDepth: (ft: number) => void) {
+		const group = new Group();
+		group.visible = false;
+		group.add(mesh);
+		wallGroup.add(group);
+		const finish: Finish = {
+			group,
+			material: mesh.material as MeshStandardMaterial,
+			widthFt,
+			setDepth,
+			heightFt: CEILING_FT,
+			repeat: null,
+			version: 0,
+		};
+		finishes[surface] = finish;
+		cutawayWalls.push({
+			mesh,
+			fullHeight: CEILING_FT,
+			y: 0,
+			glass: false,
+			onHeight: height => {
+				finish.heightFt = height;
+				tileFinish(finish);
+			},
+		});
+	}
+	function tileFinish({ material, widthFt, heightFt, repeat }: Finish) {
+		if (!repeat || !material.map || !material.normalMap) return;
+		const across = widthFt() / (repeat.width / 12);
+		const up = heightFt / (repeat.height / 12);
+		for (const map of [material.map, material.normalMap]) map.repeat.set(across, up);
+	}
+
+	const tvWallSnap = wallBoxes.find(b => b.x1 === ft(tvWallFace.x) && b.z1 === ft(tvWallFace.y1));
+	if (!tvWallSnap) throw new Error('TV wall face does not match a wall run in the floor plan');
+	const wallFinish = new Mesh(
+		new PlaneGeometry(ft(tvWallFace.y2 - tvWallFace.y1), CEILING_FT),
+		new MeshStandardMaterial(),
+	);
+	// Faces west, into the living room, with the tile's left edge at the north end.
+	wallFinish.rotation.y = -Math.PI / 2;
+	wallFinish.position.z = ft((tvWallFace.y1 + tvWallFace.y2) / 2);
+	addFinish(
+		'tvWall',
+		wallFinish,
+		() => ft(tvWallFace.y2 - tvWallFace.y1),
+		depth => {
+			wallFinish.position.x = ft(tvWallFace.x) - depth;
+			// Wall-mounted items snap to the panels' face instead of the plaster behind them.
+			tvWallSnap.x1 = ft(tvWallFace.x) - depth;
+			for (const f of tvWallFixtures) f.mesh.position.x = f.x - depth;
+		},
+	);
+
+	const column = columns[0]!;
+	const columnFinish = new Mesh(new CylinderGeometry(1, 1, CEILING_FT, 64, 1, true), new MeshStandardMaterial());
+	columnFinish.position.set(ft(column.x), CEILING_FT / 2, ft(column.y));
+	addFinish(
+		'column',
+		columnFinish,
+		// Whole tiles around, so the seam where the sleeve closes matches.
+		() => {
+			const repeat = finishes.column.repeat;
+			const around = 2 * Math.PI * columnFinish.scale.x;
+			return repeat ? Math.max(1, Math.round(around / (repeat.width / 12))) * (repeat.width / 12) : around;
+		},
+		depth => columnFinish.scale.set(ft(column.r) + depth, columnFinish.scale.y, ft(column.r) + depth),
+	);
+
+	const textureLoader = new TextureLoader();
+	const textureCache = new Map<string, Promise<Texture>>();
+	const loadTexture = (url: string) => {
+		if (!textureCache.has(url)) textureCache.set(url, textureLoader.loadAsync(url));
+		return textureCache.get(url)!;
+	};
+
+	async function setFinish(surface: FinishSurface, texture: WallTexture | null) {
+		const finish = finishes[surface];
+		const version = ++finish.version;
+		const tile = texture?.texture;
+		if (!tile) {
+			finish.group.visible = false;
+			finish.setDepth(0);
+			return;
+		}
+		const [map, normalMap] = await Promise.all([loadTexture(tile.map), loadTexture(tile.normalMap)]);
+		if (version !== finish.version) return;
+		const copy = (source: Texture, color: boolean) => {
+			const t = source.clone();
+			t.wrapS = t.wrapT = RepeatWrapping;
+			if (color) t.colorSpace = SRGBColorSpace;
+			t.needsUpdate = true;
+			return t;
+		};
+		finish.material.map?.dispose();
+		finish.material.normalMap?.dispose();
+		finish.material.map = copy(map, true);
+		finish.material.normalMap = copy(normalMap, false);
+		finish.material.roughness = 0.75;
+		finish.material.needsUpdate = true;
+		finish.repeat = tile.repeat;
+		finish.setDepth(tile.depthIn / 12);
+		tileFinish(finish);
+		finish.group.visible = true;
 	}
 
 	const itemGroup = new Group();
@@ -488,6 +622,7 @@ export function createViewer(
 			const scale = target / w.fullHeight;
 			w.mesh.scale.y = scale;
 			w.mesh.position.y = w.y + (w.fullHeight * scale) / 2;
+			w.onHeight?.(target);
 		}
 		ceilingGroup.visible = mode === 'walk';
 		labelGroup.visible = mode === 'orbit' && labels;
@@ -586,6 +721,10 @@ export function createViewer(
 		setCutaway,
 		setLabels,
 		setPlacements,
+		setFinishes: (textures: Record<FinishSurface, WallTexture | null>) => {
+			void setFinish('tvWall', textures.tvWall);
+			void setFinish('column', textures.column);
+		},
 		select,
 		snapWhenLoaded: (key: string) => snapOnLoad.add(key),
 		dispose() {

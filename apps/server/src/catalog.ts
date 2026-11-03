@@ -148,7 +148,7 @@ type PageData = {
 	text: string;
 };
 
-async function fetchPages(urls: string[]): Promise<PageData[]> {
+export async function fetchPages(urls: string[]): Promise<PageData[]> {
 	const proc = Bun.spawn(
 		[
 			'uv',
@@ -192,17 +192,9 @@ async function glbNodeNames(url: string): Promise<string[]> {
 	}
 }
 
-async function parseWithGrok(page: PageData): Promise<Product> {
-	const modelLines = await Promise.all(
-		page.models.slice(0, 3).map(async url => `${url} (nodes: ${(await glbNodeNames(url)).join(', ') || 'unknown'})`),
-	);
-	const prompt = `Extract product information from this retailer page capture. Use only facts in the input. If width/height/depth are not all listed but can be derived (for example a TV's width from its diagonal and 16:9 aspect), derive them and explain in dimensionsNote; otherwise use null. Convert sizes to inches and weight to pounds. Pick imageUrl from the image candidates and modelUrl from the 3D model candidates exactly as written. Decide how the item mounts in a home and which model nodes to drop for that mount.
-
-URL: ${page.url}
+export const pageContext = (page: PageData) => `URL: ${page.url}
 Title: ${page.title}
 Image candidates: ${[page.ogImage, page.mainImage].filter(Boolean).join(' ') || 'none'}
-3D model candidates:
-${modelLines.join('\n') || 'none'}
 
 Spec pairs:
 ${page.specs.join('\n')}
@@ -212,6 +204,23 @@ ${page.jsonLd}
 
 Visible page text:
 ${page.text}`;
+
+async function parseWithGrok(page: PageData): Promise<Product> {
+	const modelLines = await Promise.all(
+		page.models.slice(0, 3).map(async url => `${url} (nodes: ${(await glbNodeNames(url)).join(', ') || 'unknown'})`),
+	);
+	return grokStructured<Product>(
+		`Extract product information from this retailer page capture. Use only facts in the input. If width/height/depth are not all listed but can be derived (for example a TV's width from its diagonal and 16:9 aspect), derive them and explain in dimensionsNote; otherwise use null. Convert sizes to inches and weight to pounds. Pick imageUrl from the image candidates and modelUrl from the 3D model candidates exactly as written. Decide how the item mounts in a home and which model nodes to drop for that mount.
+
+3D model candidates:
+${modelLines.join('\n') || 'none'}
+
+${pageContext(page)}`,
+		productSchema,
+	);
+}
+
+export async function grokStructured<T>(prompt: string, schema: object): Promise<T> {
 	const promptFile = join(ROOT, '.cache', `grok-prompt-${Date.now()}.txt`);
 	await mkdir(join(ROOT, '.cache'), { recursive: true });
 	await writeFile(promptFile, prompt);
@@ -231,7 +240,7 @@ ${page.text}`;
 			'--output-format',
 			'json',
 			'--json-schema',
-			JSON.stringify(productSchema),
+			JSON.stringify(schema),
 		],
 		{ cwd: join(ROOT, '.cache'), stdout: 'pipe', stderr: 'pipe' },
 	);
@@ -255,7 +264,7 @@ async function download(url: string, path: string) {
 
 const extension = (url: string) => url.match(/\.(png|webp|jpe?g)/i)?.[1] ?? 'jpg';
 
-const slug = (s: string) =>
+export const slug = (s: string) =>
 	s
 		.toLowerCase()
 		.replace(/[^a-z0-9]+/g, '-')
@@ -264,11 +273,27 @@ const slug = (s: string) =>
 
 // Same product, same entry: re-importing a link updates it instead of adding a near-duplicate
 // under whatever name the LLM picks this time.
-function productKey(url: string) {
+export function productKey(url: string) {
 	const u = new URL(url);
 	const id =
 		u.pathname.match(/\/(?:dp|gp\/product)\/([A-Z0-9]{10})/)?.[1] ?? u.pathname.match(/\/ip\/(?:[^/]+\/)?(\d+)/)?.[1];
 	return `${u.hostname.replace(/^www\./, '')}:${id ?? u.pathname}`;
+}
+
+// Main photo as image.<ext> plus the listing gallery, into data/items/<id>/. Returns the main photo's asset URL.
+export async function downloadPhotos(id: string, imageUrl: string | null, gallery: string[]): Promise<string | null> {
+	const dir = join(ASSET_DIR, id);
+	await rm(join(dir, GALLERY_DIR), { recursive: true, force: true });
+	await mkdir(join(dir, GALLERY_DIR), { recursive: true });
+	await Promise.all(
+		gallery.map((url, i) =>
+			download(url, join(dir, GALLERY_DIR, `${String(i + 1).padStart(2, '0')}.${extension(url)}`)),
+		),
+	);
+	if (!imageUrl) return null;
+	const ext = extension(imageUrl);
+	await download(imageUrl, join(dir, `image.${ext}`));
+	return `/api/assets/${id}/image.${ext}`;
 }
 
 export async function importProducts(urls: string[], log: (line: string) => void = () => {}): Promise<CatalogItem[]> {
@@ -283,21 +308,8 @@ export async function importProducts(urls: string[], log: (line: string) => void
 		const existing = (await listCatalog()).find(item => productKey(item.url) === productKey(page.url));
 		const id = existing?.id ?? slug(brandPrefix + product.name);
 		const dir = join(ASSET_DIR, id);
-		await mkdir(dir, { recursive: true });
 
-		let image: string | null = null;
-		if (imageUrl) {
-			const ext = extension(imageUrl);
-			await download(imageUrl, join(dir, `image.${ext}`));
-			image = `/api/assets/${id}/image.${ext}`;
-		}
-		await rm(join(dir, GALLERY_DIR), { recursive: true, force: true });
-		await mkdir(join(dir, GALLERY_DIR));
-		await Promise.all(
-			page.images.map((url, i) =>
-				download(url, join(dir, GALLERY_DIR, `${String(i + 1).padStart(2, '0')}.${extension(url)}`)),
-			),
-		);
+		const image = await downloadPhotos(id, imageUrl, page.images);
 		let model: string | null = null;
 		let modelSource: CatalogItem['modelSource'] = null;
 		if (modelUrl) {

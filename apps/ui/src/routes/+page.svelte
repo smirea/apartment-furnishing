@@ -1,5 +1,15 @@
 <script lang="ts">
-	import type { CatalogEntry, CatalogItem, Placement } from '@repo/shared/items';
+	import { finishAreasIn } from '@repo/shared/floorplan';
+	import {
+		panelsNeeded,
+		type CatalogEntry,
+		type CatalogItem,
+		type Finishes,
+		type FinishSurface,
+		type Placement,
+		type WallTexture,
+		type WallTextureEntry,
+	} from '@repo/shared/items';
 	import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { onMount, tick } from 'svelte';
 	import { createViewer, type Mode } from '../lib/scene';
@@ -14,6 +24,7 @@
 	const saved = JSON.parse(localStorage.getItem(OPTIONS_KEY) ?? '{}');
 	let cutaway = $state<boolean>(saved.cutaway ?? true);
 	let labels = $state<boolean>(saved.labels ?? false);
+	let open = $state<{ furniture: boolean; textures: boolean }>({ furniture: true, textures: true, ...saved.open });
 	let viewer = $state<ReturnType<typeof createViewer>>();
 
 	async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -31,6 +42,50 @@
 	}));
 	const catalogList = $derived(catalogQuery.data ?? []);
 	const catalog = $derived(Object.fromEntries(catalogList.map(item => [item.id, item])));
+
+	const texturesQuery = createQuery(() => ({
+		queryKey: ['textures'],
+		queryFn: () => api<WallTextureEntry[]>('/api/textures'),
+		refetchInterval: query => (query.state.data?.some(t => t.textureJob?.state === 'running') ? 3000 : false),
+	}));
+	const textureList = $derived(texturesQuery.data ?? []);
+	const finishesQuery = createQuery(() => ({
+		queryKey: ['finishes'],
+		queryFn: () => api<Finishes>('/api/finishes'),
+	}));
+	const finishes = $derived(finishesQuery.data ?? { tvWall: null, column: null });
+	const finishMutation = createMutation(() => ({
+		mutationFn: (patch: Partial<Finishes>) =>
+			api<Finishes>('/api/finishes', { method: 'PUT', body: JSON.stringify(patch) }),
+		onSuccess: (next: Finishes) => queryClient.setQueryData(['finishes'], next),
+	}));
+	const toggleFinish = (surface: FinishSurface, id: string) =>
+		finishMutation.mutate({ [surface]: finishes[surface] === id ? null : id });
+
+	let textureUrl = $state('');
+	const textureImport = createMutation(() => ({
+		mutationFn: (url: string) =>
+			api<WallTexture>('/api/textures/import', { method: 'POST', body: JSON.stringify({ url }) }),
+		onSuccess: async () => {
+			textureUrl = '';
+			await queryClient.invalidateQueries({ queryKey: ['textures'] });
+		},
+	}));
+	const textureGenerate = createMutation(() => ({
+		mutationFn: (id: string) => api(`/api/textures/${id}/generate`, { method: 'POST' }),
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: ['textures'] }),
+	}));
+
+	function estimate(t: WallTexture, surface: FinishSurface) {
+		if (!t.panel) return null;
+		const panels = panelsNeeded(t.panel, finishAreasIn[surface]);
+		const packs = Math.ceil(panels / t.panelsPerPack);
+		const cost =
+			t.price === null
+				? ''
+				: ` ≈ ${(packs * t.price).toLocaleString('en-US', { style: 'currency', currency: t.currency, maximumFractionDigits: 0 })}`;
+		return `${panels} panels${cost}`;
+	}
 
 	let placements = $state<Placement[]>([]);
 	let placementsLoaded = false;
@@ -151,7 +206,11 @@
 	$effect(() => {
 		if (viewer && (placementsLoaded || placements.length)) viewer.setPlacements($state.snapshot(placements), catalog);
 	});
-	$effect(() => localStorage.setItem(OPTIONS_KEY, JSON.stringify({ cutaway, labels })));
+	$effect(() => {
+		const byId = Object.fromEntries(textureList.map(t => [t.id, t]));
+		viewer?.setFinishes({ tvWall: byId[finishes.tvWall ?? ''] ?? null, column: byId[finishes.column ?? ''] ?? null });
+	});
+	$effect(() => localStorage.setItem(OPTIONS_KEY, JSON.stringify({ cutaway, labels, open })));
 </script>
 
 <svelte:window onkeydown={onKey} />
@@ -186,63 +245,176 @@
 
 	{#if mode === 'orbit'}
 		<section class="panel items">
-			<form
-				class="import"
-				onsubmit={e => {
-					e.preventDefault();
-					if (importUrl.trim()) importMutation.mutate(importUrl.trim());
-				}}
+			<button
+				type="button"
+				class="section-toggle"
+				aria-expanded={open.furniture}
+				onclick={() => (open.furniture = !open.furniture)}
 			>
-				<input
-					type="url"
-					placeholder="Paste an Amazon or Walmart link"
-					bind:value={importUrl}
-					disabled={importMutation.isPending}
-				/>
-				<button type="submit" class="primary" disabled={importMutation.isPending || !importUrl.trim()}>
-					{importMutation.isPending ? 'Importing…' : 'Import'}
-				</button>
-			</form>
-			{#if importMutation.isError}
-				<p class="error">{importMutation.error.message}</p>
-			{/if}
-
-			<ul>
-				{#if importMutation.isPending}
-					<li>
-						<span class="thumb"></span>
-						<div>
-							<strong>{new URL(importMutation.variables).hostname.replace('www.', '')} link</strong>
-							<span class="status busy">Importing · reading the page (about a minute)</span>
-						</div>
-					</li>
+				Furniture <span class="muted">{catalogList.length}</span>
+			</button>
+			{#if open.furniture}
+				<form
+					class="import"
+					onsubmit={e => {
+						e.preventDefault();
+						if (importUrl.trim()) importMutation.mutate(importUrl.trim());
+					}}
+				>
+					<input
+						type="url"
+						placeholder="Paste an Amazon or Walmart link"
+						bind:value={importUrl}
+						disabled={importMutation.isPending}
+					/>
+					<button type="submit" class="primary" disabled={importMutation.isPending || !importUrl.trim()}>
+						{importMutation.isPending ? 'Importing…' : 'Import'}
+					</button>
+				</form>
+				{#if importMutation.isError}
+					<p class="error">{importMutation.error.message}</p>
 				{/if}
-				{#each catalogList as item (item.id)}
-					<li>
-						{#if item.image}<img src={item.image} alt="" />{:else}<span class="thumb"></span>{/if}
-						<div>
-							<strong>{item.name}</strong>
-							{#if item.modelJob?.state === 'running'}
-								<span class="status busy">Building 3D model · 2–5 min</span>
-							{:else if item.modelJob?.state === 'failed'}
-								<span class="status failed" title={item.modelJob.error}>3D model failed · select it to retry</span>
-							{/if}
-							<span class="muted">
-								{money(item) ?? ''}{#if item.modelSource === 'generated'}
-									· AI 3D{:else if item.model}
-									· 3D{:else if !item.modelJob}
-									· no 3D{/if}{#if placedCount(item.id)}
-									· {placedCount(item.id)} placed{/if}
-							</span>
-						</div>
-						<button type="button" onclick={() => addToRoom(item.id)}>Add</button>
-					</li>
-				{:else}
-					<li class="muted">
-						{catalogQuery.isPending ? 'Loading…' : importMutation.isPending ? '' : 'No items yet. Paste a link above.'}
-					</li>
-				{/each}
-			</ul>
+
+				<ul>
+					{#if importMutation.isPending}
+						<li>
+							<span class="thumb"></span>
+							<div>
+								<strong>{new URL(importMutation.variables).hostname.replace('www.', '')} link</strong>
+								<span class="status busy">Importing · reading the page (about a minute)</span>
+							</div>
+						</li>
+					{/if}
+					{#each catalogList as item (item.id)}
+						<li>
+							{#if item.image}<img src={item.image} alt="" />{:else}<span class="thumb"></span>{/if}
+							<div>
+								<strong>{item.name}</strong>
+								{#if item.modelJob?.state === 'running'}
+									<span class="status busy">Building 3D model · 2–5 min</span>
+								{:else if item.modelJob?.state === 'failed'}
+									<span class="status failed" title={item.modelJob.error}>3D model failed · select it to retry</span>
+								{/if}
+								<span class="muted">
+									{money(item) ?? ''}{#if item.modelSource === 'generated'}
+										· AI 3D{:else if item.model}
+										· 3D{:else if !item.modelJob}
+										· no 3D{/if}{#if placedCount(item.id)}
+										· {placedCount(item.id)} placed{/if}
+								</span>
+							</div>
+							<button type="button" onclick={() => addToRoom(item.id)}>Add</button>
+						</li>
+					{:else}
+						<li class="muted">
+							{catalogQuery.isPending
+								? 'Loading…'
+								: importMutation.isPending
+									? ''
+									: 'No items yet. Paste a link above.'}
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		</section>
+
+		<section class="panel items textures">
+			<button
+				type="button"
+				class="section-toggle"
+				aria-expanded={open.textures}
+				onclick={() => (open.textures = !open.textures)}
+			>
+				Living room wall texture <span class="muted">{textureList.length}</span>
+			</button>
+			{#if open.textures}
+				<form
+					class="import"
+					onsubmit={e => {
+						e.preventDefault();
+						if (textureUrl.trim()) textureImport.mutate(textureUrl.trim());
+					}}
+				>
+					<input
+						type="url"
+						placeholder="Paste a wall panel link"
+						bind:value={textureUrl}
+						disabled={textureImport.isPending}
+					/>
+					<button type="submit" class="primary" disabled={textureImport.isPending || !textureUrl.trim()}>
+						{textureImport.isPending ? 'Importing…' : 'Import'}
+					</button>
+				</form>
+				{#if textureImport.isError}
+					<p class="error">{textureImport.error.message}</p>
+				{/if}
+				{#if finishMutation.isError}
+					<p class="error">{finishMutation.error.message}</p>
+				{/if}
+
+				<ul>
+					{#if textureImport.isPending}
+						<li>
+							<span class="thumb"></span>
+							<div>
+								<strong>{new URL(textureImport.variables).hostname.replace('www.', '')} link</strong>
+								<span class="status busy">Importing · reading the page (about a minute)</span>
+							</div>
+						</li>
+					{/if}
+					{#each textureList as t (t.id)}
+						<li>
+							{#if t.texture}<span class="swatch" style:background-image="url({t.texture.map})"></span>
+							{:else if t.image}<img src={t.image} alt="" />{:else}<span class="thumb"></span>{/if}
+							<div>
+								<strong title={t.name}>{t.name}</strong>
+								{#if t.textureJob?.state === 'running'}
+									<span class="status busy">Building texture · 2–5 min</span>
+								{:else if t.textureJob?.state === 'failed'}
+									<span class="status failed" title={t.textureJob.error}>Texture failed</span>
+								{:else if !t.texture}
+									<span class="muted">No texture yet</span>
+								{/if}
+								<span class="muted">
+									{t.price === null ? '' : t.price.toLocaleString('en-US', { style: 'currency', currency: t.currency })}
+									{#if t.panelsPerPack > 1}· {t.panelsPerPack} panels{/if}
+									{#if t.panel}· {t.panel.width}" × {t.panel.height}"{/if}
+								</span>
+								{#if t.panel}
+									<span class="muted">Wall {estimate(t, 'tvWall')} · column {estimate(t, 'column')}</span>
+								{/if}
+							</div>
+							<div class="apply">
+								{#if t.texture}
+									<button
+										type="button"
+										aria-pressed={finishes.tvWall === t.id}
+										onclick={() => toggleFinish('tvWall', t.id)}>Wall</button
+									>
+									<button
+										type="button"
+										aria-pressed={finishes.column === t.id}
+										onclick={() => toggleFinish('column', t.id)}>Column</button
+									>
+								{/if}
+								{#if t.textureJob?.state !== 'running' && (!t.texture || t.textureJob?.state === 'failed')}
+									<button type="button" onclick={() => textureGenerate.mutate(t.id)}
+										>{t.textureJob ? 'Retry' : 'Build'}</button
+									>
+								{/if}
+							</div>
+						</li>
+					{:else}
+						<li class="muted">
+							{texturesQuery.isPending
+								? 'Loading…'
+								: textureImport.isPending
+									? ''
+									: 'Paste a wood slat (or other) wall panel link to cover the TV wall and the column.'}
+						</li>
+					{/each}
+				</ul>
+			{/if}
 		</section>
 	{/if}
 </div>
@@ -371,9 +543,55 @@
 		font-size: 0.85rem;
 	}
 
+	/* Furniture lists grow long; the few wall textures keep their room and the furniture list scrolls instead. */
+	.items.textures {
+		flex-shrink: 0;
+		max-height: 45%;
+	}
+
 	.import {
 		display: flex;
 		gap: 0.5rem;
+	}
+
+	.section-toggle {
+		display: flex;
+		gap: 0.4rem;
+		align-items: baseline;
+		width: 100%;
+		padding: 0;
+		border: none;
+		font-size: 0.9rem;
+		text-align: left;
+	}
+
+	.section-toggle::after {
+		content: '▾';
+		margin-left: auto;
+		color: var(--app-muted);
+		transition: transform 0.15s;
+	}
+
+	.section-toggle[aria-expanded='false']::after {
+		transform: rotate(-90deg);
+	}
+
+	.items .swatch {
+		width: 3rem;
+		height: 3rem;
+		border-radius: 0.25rem;
+		background-size: 1.5rem auto;
+	}
+
+	.items .apply {
+		display: grid;
+		gap: 0.3rem;
+	}
+
+	.items .apply button[aria-pressed='true'] {
+		border-color: var(--app-accent);
+		background: var(--app-accent);
+		color: var(--app-accent-ink);
 	}
 
 	.import input {
@@ -556,8 +774,9 @@
 			display: none;
 		}
 
-		.items {
-			max-height: 30vh;
+		.items,
+		.items.textures {
+			max-height: 26vh;
 			overflow-y: auto;
 		}
 

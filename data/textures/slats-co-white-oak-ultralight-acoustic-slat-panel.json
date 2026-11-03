@@ -1,0 +1,27 @@
+{
+	"id": "slats-co-white-oak-ultralight-acoustic-slat-panel",
+	"url": "https://slats.co/products/118-tall-ultralight-flexible-lightweight-white-oak-acoustic-wood-slat-wall-panels-with-black-felt-backing",
+	"importedAt": "2026-11-03T16:06:26.910Z",
+	"name": "White Oak Ultralight Acoustic Slat Panel",
+	"brand": "SLATS.CO",
+	"price": 499,
+	"currency": "USD",
+	"panelsPerPack": 5,
+	"panel": {
+		"width": 11.8,
+		"height": 118.11,
+		"depth": 0.35
+	},
+	"summary": "White oak real wood veneer laminated onto 9mm recycled black acoustic felt, with no MDF or rigid core.",
+	"image": "/api/assets/slats-co-white-oak-ultralight-acoustic-slat-panel/image.jpg",
+	"texture": {
+		"map": "/api/assets/slats-co-white-oak-ultralight-acoustic-slat-panel/texture.png?v=1793722059511",
+		"normalMap": "/api/assets/slats-co-white-oak-ultralight-acoustic-slat-panel/texture-normal.png?v=1793722059511",
+		"repeat": {
+			"width": 11.8,
+			"height": 23.6
+		},
+		"depthIn": 0.35,
+		"note": "Seven slats and an approximately 3:1 face-to-gap ratio are estimated from the sole listing photo: 1.264 in faces, 0.421 in gaps, and 1.686 in pitch across the recorded 11.8 in panel width; tile height is 23.6 in and recorded total thickness is 0.35 in. Warm muted white oak is sampled from the main photo over charcoal black felt, with thin veneer relief rather than a rigid wood core."
+	}
+}

@@ -1,10 +1,20 @@
-import type { CatalogEntry, Placement } from '@repo/shared/items';
+import type { CatalogEntry, Finishes, Placement, WallTextureEntry } from '@repo/shared/items';
 import { join, normalize } from 'node:path';
 import { ASSET_DIR, importProducts, listCatalog, readItem, readPlacements, updatePlacements } from './catalog';
 import { modelJobs, startModelJob } from './generate-model';
 import { planGeometry } from '@repo/shared/plan';
 import { usdzPath } from './usdz';
 import { config } from './config';
+import {
+	FINISH_SURFACES,
+	importTexture,
+	listTextures,
+	readFinishes,
+	readTexture,
+	saveFinishes,
+	startTextureJob,
+	textureJobs,
+} from './textures';
 
 const isVec3 = (v: unknown): v is [number, number, number] =>
 	Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
@@ -44,6 +54,51 @@ const server = Bun.serve({
 					console.error(error);
 					return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 502 });
 				}
+			},
+		},
+		'/api/textures': {
+			GET: async () =>
+				Response.json(
+					(await listTextures()).map((t): WallTextureEntry => ({ ...t, textureJob: textureJobs.get(t.id) ?? null })),
+				),
+		},
+		'/api/textures/import': {
+			POST: async request => {
+				const { url } = (await request.json()) as { url?: string };
+				if (!url || !/^https?:\/\//.test(url)) return Response.json({ error: 'Paste a product URL' }, { status: 400 });
+				try {
+					const texture = await importTexture(url, console.log);
+					if (!texture.texture) startTextureJob(texture);
+					return Response.json(texture);
+				} catch (error) {
+					console.error(error);
+					return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 502 });
+				}
+			},
+		},
+		'/api/textures/:id/generate': {
+			POST: async request => {
+				const texture = await readTexture(request.params.id).catch(() => null);
+				if (!texture) return Response.json({ error: 'Unknown texture' }, { status: 404 });
+				startTextureJob(texture);
+				return Response.json({ ok: true });
+			},
+		},
+		'/api/finishes': {
+			GET: async () => Response.json(await readFinishes()),
+			PUT: async request => {
+				const body = (await request.json()) as Partial<Finishes>;
+				const known = new Set((await listTextures()).filter(t => t.texture).map(t => t.id));
+				const finishes = await readFinishes();
+				for (const surface of FINISH_SURFACES) {
+					const id = body[surface];
+					if (id === undefined) continue;
+					if (id !== null && !known.has(id))
+						return Response.json({ error: `No finished texture ${id}` }, { status: 400 });
+					finishes[surface] = id;
+				}
+				await saveFinishes(finishes);
+				return Response.json(finishes);
 			},
 		},
 		'/api/plan': Response.json(planGeometry()),

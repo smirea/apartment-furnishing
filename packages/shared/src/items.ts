@@ -27,10 +27,10 @@ export type CatalogItem = {
 	modelSource: 'listing' | 'generated' | null;
 };
 
-export type ModelJob = { state: 'running' } | { state: 'failed'; error: string };
+export type Job = { state: 'running' } | { state: 'failed'; error: string };
 
 // What GET /api/catalog returns: the stored item plus any in-flight model generation.
-export type CatalogEntry = CatalogItem & { modelJob: ModelJob | null };
+export type CatalogEntry = CatalogItem & { modelJob: Job | null };
 
 // One copy of a catalog item in the apartment. World units are feet, +x east, +z south,
 // y is the height of the item's bottom. The model's front is +z before rotation.
@@ -41,3 +41,46 @@ export type Placement = {
 	// Euler XYZ in degrees; y = 90 faces east, -90 west, 180 north.
 	rotation: [x: number, y: number, z: number];
 };
+
+// A wall-panel product (wood slats and the like) imported for the living room's TV wall and column. Codex turns the
+// listing photos into a seamless tile; three.js repeats it at real scale over whichever surfaces use it.
+export type WallTexture = {
+	id: string;
+	url: string;
+	importedAt: string;
+	name: string;
+	brand: string | null;
+	// Per listing, which may be a pack of several panels.
+	price: number | null;
+	currency: string;
+	panelsPerPack: number;
+	// One panel as installed, in inches; height runs floor to ceiling for vertical slats.
+	panel: { width: number; height: number; depth: number } | null;
+	summary: string;
+	image: string | null;
+	texture: {
+		map: string;
+		normalMap: string;
+		// Inches of wall one copy of the tile covers.
+		repeat: { width: number; height: number };
+		depthIn: number;
+		note: string;
+	} | null;
+};
+
+export type WallTextureEntry = WallTexture & { textureJob: Job | null };
+
+export type FinishSurface = 'tvWall' | 'column';
+
+// Which wall texture each living-room surface wears, by texture id.
+export type Finishes = Record<FinishSurface, string | null>;
+
+// Panels to buy for a surface. Full-height columns of panels across the width; when the panel is shorter than the
+// surface, the strips that top up each column are cut from shared panels.
+export function panelsNeeded(panel: { width: number; height: number }, area: { width: number; height: number }) {
+	const columns = Math.ceil(area.width / panel.width);
+	const full = Math.floor(area.height / panel.height);
+	const rest = area.height - full * panel.height;
+	if (rest < 0.5) return columns * full;
+	return columns * full + Math.ceil(columns / Math.floor(panel.height / rest));
+}

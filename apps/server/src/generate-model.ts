@@ -1,6 +1,6 @@
 // Listings without a 3D model get a procedural one: Codex studies the listing photos (including dimension
 // diagrams), works out the real size, and writes a trimesh script (kept as model.py next to the GLB).
-import type { CatalogItem, ModelJob } from '@repo/shared/items';
+import type { CatalogItem, Job } from '@repo/shared/items';
 import { copyFile, mkdtemp, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, extname, join } from 'node:path';
@@ -14,7 +14,7 @@ const UV_CACHE = join(ROOT, '.cache/uv');
 
 if (!Bun.which('codex')) throw new Error('codex CLI not found on PATH');
 
-export const modelJobs = new Map<string, ModelJob>();
+export const modelJobs = new Map<string, Job>();
 
 async function prompt(item: CatalogItem, photos: string[]) {
 	const d = item.dimensions;
@@ -41,7 +41,7 @@ async function readDimensions(path: string): Promise<Pick<CatalogItem, 'dimensio
 }
 
 // Main photo first: it shows the colorway being bought, the gallery may include others.
-async function collectPhotos(dir: string, work: string): Promise<string[]> {
+export async function collectPhotos(dir: string, work: string): Promise<string[]> {
 	const main = (await readdir(dir)).find(f => f.startsWith('image.'));
 	const gallery = (await readdir(join(dir, GALLERY_DIR)).catch(() => [])).sort();
 	const sources = [...(main ? [join(dir, main)] : []), ...gallery.map(f => join(dir, GALLERY_DIR, f))];
@@ -55,11 +55,8 @@ async function collectPhotos(dir: string, work: string): Promise<string[]> {
 	);
 }
 
-export async function generateModel(item: CatalogItem, log: (line: string) => void = () => {}): Promise<CatalogItem> {
-	const dir = join(ASSET_DIR, item.id);
-	const work = await mkdtemp(join(tmpdir(), `model-${item.id}-`));
-	const photos = await collectPhotos(dir, work);
-	log(`codex: modeling ${item.id} from ${photos.length} photo(s) in ${work}`);
+// Codex runs in a scratch folder holding the photos, with network for uv, and writes its outputs there.
+export async function runCodex(work: string, photos: string[], prompt: string, expect: string[]) {
 	const proc = Bun.spawn(
 		[
 			'codex',
@@ -81,7 +78,7 @@ export async function generateModel(item: CatalogItem, log: (line: string) => vo
 			'-',
 		],
 		{
-			stdin: new Blob([await prompt(item, photos)]),
+			stdin: new Blob([prompt]),
 			stdout: 'pipe',
 			stderr: 'pipe',
 			env: { ...process.env, UV_CACHE_DIR: UV_CACHE },
@@ -92,10 +89,18 @@ export async function generateModel(item: CatalogItem, log: (line: string) => vo
 		new Response(proc.stderr).text(),
 		proc.exited,
 	]);
-	const glb = Bun.file(join(work, 'model.glb'));
-	if (code !== 0 || !(await glb.exists())) {
-		throw new Error(`codex exited ${code} without model.glb: ${(err || out).slice(-1500)}`);
-	}
+	const missing = [];
+	for (const name of expect) if (!(await Bun.file(join(work, name)).exists())) missing.push(name);
+	if (code !== 0 || missing.length)
+		throw new Error(`codex exited ${code} without ${missing.join(', ') || 'success'}: ${(err || out).slice(-1500)}`);
+}
+
+export async function generateModel(item: CatalogItem, log: (line: string) => void = () => {}): Promise<CatalogItem> {
+	const dir = join(ASSET_DIR, item.id);
+	const work = await mkdtemp(join(tmpdir(), `model-${item.id}-`));
+	const photos = await collectPhotos(dir, work);
+	log(`codex: modeling ${item.id} from ${photos.length} photo(s) in ${work}`);
+	await runCodex(work, photos, await prompt(item, photos), ['model.glb', 'build.py']);
 	const size = await readDimensions(join(work, 'dimensions.json'));
 	await copyFile(join(work, 'model.glb'), join(dir, 'model.glb'));
 	await copyFile(join(work, 'build.py'), join(dir, 'model.py'));

@@ -19,7 +19,8 @@ export type Wall = {
 
 export type Room = { name: string; floor: FloorKind; rect: Rect; size?: string };
 
-export type Fixture = { rect: Rect; height: number; color: number; y?: number; solid?: boolean };
+// `tvWall` fixtures sit on the TV wall's living-room face and move out onto any wall texture applied there.
+export type Fixture = { rect: Rect; height: number; color: number; y?: number; solid?: boolean; tvWall?: boolean };
 
 // Leaf drawn in its open position, hinge first, as the swing arcs on the plan show.
 export type Door = [hingeX: number, hingeY: number, endX: number, endY: number];
@@ -135,9 +136,9 @@ export const fixtures: Fixture[] = [
 	{ rect: [700, 600, 840, 605], height: 0.15, y: 5.5, color: 0xd8c8a8 },
 	{ rect: [650, 300, 705, 380], height: 0.15, y: 5.5, color: 0xd8c8a8 },
 	// Living-room TV wall: switch, data jack + outlet, smoke alarm (taped elevation)
-	{ rect: [576, 665, 578, 671], height: 0.375, y: 3.75, color: 0xffffff },
-	{ rect: [576, 755, 578, 769], height: 0.375, y: 1.15, color: 0xffffff },
-	{ rect: [575, 701, 578, 712], height: 0.15, y: 8.75, color: 0xf4f4f4 },
+	{ rect: [576, 665, 578, 671], height: 0.375, y: 3.75, color: 0xffffff, tvWall: true },
+	{ rect: [576, 755, 578, 769], height: 0.375, y: 1.15, color: 0xffffff, tvWall: true },
+	{ rect: [575, 701, 578, 712], height: 0.15, y: 8.75, color: 0xf4f4f4, tvWall: true },
 ];
 
 export const doors: Door[] = [
@@ -159,3 +160,13 @@ export const columns: Column[] = [{ x: 307, y: 865, r: 33 }];
 export const footprint: Rect = [40, 25, 910, 925];
 
 export const ft = (px: number) => px / PX_PER_FT;
+
+// Living-room face of the TV wall (x) and its run from the office-wall corner to the south pier (y1..y2), in plan px.
+export const tvWallFace = { x: 578, y1: 641, y2: 893 };
+
+// Tape-measured surfaces a wall texture can cover, in inches: the TV wall from the living room and the column's
+// circumference, both floor to ceiling.
+export const finishAreasIn = {
+	tvWall: { width: 122, height: CEILING_FT * 12 },
+	column: { width: Math.round(Math.PI * 33), height: CEILING_FT * 12 },
+};
