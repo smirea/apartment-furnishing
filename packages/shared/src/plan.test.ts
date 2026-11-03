@@ -26,3 +26,11 @@ test('places the texture surfaces on the TV wall face and the column, in feet', 
 test('hangs the TV centered on the measured 122" of the TV wall', () => {
 	expect(planGeometry().tvMount).toEqual({ x: 24.388, z: 32.596 });
 });
+
+test("lists the TV wall's switch, outlet and smoke alarm against its face, in feet", () => {
+	expect(planGeometry().tvWallDevices).toEqual([
+		{ rect: [24.304, 28.059, 24.388, 28.312], y: 3.75, height: 0.375, color: 0xffffff },
+		{ rect: [24.304, 31.857, 24.388, 32.447], y: 1.15, height: 0.375, color: 0xffffff },
+		{ rect: [24.262, 29.578, 24.388, 30.042], y: 8.75, height: 0.15, color: 0xf4f4f4 },
+	]);
+});

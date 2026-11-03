@@ -46,6 +46,8 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
     @ObservationIgnored private let items = Entity()
     @ObservationIgnored private let wallFinishes = WallFinishes()
     @ObservationIgnored private let fixtureRoot = Entity()
+    // The TV wall's switch, outlets and smoke alarm, kept on whatever face the wall shows, like the web plan.
+    @ObservationIgnored private let devices = Entity()
     // What each fixture currently draws, keyed by fixture; the signature changes when its pick or size does.
     @ObservationIgnored private var shownFixtures: [String: (signature: String, entity: Entity)] = [:]
     @ObservationIgnored private var textures: [WallTexture] = []
@@ -55,6 +57,8 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
     @ObservationIgnored private var picksSaving = 0
     // The newest pick per fixture; replies to older picks that land after it are dropped.
     @ObservationIgnored private var latestPick: [String: UUID] = [:]
+    @ObservationIgnored private var tvSave: Task<Void, Never>?
+    @ObservationIgnored private var tvSaveID: UUID?
     @ObservationIgnored private var planAnchor: AnchorEntity?
     @ObservationIgnored private var marker: AnchorEntity?
     @ObservationIgnored private var catalog: [String: CatalogItem] = [:]
@@ -93,6 +97,7 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
         planRoot.addChild(items)
         planRoot.addChild(wallFinishes.root)
         planRoot.addChild(fixtureRoot)
+        planRoot.addChild(devices)
         wallFinishes.root.isEnabled = showsTextures
         view.session.delegate = self
     }
@@ -110,6 +115,7 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
             guard missing.isEmpty else { throw URLError(.cannotParseResponse, userInfo: [NSLocalizedDescriptionKey: "the plan has no \(missing.joined(separator: ", "))"]) }
             self.plan = loaded
             buildOutline(loaded)
+            buildDevices(loaded)
             self.catalog = Dictionary(try await catalog.map { ($0.id, $0) }) { a, _ in a }
             apply(try await placements)
             (self.fixtures, self.textures) = (try await fixtures, try await textures)
@@ -362,6 +368,13 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
 
     func select(_ fixture: Fixture, _ option: String?) {
         guard let index = fixtures.firstIndex(where: { $0.key == fixture.key }), fixtures[index].selected != option else { return }
+        // A height drag still waiting to save carries the old TV's size and visibility, which would undo this pick.
+        if fixture.kind == .tv, tvSave != nil {
+            tvSave?.cancel()
+            tvSave = nil
+            tvSaveID = nil
+            picksSaving -= 1
+        }
         fixtureEdits += 1
         fixtures[index].selected = option
         applyFixtures()
@@ -379,6 +392,33 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
                 fixtureEdits += 1
                 if let fresh = try? await API.fixtures() { fixtures = fresh; applyFixtures() }
             }
+        }
+    }
+
+    // Slider drags move the TV at once and save once they pause, like the web plan's TV fields.
+    func updateTV(_ tv: TVSettings) {
+        guard let index = fixtures.firstIndex(where: { $0.kind == .tv }), fixtures[index].tv != tv else { return }
+        fixtureEdits += 1
+        fixtures[index].tv = tv
+        applyFixtures()
+        if tvSave == nil { picksSaving += 1 }
+        tvSave?.cancel()
+        let save = UUID()
+        tvSaveID = save
+        // Only the newest save touches the shared state; an older one cancelled mid-request leaves it alone.
+        tvSave = Task {
+            try? await Task.sleep(for: .milliseconds(300))
+            guard tvSaveID == save else { return }
+            let saved: Fixture?
+            do { saved = try await API.save(tv) } catch {
+                saved = nil
+                if tvSaveID == save { note = "Couldn't save the TV: \(error.localizedDescription)" }
+            }
+            guard tvSaveID == save else { return }
+            tvSave = nil
+            picksSaving -= 1
+            fixtureEdits += 1
+            if let saved { store(saved) }
         }
     }
 
@@ -414,16 +454,21 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
     private func applyFixtures() {
         guard let plan else { return }
         let tile = fixtures.first { $0.kind == .wallTexture }?.selected.flatMap { id in textures.first { $0.id == id }?.texture }
+        // The TV and the wall's devices sit on the texture's face when one is up.
+        let wallDepth = showsTextures ? tile.map { $0.depthIn / 12 + WallFinishes.standoffFeet } ?? 0 : 0
         for fixture in fixtures {
             let inRoom = fixture.room == room?.rawValue
             switch fixture.kind {
             case .item: showItem(fixture, inRoom: inRoom)
             case .tv:
-                // The TV hangs on the texture's face when one is up.
-                let wallDepth = showsTextures ? tile.map { $0.depthIn / 12 + WallFinishes.standoffFeet } ?? 0 : 0
                 showTV(fixture, inRoom: inRoom, plan: plan, wallDepth: wallDepth)
             case .wallTexture, .other: break
             }
+        }
+        let area = room.flatMap { plan.rect(of: $0) }
+        devices.isEnabled = area.map { Plan.contains($0, [plan.tvMount.x - 1, plan.tvMount.z]) } ?? false
+        for (device, entity) in zip(plan.tvWallDevices, devices.children) {
+            entity.position.x = (device.rect[0] + device.rect[2]) / 2 - wallDepth
         }
         Task {
             do {
@@ -444,13 +489,11 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
         shownFixtures[key] = (signature, entity)
     }
 
+    // Rebuilt only when the size changes; height and tilt just move it, so a slider drag stays smooth.
     private func showTV(_ fixture: Fixture, inRoom: Bool, plan: Plan, wallDepth: Float) {
         let tv = fixture.tv.flatMap { inRoom && $0.visible && fixture.selected != nil ? $0 : nil }
-        show(fixture.key, signature: tv.map { "\($0)|\(wallDepth)" }) {
-            let entity = TVEntity.make(tv!)
-            entity.transform = TVEntity.transform(tv!, mount: plan.tvMount, wallDepth: wallDepth)
-            return entity
-        }
+        show(fixture.key, signature: tv.map { "\($0.widthIn)x\($0.heightIn)" }) { TVEntity.make(tv!) }
+        if let tv { shownFixtures[fixture.key]?.entity.transform = TVEntity.transform(tv, mount: plan.tvMount, wallDepth: wallDepth) }
     }
 
     // Back flush to the fixture's wall face and centered on it, the way the web plan places it.
@@ -577,6 +620,19 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
     }
 
     // MARK: Outline
+
+    private func buildDevices(_ plan: Plan) {
+        devices.children.removeAll()
+        for device in plan.tvWallDevices {
+            let r = device.rect
+            let color = UIColor(red: CGFloat(device.color >> 16 & 0xff) / 255, green: CGFloat(device.color >> 8 & 0xff) / 255,
+                                blue: CGFloat(device.color & 0xff) / 255, alpha: 1)
+            let entity = ModelEntity(mesh: .generateBox(width: r[2] - r[0], height: device.height, depth: r[3] - r[1]),
+                                     materials: [SimpleMaterial(color: color, roughness: 0.5, isMetallic: false)])
+            entity.position = [(r[0] + r[2]) / 2, device.y + device.height / 2, (r[1] + r[3]) / 2]
+            devices.addChild(entity)
+        }
+    }
 
     // Wall footprints sit on the floor, so their edges trace the wall faces you aligned against.
     private func buildOutline(_ plan: Plan) {

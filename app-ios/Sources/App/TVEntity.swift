@@ -10,7 +10,7 @@ enum TVEntity {
     private static let bezel: Float = 0.3 / 12
 
     static func make(_ tv: TVSettings) -> Entity {
-        let width = tv.widthIn / 12, height = tv.heightIn / 12
+        let width = Float(tv.widthIn) / 12, height = Float(tv.heightIn) / 12
         let root = Entity()
         let body = ModelEntity(mesh: .generateBox(width: depth, height: height, depth: width),
                                materials: [SimpleMaterial(color: UIColor(white: 0.08, alpha: 1), roughness: 0.4, isMetallic: true)])
@@ -29,10 +29,10 @@ enum TVEntity {
 
     // `wallDepth` is how far a wall texture stands out from the wall, in feet.
     static func transform(_ tv: TVSettings, mount: Plan.Point, wallDepth: Float) -> Transform {
-        let height = tv.heightIn / 12, tilt = tv.tiltDeg * .pi / 180
+        let height = Float(tv.heightIn) / 12, tilt = Float(tv.tiltDeg) * .pi / 180
         // Tilting about the center swings the bottom edge toward the wall; the mount holds it out by that much.
         let x = mount.x - wallDepth - mountDepth - depth / 2 - height / 2 * sin(tilt)
-        return Transform(rotation: simd_quatf(angle: tilt, axis: [0, 0, 1]), translation: [x, tv.centerIn / 12, mount.z])
+        return Transform(rotation: simd_quatf(angle: tilt, axis: [0, 0, 1]), translation: [x, Float(tv.centerIn) / 12, mount.z])
     }
 
     private static func text(_ string: String, size: Float, y: Float) -> Entity {

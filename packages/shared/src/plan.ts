@@ -1,4 +1,4 @@
-import { CEILING_FT, columns, finishAreasIn, ft, rooms, tvWallFace, walls, type Rect } from './floorplan';
+import { CEILING_FT, columns, finishAreasIn, fixtures, ft, rooms, tvWallFace, walls, type Rect } from './floorplan';
 
 // The floor plan as the AR app needs it, in feet (+x east, +z south): the floor footprint of every wall run between
 // door openings, so the outline's edges are the wall faces you can line up against in the room.
@@ -15,6 +15,9 @@ export type PlanGeometry = {
 	};
 	// Where the TV hangs: the middle of the TV wall's measured span on its living-room face, before any wall texture.
 	tvMount: { x: number; z: number };
+	// The switch, outlets, data jack and smoke alarm on the TV wall, which move out onto any wall texture there. `rect`
+	// is their footprint against the bare wall, `y` the bottom edge, `color` 0xRRGGBB.
+	tvWallDevices: { rect: Rect; y: number; height: number; color: number }[];
 };
 
 const round = (n: number) => Math.round(n * 1000) / 1000;
@@ -50,5 +53,8 @@ export function planGeometry(): PlanGeometry {
 			column: { x: round(ft(column.x)), z: round(ft(column.y)), radius: round(ft(column.r)) },
 		},
 		tvMount: { x: round(ft(tvWallFace.x)), z: round(ft(tvWallFace.y2) - finishAreasIn.tvWall.width / 24) },
+		tvWallDevices: fixtures
+			.filter(f => f.tvWall)
+			.map(f => ({ rect: toFeet(f.rect), y: f.y ?? 0, height: f.height, color: f.color })),
 	};
 }
