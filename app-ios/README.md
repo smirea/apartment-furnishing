@@ -15,8 +15,9 @@ To point the app at another server, set `serverURL` in its defaults, for example
 - **Align.** The first launch asks for two corners. Tap a corner on the plan (taps snap to wall-face corners), aim the crosshair at that corner on the real floor, and tap **Set point**. Repeat for a second corner far from the first. The caption compares the plan distance with the distance you marked, which shows how well the two agree.
 - **Relaunch.** The app saves ARKit's world map with the alignment anchor. On the next launch, look around the room and the furniture reappears without marking points again. **Realign** starts over.
 - **Move furniture.** Drag an item to slide it across the floor and twist with two fingers to turn it. The move saves to `data/placements.json` through the server, so the web plan shows it too.
-- **Live updates.** The app polls placements every second and the catalog every 5 seconds, so items you move or import on the laptop appear on the phone.
+- **Live updates.** The app polls placements every second, and the catalog and wall textures every 5 seconds, so items you move or import and textures you pick on the laptop appear on the phone.
 - **Outline.** The wall footprints are drawn on the floor (glass in cyan) so you can check the alignment against the real walls.
+- **Textures.** The wall textures picked in the web plan (`data/finishes.json`) cover the TV wall and sleeve the column at real tile scale, floor to ceiling. They stand an inch proud of the panel depth so LiDAR occlusion of the real wall can't hide them. The switch is on by default and the app remembers it.
 
 On a LiDAR iPhone or iPad, real walls, furniture, and people hide the virtual furniture behind them.
 
