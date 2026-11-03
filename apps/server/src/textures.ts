@@ -10,6 +10,7 @@ import {
 	downloadPhotos,
 	fetchPages,
 	grokStructured,
+	readDocuments,
 	pageContext,
 	productKey,
 	slug,
@@ -17,6 +18,8 @@ import {
 import { collectPhotos, runCodex } from './generate-model';
 
 const TEXTURE_DIR = join(DATA_DIR, 'textures');
+// Spec-sheet text saved next to the photos at import, so texture builds (and rebuilds) get exact slat sizes.
+const SPEC_FILE = 'spec.txt';
 const FINISHES_FILE = join(DATA_DIR, 'finishes.json');
 const PROMPT_FILE = Bun.file(join(import.meta.dir, 'texture-prompt.md'));
 if (!(await PROMPT_FILE.exists())) throw new Error(`missing ${PROMPT_FILE.name}`);
@@ -95,10 +98,11 @@ export async function importTextures(urls: string[], log: (line: string) => void
 	await mkdir(TEXTURE_DIR, { recursive: true });
 	log(`capturing ${urls.length} page(s)…`);
 	const pages = await fetchPages(urls);
+	const specs = await Promise.all(pages.map(page => readDocuments(page.documents)));
 	// One unreadable page shouldn't throw away the rest of a store import: keep the others, report it at the end.
-	const parsed = await mapLimit(pages, PARSE_CONCURRENCY, page =>
+	const parsed = await mapLimit([...pages.entries()], PARSE_CONCURRENCY, ([i, page]) =>
 		grokStructured<Panel>(
-			`Extract wall-panel product information from this retailer page capture. Use only facts in the input. Convert sizes to inches. Pick imageUrl from the image candidates exactly as written.\n\n${pageContext(page)}`,
+			`Extract wall-panel product information from this retailer page capture. Use only facts in the input; the manufacturer's spec sheets, when present, beat the page for sizes. Convert sizes to inches. Pick imageUrl from the image candidates exactly as written.\n\n${pageContext(page)}${specs[i] ? `\n\nSpec sheets:\n${specs[i]}` : ''}`,
 			panelSchema,
 		).catch((error: unknown) => (error instanceof Error ? error : new Error(String(error)))),
 	);
@@ -128,6 +132,7 @@ export async function importTextures(urls: string[], log: (line: string) => void
 			texture: existing?.texture ?? null,
 		};
 		await saveTexture(texture);
+		await writeFile(join(ASSET_DIR, id, SPEC_FILE), specs[i]!);
 		known.push(texture);
 		imported.push(texture);
 		log(
@@ -182,10 +187,12 @@ export const importTexture = async (url: string, log?: (line: string) => void) =
 
 async function prompt(texture: WallTexture, photos: string[]) {
 	const p = texture.panel;
+	const spec = Bun.file(join(ASSET_DIR, texture.id, SPEC_FILE));
 	return (await PROMPT_FILE.text())
 		.replace('{{name}}', texture.name)
 		.replace('{{size}}', p ? `${p.width} in wide × ${p.height} in tall × ${p.depth} in thick` : 'not listed')
 		.replace('{{summary}}', texture.summary)
+		.replace('{{spec}}', ((await spec.exists()) && (await spec.text()).trim()) || 'none published')
 		.replace('{{photos}}', photos.map((name, i) => `${i + 1}. ${name}`).join('\n'));
 }
 

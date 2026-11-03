@@ -4,6 +4,12 @@ Product: {{name}}
 One panel on record: {{size}}
 Description: {{summary}}
 
+Manufacturer spec sheet text. Its numbers (slat face width, groove width and profile, slats per panel, thickness, finishes) are exact: use them over anything you estimate from photos, and say so in the note.
+
+```
+{{spec}}
+```
+
 Photos, attached in this order and saved in the current directory:
 
 {{photos}}
@@ -12,7 +18,7 @@ The first photo is the main listing photo and shows the color being bought. The 
 
 ## 1. Work out the pattern and its real size
 
-Study every photo before writing code. Dimension diagrams beat spec tables. Work out, in inches:
+Read the spec sheet, then study every photo before writing code. The spec sheet beats dimension diagrams, which beat spec tables and estimates. Work out, in inches:
 
 - The repeating structure as installed on a wall: for slat panels, the slat width, the gap between slats, the slat pitch (width + gap) and how many slats one panel has. For fluted, shiplap, tile or 3D panels, the equivalent repeating unit.
 - The panel thickness, front of the slats to the back of the backing.

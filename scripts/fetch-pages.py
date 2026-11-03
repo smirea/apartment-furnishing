@@ -65,6 +65,20 @@ EXTRACT = r"""async () => {
 		if (!images.length) images = uniq(await shopify());
 		if (!images.length) images = uniq(ldImages());
 	} catch {}
+	// Linked PDFs, spec sheets first: manufacturers put exact dimensions there that product pages round or omit.
+	const pdfs = [];
+	for (let i = html.indexOf('.pdf'); i !== -1; i = html.indexOf('.pdf', i + 4)) {
+		let a = i;
+		while (a > 0 && !stop.has(html[a - 1])) a--;
+		let b = i + 4;
+		while (b < html.length && !stop.has(html[b])) b++;
+		try {
+			pdfs.push(new URL(unescape(html.slice(a, b)), location.href).href);
+		} catch {}
+	}
+	const documents = uniq(pdfs.filter((u) => /^https?:/.test(u) && /\/[^/]+\.pdf$/i.test(new URL(u).pathname)))
+		.sort((x, y) => Number(/spec|dimension|guide|sheet/i.test(y)) - Number(/spec|dimension|guide|sheet/i.test(x)))
+		.slice(0, 3);
 	const jsonLd = [...document.querySelectorAll('script[type="application/ld+json"]')].map((s) => s.textContent).join('\n').slice(0, 15000);
 	return {
 		url: location.href,
@@ -73,6 +87,7 @@ EXTRACT = r"""async () => {
 		mainImage: document.querySelector('#landingImage, [data-testid="hero-image"] img, main img')?.src ?? null,
 		models: uniq(models),
 		images: images.slice(0, 12),
+		documents,
 		specs,
 		jsonLd,
 		text: document.body.innerText.replace(/\n{3,}/g, '\n\n').slice(0, 40000),

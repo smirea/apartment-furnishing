@@ -13,7 +13,7 @@ export const GALLERY_DIR = 'gallery';
 const PLACEMENTS_FILE = join(DATA_DIR, 'placements.json');
 const GROK_MODEL = 'grok-4.7-build-fast';
 
-for (const bin of ['grok', 'uv']) if (!Bun.which(bin)) throw new Error(`${bin} CLI not found on PATH`);
+for (const bin of ['grok', 'uv', 'pdftotext']) if (!Bun.which(bin)) throw new Error(`${bin} CLI not found on PATH`);
 
 export async function listCatalog(): Promise<CatalogItem[]> {
 	await mkdir(CATALOG_DIR, { recursive: true });
@@ -143,6 +143,8 @@ type PageData = {
 	mainImage: string | null;
 	models: string[];
 	images: string[];
+	// Linked PDFs, spec sheets first.
+	documents: string[];
 	specs: string[];
 	jsonLd: string;
 	text: string;
@@ -254,6 +256,29 @@ export async function grokStructured<T>(prompt: string, schema: object): Promise
 	const result = JSON.parse(out);
 	if (!result.structuredOutput) throw new Error(`grok returned no structured output: ${out.slice(0, 500)}`);
 	return result.structuredOutput;
+}
+
+// Text of the page's linked spec sheets, for prompts that need exact dimensions.
+export async function readDocuments(urls: string[]): Promise<string> {
+	const texts = await Promise.all(
+		urls.map(async url => {
+			const res = await fetch(url, { headers: { 'user-agent': 'Mozilla/5.0' } });
+			if (!res.ok) throw new Error(`${res.status} downloading ${url}`);
+			const proc = Bun.spawn(['pdftotext', '-layout', '-', '-'], {
+				stdin: new Uint8Array(await res.arrayBuffer()),
+				stdout: 'pipe',
+				stderr: 'pipe',
+			});
+			const [out, err, code] = await Promise.all([
+				new Response(proc.stdout).text(),
+				new Response(proc.stderr).text(),
+				proc.exited,
+			]);
+			if (code !== 0) throw new Error(`pdftotext failed on ${url}: ${err}`);
+			return `Document ${url}:\n${out.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n')}`;
+		}),
+	);
+	return texts.join('\n\n').slice(0, 30000);
 }
 
 async function download(url: string, path: string) {
