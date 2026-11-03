@@ -303,6 +303,9 @@ export async function importProducts(urls: string[], log: (line: string) => void
 	for (const page of await fetchPages(urls)) {
 		log(`→ ${page.title.slice(0, 80)} (${page.models.length} model candidate(s))`);
 		const { imageUrl, modelUrl, ...product } = await parseWithGrok(page);
+		// TVs are built into the plan; the TV panel only needs their size.
+		if (product.category === 'tv')
+			throw new Error(`${product.name} is a TV: paste its link in the TV panel, which reads its size`);
 		const brandPrefix =
 			product.brand && !product.name.toLowerCase().startsWith(product.brand.toLowerCase()) ? `${product.brand} ` : '';
 		const existing = (await listCatalog()).find(item => productKey(item.url) === productKey(page.url));

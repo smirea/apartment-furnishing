@@ -71,7 +71,9 @@ const panelSchema = {
 	},
 };
 
-type Panel = Omit<WallTexture, 'id' | 'url' | 'importedAt' | 'image' | 'texture'> & { imageUrl: string | null };
+type Panel = Omit<WallTexture, 'id' | 'url' | 'importedAt' | 'image' | 'texture' | 'group'> & {
+	imageUrl: string | null;
+};
 
 // Parallel grok calls per batch: each takes 10 to 20 s and a store import can be dozens of pages.
 const PARSE_CONCURRENCY = 6;
@@ -122,6 +124,7 @@ export async function importTextures(urls: string[], log: (line: string) => void
 			importedAt: new Date().toISOString(),
 			...panel,
 			image: await downloadPhotos(id, imageUrl, page.images),
+			group: existing?.group ?? null,
 			texture: existing?.texture ?? null,
 		};
 		await saveTexture(texture);
@@ -131,9 +134,47 @@ export async function importTextures(urls: string[], log: (line: string) => void
 			`  saved texture ${id}: ${panel.price ?? '?'} ${panel.currency} for ${panel.panelsPerPack}, panel ${JSON.stringify(panel.panel)}, ${page.images.length} photo(s)`,
 		);
 	}
+	await assignGroups(log);
 	if (failures.length)
 		throw new Error(`Imported ${imported.length}, failed ${failures.length}:\n${failures.join('\n')}`);
 	return imported;
+}
+
+// Names the product type of every texture that has none, in one call over the whole collection so colorways of a
+// line share a group and new imports join the groups already in use.
+export async function assignGroups(log: (line: string) => void = () => {}) {
+	const all = await listTextures();
+	const missing = all.filter(t => !t.group);
+	if (!missing.length) return;
+	const groups = [...new Set(all.map(t => t.group).filter(Boolean))];
+	const { assignments } = await grokStructured<{ assignments: { id: string; group: string }[] }>(
+		`Group these wall-panel products by product type, so a wall-texture picker can show each type as one row of color swatches. A type is the product line and construction, never the color or the felt: for example "Ultralight slats", "Ultralight wide slats", "Full accent panels", "Truewood Lite slats", "Solid wood slats", "Paint-ready fluted", "Hexagon tiles". Keep names short and in sentence case. Reuse these existing groups where a product fits: ${groups.join(', ') || 'none yet'}.
+
+${missing.map(t => `${t.id}: ${t.name} (${t.url}). ${t.summary}`).join('\n')}`,
+		{
+			type: 'object',
+			additionalProperties: false,
+			required: ['assignments'],
+			properties: {
+				assignments: {
+					type: 'array',
+					items: {
+						type: 'object',
+						additionalProperties: false,
+						required: ['id', 'group'],
+						properties: { id: { type: 'string' }, group: { type: 'string' } },
+					},
+				},
+			},
+		},
+	);
+	const byId = new Map(assignments.map(a => [a.id, a.group]));
+	for (const t of missing) {
+		const group = byId.get(t.id);
+		if (!group) throw new Error(`grok assigned no group to ${t.id}`);
+		await saveTexture({ ...(await readTexture(t.id)), group });
+	}
+	log(`grouped ${missing.length} texture(s): ${[...new Set(byId.values())].join(', ')}`);
 }
 
 export const importTexture = async (url: string, log?: (line: string) => void) =>

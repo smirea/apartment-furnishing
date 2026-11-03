@@ -20,6 +20,7 @@ import { modelJobs, startModelJob } from './generate-model';
 import { planGeometry } from '@repo/shared/plan';
 import { usdzPath } from './usdz';
 import { config } from './config';
+import { importTv, listTvs, removeTv } from './tvs';
 import { ideaFile, ideasHtml } from './ideas';
 import {
 	FINISH_SURFACES,
@@ -117,6 +118,25 @@ const server = Bun.serve({
 				}
 				await saveFinishes(finishes);
 				return Response.json(finishes);
+			},
+		},
+		'/api/tvs': { GET: async () => Response.json(await listTvs()) },
+		'/api/tvs/import': {
+			POST: async request => {
+				const { url } = (await request.json()) as { url?: string };
+				if (!url || !/^https?:\/\//.test(url)) return Response.json({ error: 'Paste a product URL' }, { status: 400 });
+				try {
+					return Response.json(await importTv(url));
+				} catch (error) {
+					console.error(error);
+					return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 502 });
+				}
+			},
+		},
+		'/api/tvs/:id': {
+			DELETE: async request => {
+				await removeTv(request.params.id);
+				return Response.json({ ok: true });
 			},
 		},
 		'/api/tv': {

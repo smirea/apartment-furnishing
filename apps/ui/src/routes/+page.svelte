@@ -5,6 +5,7 @@
 		TV_RATIOS,
 		tvDiagonal,
 		tvSize,
+		type TvModel,
 		type TvSettings,
 		type CatalogEntry,
 		type CatalogItem,
@@ -80,14 +81,20 @@
 			api<Finishes>('/api/finishes', { method: 'PUT', body: JSON.stringify(patch) }),
 		onSuccess: (next: Finishes) => queryClient.setQueryData(['finishes'], next),
 	}));
-	let target = $state<FinishSurface>(saved.target ?? 'tvWall');
 	// Swatches show the tile at a fixed scale so slat widths compare across products.
 	const SWATCH_PX_PER_FT = 40;
-	const sortedTextures = $derived(textureList.toSorted((a, b) => a.name.localeCompare(b.name)));
+	const textureGroups = $derived(
+		Object.entries(Object.groupBy(textureList, t => t.group ?? 'Other'))
+			.map(([group, items]) => [group, items!.toSorted((a, b) => a.name.localeCompare(b.name))] as const)
+			.toSorted(([a], [b]) => a.localeCompare(b)),
+	);
+	// One texture dresses both the TV wall and the column.
+	const applied = (t: WallTexture) => finishes.tvWall === t.id || finishes.column === t.id;
 	function clickSwatch(t: WallTextureEntry) {
-		if (t.texture && t.textureJob?.state !== 'failed')
-			finishMutation.mutate({ [target]: finishes[target] === t.id ? null : t.id });
-		else if (!t.textureJob || t.textureJob.state === 'failed') textureGenerate.mutate(t.id);
+		if (t.texture && t.textureJob?.state !== 'failed') {
+			const id = applied(t) ? null : t.id;
+			finishMutation.mutate({ tvWall: id, column: id });
+		} else if (!t.textureJob || t.textureJob.state === 'failed') textureGenerate.mutate(t.id);
 	}
 	let tip = $state<{ texture: WallTextureEntry; x: number; y: number } | null>(null);
 	function showTip(texture: WallTextureEntry, el: HTMLElement) {
@@ -226,6 +233,22 @@
 		}, SAVE_DELAY_MS);
 	}
 	const round1 = (n: number) => Math.round(n * 10) / 10;
+	const tvModelsQuery = createQuery(() => ({ queryKey: ['tvs'], queryFn: () => api<TvModel[]>('/api/tvs') }));
+	const tvModels = $derived(tvModelsQuery.data ?? []);
+	let tvUrl = $state('');
+	// Adding a TV link also switches to its size, since that is why it was pasted.
+	const tvImport = createMutation(() => ({
+		mutationFn: (url: string) => api<TvModel>('/api/tvs/import', { method: 'POST', body: JSON.stringify({ url }) }),
+		onSuccess: async (m: TvModel) => {
+			tvUrl = '';
+			updateTv({ widthIn: m.widthIn, heightIn: m.heightIn });
+			await queryClient.invalidateQueries({ queryKey: ['tvs'] });
+		},
+	}));
+	const tvRemove = createMutation(() => ({
+		mutationFn: (id: string) => api(`/api/tvs/${id}`, { method: 'DELETE' }),
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: ['tvs'] }),
+	}));
 	const positive = (value: string) => (Number(value) > 0 ? Number(value) : null);
 	const tvRatio = $derived(
 		tv ? TV_RATIOS.findIndex(([w, h]) => Math.abs(tv!.widthIn / tv!.heightIn - w / h) < 0.01) : -1,
@@ -275,7 +298,7 @@
 		const byId = Object.fromEntries(textureList.map(t => [t.id, t]));
 		viewer?.setFinishes({ tvWall: byId[finishes.tvWall ?? ''] ?? null, column: byId[finishes.column ?? ''] ?? null });
 	});
-	$effect(() => localStorage.setItem(OPTIONS_KEY, JSON.stringify({ cutaway, labels, open, target })));
+	$effect(() => localStorage.setItem(OPTIONS_KEY, JSON.stringify({ cutaway, labels, open })));
 </script>
 
 <svelte:window onkeydown={onKey} />
@@ -314,37 +337,37 @@
 				Living room wall texture <span class="muted">{textureList.length}</span>
 			</button>
 			{#if open.textures}
-				<div class="targets" role="group" aria-label="Surface a swatch click dresses">
-					<span class="muted">Swatches go on the</span>
-					<button type="button" aria-pressed={target === 'tvWall'} onclick={() => (target = 'tvWall')}>TV wall</button>
-					<button type="button" aria-pressed={target === 'column'} onclick={() => (target = 'column')}>Column</button>
-				</div>
 				{#if finishMutation.isError}
 					<p class="error">{finishMutation.error.message}</p>
 				{/if}
-				<div class="swatches">
-					{#each sortedTextures as t (t.id)}
-						<button
-							type="button"
-							class="swatch"
-							class:on-target={finishes[target] === t.id}
-							class:busy={t.textureJob?.state === 'queued' || t.textureJob?.state === 'running'}
-							class:failed={t.textureJob?.state === 'failed'}
-							style:background-image="url({t.texture?.map ?? t.image})"
-							style:background-size={t.texture ? `${(t.texture.repeat.width / 12) * SWATCH_PX_PER_FT}px auto` : 'cover'}
-							aria-label={t.name}
-							onclick={() => clickSwatch(t)}
-							onpointerenter={e => showTip(t, e.currentTarget)}
-							onpointerleave={() => (tip = null)}
-							onfocus={e => showTip(t, e.currentTarget)}
-							onblur={() => (tip = null)}
-						>
-							{#if finishes.tvWall === t.id}<span class="badge wall">W</span>{/if}
-							{#if finishes.column === t.id}<span class="badge column">C</span>{/if}
-						</button>
-					{/each}
-					{#if textureImport.isPending}<span class="swatch busy" aria-label="Importing"></span>{/if}
-				</div>
+				{#each textureGroups as [group, items] (group)}
+					<h3 class="group">{group} <span class="muted">{items.length}</span></h3>
+					<div class="swatches">
+						{#each items as t (t.id)}
+							<button
+								type="button"
+								class="swatch"
+								class:on-target={applied(t)}
+								class:busy={t.textureJob?.state === 'queued' || t.textureJob?.state === 'running'}
+								class:failed={t.textureJob?.state === 'failed'}
+								style:background-image="url({t.texture?.map ?? t.image})"
+								style:background-size={t.texture
+									? `${(t.texture.repeat.width / 12) * SWATCH_PX_PER_FT}px auto`
+									: 'cover'}
+								aria-label={t.name}
+								onclick={() => clickSwatch(t)}
+								onpointerenter={e => showTip(t, e.currentTarget)}
+								onpointerleave={() => (tip = null)}
+								onfocus={e => showTip(t, e.currentTarget)}
+								onblur={() => (tip = null)}
+							>
+							</button>
+						{/each}
+					</div>
+				{/each}
+				{#if textureImport.isPending}<div class="swatches">
+						<span class="swatch busy" aria-label="Importing"></span>
+					</div>{/if}
 				{#if !textureList.length && !textureImport.isPending}
 					<p class="muted">
 						{texturesQuery.isPending ? 'Loading…' : 'Paste a wall panel link to cover the TV wall and the column.'}
@@ -430,16 +453,14 @@
 						/>
 					</label>
 					<label
-						>Center height
+						>Center {round1(tv.centerIn)}″
 						<input
-							type="number"
-							min="1"
-							step="1"
-							value={round1(tv.centerIn)}
-							oninput={e => {
-								const centerIn = positive(e.currentTarget.value);
-								if (centerIn) updateTv({ centerIn });
-							}}
+							type="range"
+							min={Math.ceil(tv.heightIn / 2)}
+							max={Math.floor(120 - tv.heightIn / 2)}
+							step="0.5"
+							value={tv.centerIn}
+							oninput={e => updateTv({ centerIn: Number(e.currentTarget.value) })}
 						/>
 					</label>
 					<label
@@ -460,6 +481,42 @@
 					)}″, centered on the wall.
 				</p>
 				{#if tvError}<p class="error">{tvError}</p>{/if}
+				{#if tvModels.length}
+					<ul class="tv-models">
+						{#each tvModels as m (m.id)}
+							<li class:current={Math.abs(m.widthIn - tv.widthIn) < 0.05 && Math.abs(m.heightIn - tv.heightIn) < 0.05}>
+								<button
+									type="button"
+									class="pick"
+									onclick={() => updateTv({ widthIn: m.widthIn, heightIn: m.heightIn })}
+									>{round1(tvDiagonal(m))}″</button
+								>
+								<a href={m.url} target="_blank" rel="noreferrer" title={m.name}>{m.name}</a>
+								<button type="button" class="remove" aria-label="Remove {m.name}" onclick={() => tvRemove.mutate(m.id)}
+									>×</button
+								>
+							</li>
+						{/each}
+					</ul>
+				{/if}
+				<form
+					class="import"
+					onsubmit={e => {
+						e.preventDefault();
+						if (tvUrl.trim()) tvImport.mutate(tvUrl.trim());
+					}}
+				>
+					<input
+						type="url"
+						placeholder="Paste a TV link for its size"
+						bind:value={tvUrl}
+						disabled={tvImport.isPending}
+					/>
+					<button type="submit" class="primary" disabled={tvImport.isPending || !tvUrl.trim()}>
+						{tvImport.isPending ? 'Reading…' : 'Add'}
+					</button>
+				</form>
+				{#if tvImport.isError}<p class="error">{tvImport.error.message}</p>{/if}
 			{/if}
 		</section>
 
@@ -589,13 +646,7 @@
 			{/if}
 			<p class="muted">{t.summary}</p>
 			{#if t.texture}<p class="note">{t.texture.note}</p>{/if}
-			{#if finishes.tvWall === t.id || finishes.column === t.id}
-				<span class="applied"
-					>On the {[finishes.tvWall === t.id && 'TV wall', finishes.column === t.id && 'column']
-						.filter(Boolean)
-						.join(' and ')}</span
-				>
-			{/if}
+			{#if applied(t)}<span class="applied">On the TV wall and column</span>{/if}
 		</div>
 	{/if}
 
@@ -786,21 +837,10 @@
 		transform: rotate(-90deg);
 	}
 
-	.targets {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 0.4rem;
-		align-items: center;
-	}
-
-	.targets button {
-		padding: 0.25rem 0.6rem;
-	}
-
-	.targets button[aria-pressed='true'] {
-		border-color: var(--app-accent);
-		background: var(--app-accent);
-		color: var(--app-accent-ink);
+	.items h3.group {
+		margin: 0.2rem 0 -0.2rem;
+		font-size: 0.75rem;
+		font-weight: 600;
 	}
 
 	.swatches {
@@ -851,24 +891,44 @@
 		background: color-mix(in srgb, var(--app-error) 55%, transparent);
 	}
 
-	.badge {
-		position: absolute;
-		bottom: 2px;
-		padding: 0 0.2rem;
-		border-radius: 0.2rem;
+	.tv-models {
+		display: grid;
+		gap: 0.25rem;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.tv-models li {
+		display: grid;
+		grid-template-columns: auto 1fr auto;
+		gap: 0.5rem;
+		align-items: center;
+	}
+
+	.tv-models a {
+		overflow: hidden;
+		color: var(--app-text);
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	.tv-models .pick {
+		min-width: 3.4rem;
+		padding: 0.2rem 0.4rem;
+	}
+
+	.tv-models li.current .pick {
+		border-color: var(--app-accent);
 		background: var(--app-accent);
 		color: var(--app-accent-ink);
-		font-size: 0.6rem;
-		font-weight: 700;
-		line-height: 1.3;
 	}
 
-	.badge.wall {
-		left: 2px;
-	}
-
-	.badge.column {
-		right: 2px;
+	.tv-models .remove {
+		padding: 0 0.4rem;
+		border: none;
+		color: var(--app-muted);
+		font-size: 1.1rem;
 	}
 
 	.tip {
