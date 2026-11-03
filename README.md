@@ -54,6 +54,10 @@ Names were assigned by looking at each image, so a couple are best guesses (`bed
 
 [`app-ios/`](app-ios) is an iPhone AR app that places the same furniture in the real apartment, aligned from two floor corners you mark. Moves made in the app save back to the plan. Run it with `bun run ios` while the server runs; see [`app-ios/README.md`](app-ios/README.md).
 
+## Ideas
+
+Furniture ideas and inspiration photos live in [`ideas/`](ideas/README.md).
+
 ## Adding furniture
 
 Paste an Amazon or Walmart link into the **Import** box in the app (or run `bun run import <url> [...]`). For each link the server:
