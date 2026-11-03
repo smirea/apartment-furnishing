@@ -21,3 +21,6 @@ build
 # other
 .DS_Store
 data/items/*/model.usdz
+
+# local data; worktrees copy it from the main checkout in worktree:setup
+data/app.db*
