@@ -4,7 +4,7 @@ import type { CatalogItem, Job } from '@repo/shared/items';
 import { copyFile, mkdtemp, readdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, extname, join } from 'node:path';
-import { ASSET_DIR, GALLERY_DIR, ROOT, readItem, saveItem } from './catalog';
+import { ASSET_DIR, GALLERY_DIR, ROOT, catalog } from './catalog';
 
 // Read per job so prompt edits apply without restarting the server.
 const PROMPT_FILE = Bun.file(join(import.meta.dir, 'model-prompt.md'));
@@ -105,13 +105,13 @@ export async function generateModel(item: CatalogItem, log: (line: string) => vo
 	await copyFile(join(work, 'model.glb'), join(dir, 'model.glb'));
 	await copyFile(join(work, 'build.py'), join(dir, 'model.py'));
 	const updated: CatalogItem = {
-		...(await readItem(item.id)),
+		...catalog.read(item.id),
 		...size,
 		// Cache-busting version: the path stays the same across regenerations.
 		model: `/api/assets/${item.id}/model.glb?v=${Date.now()}`,
 		modelSource: 'generated',
 	};
-	await saveItem(updated);
+	catalog.put(updated);
 	log(`codex: ${item.id} done, ${JSON.stringify(size)} (${work})`);
 	return updated;
 }

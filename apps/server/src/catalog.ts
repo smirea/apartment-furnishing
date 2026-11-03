@@ -1,53 +1,29 @@
 // Product import pipeline shared by the API (POST /api/catalog/import) and scripts/import-item.ts.
 // Captures each page with a headless Camoufox browser, has the grok CLI turn it into
-// structured product info, downloads the photos and any 3D model, and writes data/catalog/<id>.json.
+// structured product info, downloads the photos and any 3D model, and saves the item to the catalog table.
 import type { CatalogItem, Placement } from '@repo/shared/items';
-import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { table } from './db';
 
 export const ROOT = join(import.meta.dir, '../../..');
-export const DATA_DIR = join(ROOT, 'data');
-const CATALOG_DIR = join(DATA_DIR, 'catalog');
-export const ASSET_DIR = join(DATA_DIR, 'items');
+export const ASSET_DIR = join(ROOT, 'data/items');
 export const GALLERY_DIR = 'gallery';
-const PLACEMENTS_FILE = join(DATA_DIR, 'placements.json');
 const GROK_MODEL = 'grok-4.7-build-fast';
 
 for (const bin of ['grok', 'uv', 'pdftotext']) if (!Bun.which(bin)) throw new Error(`${bin} CLI not found on PATH`);
 
-export async function listCatalog(): Promise<CatalogItem[]> {
-	await mkdir(CATALOG_DIR, { recursive: true });
-	const files = (await readdir(CATALOG_DIR)).filter(f => f.endsWith('.json'));
-	const items: CatalogItem[] = await Promise.all(files.map(f => Bun.file(join(CATALOG_DIR, f)).json()));
-	return items.sort((a, b) => b.importedAt.localeCompare(a.importedAt));
-}
+export const catalog = table<CatalogItem>('catalog_items', {
+	key: 'id',
+	json: ['dimensions', 'highlights', 'removeNodes'],
+	order: 'importedAt DESC',
+});
 
-export const readItem = (id: string): Promise<CatalogItem> => Bun.file(join(CATALOG_DIR, `${id}.json`)).json();
-
-export async function saveItem(item: CatalogItem) {
-	await writeFile(join(CATALOG_DIR, `${item.id}.json`), JSON.stringify(item, null, '\t') + '\n');
-}
-
-export async function readPlacements(): Promise<Placement[]> {
-	const file = Bun.file(PLACEMENTS_FILE);
-	return (await file.exists()) ? file.json() : [];
-}
-
-let placementWrites: Promise<unknown> = Promise.resolve();
-
-// Every client edits single items, so each change is a read-modify-write of the whole file. Chaining them keeps two
-// overlapping edits from both reading the same snapshot and one silently dropping the other.
-export function updatePlacements(change: (placements: Placement[]) => Placement[]): Promise<Placement[]> {
-	const write = placementWrites
-		.catch(() => {})
-		.then(async () => {
-			const updated = change(await readPlacements());
-			await writeFile(PLACEMENTS_FILE, JSON.stringify(updated, null, '\t') + '\n');
-			return updated;
-		});
-	placementWrites = write;
-	return write;
-}
+export const placements = table<Placement>('placements', {
+	key: 'key',
+	json: ['position', 'rotation'],
+	order: 'rowid',
+});
 
 const productSchema = {
 	type: 'object',
@@ -327,7 +303,6 @@ export async function importProducts(
 	log: (line: string) => void = () => {},
 	category?: string,
 ): Promise<CatalogItem[]> {
-	await mkdir(CATALOG_DIR, { recursive: true });
 	log(`capturing ${urls.length} page(s)…`);
 	const imported: CatalogItem[] = [];
 	for (const page of await fetchPages(urls)) {
@@ -340,7 +315,7 @@ export async function importProducts(
 			throw new Error(`${product.name} is not a ${category} (read as ${product.category})`);
 		const brandPrefix =
 			product.brand && !product.name.toLowerCase().startsWith(product.brand.toLowerCase()) ? `${product.brand} ` : '';
-		const existing = (await listCatalog()).find(item => productKey(item.url) === productKey(page.url));
+		const existing = catalog.all().find(item => productKey(item.url) === productKey(page.url));
 		const id = existing?.id ?? slug(brandPrefix + product.name);
 		const dir = join(ASSET_DIR, id);
 
@@ -366,7 +341,7 @@ export async function importProducts(
 			model,
 			modelSource,
 		};
-		await saveItem(item);
+		catalog.put(item);
 		log(
 			`  saved ${id}: ${product.price ?? '?'} ${product.currency}, dims ${JSON.stringify(product.dimensions)}, ${page.images.length} photo(s), model ${model ? 'yes' : 'no'}`,
 		);
