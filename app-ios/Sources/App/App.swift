@@ -71,7 +71,11 @@ struct ContentView: View {
                 }
             case .placed:
                 HStack {
-                    Toggle("Outline", isOn: $scene.showsOutline).fixedSize()
+                    VStack(alignment: .leading) {
+                        Toggle("Outline", isOn: $scene.showsOutline)
+                        Toggle("Textures", isOn: $scene.showsTextures)
+                    }
+                    .fixedSize()
                     Spacer()
                     Button("Realign", action: scene.realign).buttonStyle(.bordered)
                 }

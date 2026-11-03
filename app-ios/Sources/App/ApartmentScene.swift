@@ -25,12 +25,19 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
     var plan: Plan?
     var note: String?
     var showsOutline = true { didSet { outline.isEnabled = showsOutline } }
+    var showsTextures = UserDefaults.standard.object(forKey: "showsTextures") as? Bool ?? true {
+        didSet {
+            UserDefaults.standard.set(showsTextures, forKey: "showsTextures")
+            wallFinishes.root.isEnabled = showsTextures
+        }
+    }
 
     @ObservationIgnored let view: ARView
     // Children of planRoot are in plan feet; its scale turns them into meters under the alignment anchor.
     @ObservationIgnored private let planRoot = Entity()
     @ObservationIgnored private let outline = Entity()
     @ObservationIgnored private let items = Entity()
+    @ObservationIgnored private let wallFinishes = WallFinishes()
     @ObservationIgnored private var planAnchor: AnchorEntity?
     @ObservationIgnored private var marker: AnchorEntity?
     @ObservationIgnored private var catalog: [String: CatalogItem] = [:]
@@ -61,6 +68,8 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
         planRoot.scale = SIMD3(repeating: metersPerFoot)
         planRoot.addChild(outline)
         planRoot.addChild(items)
+        planRoot.addChild(wallFinishes.root)
+        wallFinishes.root.isEnabled = showsTextures
         view.session.delegate = self
     }
 
@@ -70,11 +79,15 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
             async let plan = API.plan()
             async let catalog = API.catalog()
             async let placements = API.placements()
+            async let finishes = API.finishes()
+            async let textures = API.textures()
             let loaded = try await plan
             self.plan = loaded
             buildOutline(loaded)
             self.catalog = Dictionary(try await catalog.map { ($0.id, $0) }) { a, _ in a }
             apply(try await placements)
+            let (chosen, available) = (try await finishes, try await textures)
+            Task { await applyFinishes(chosen, available) }
         } catch {
             phase = .failed("Can't reach \(API.baseURL.absoluteString): \(error.localizedDescription)")
             return
@@ -240,7 +253,12 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
             try? await Task.sleep(for: .seconds(1))
             tick += 1
             do {
-                if tick.isMultiple(of: 5) { catalog = Dictionary(try await API.catalog().map { ($0.id, $0) }) { a, _ in a } }
+                if tick.isMultiple(of: 5) {
+                    catalog = Dictionary(try await API.catalog().map { ($0.id, $0) }) { a, _ in a }
+                    let (chosen, available) = (try await API.finishes(), try await API.textures())
+                    // Texture downloads can take a while; placements keep polling meanwhile.
+                    Task { await applyFinishes(chosen, available) }
+                }
                 let generation = saves
                 let incoming = try await API.placements()
                 if generation == saves { apply(incoming) }
@@ -261,6 +279,15 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
             if let existing = placed[placement.key], existing.signature != item.signature { remove(placement.key, existing) }
             if placed[placement.key] == nil { add(placement, item) }
             if moving[placement.key] == nil { placed[placement.key]?.entity.transform = placement.transform }
+        }
+    }
+
+    private func applyFinishes(_ finishes: Finishes, _ textures: [WallTexture]) async {
+        guard let plan else { return }
+        do {
+            try await wallFinishes.apply(finishes, textures, plan: plan)
+        } catch {
+            note = "Wall texture: \(error.localizedDescription)"
         }
     }
 
