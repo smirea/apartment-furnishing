@@ -255,7 +255,9 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
             do {
                 if tick.isMultiple(of: 5) {
                     catalog = Dictionary(try await API.catalog().map { ($0.id, $0) }) { a, _ in a }
-                    await applyFinishes(try await API.finishes(), try await API.textures())
+                    let (chosen, available) = (try await API.finishes(), try await API.textures())
+                    // Texture downloads can take a while; placements keep polling meanwhile.
+                    Task { await applyFinishes(chosen, available) }
                 }
                 let generation = saves
                 let incoming = try await API.placements()
