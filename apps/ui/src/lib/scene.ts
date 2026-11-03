@@ -524,6 +524,10 @@ export function createViewer(
 		if (!bedModels.has(key)) bedModels.set(key, buildItem(item));
 		const model = await bedModels.get(key)!.catch(error => {
 			bedModels.delete(key);
+			if (version === bedVersion) {
+				bedGroup.clear();
+				shownBedKey = null;
+			}
 			throw error;
 		});
 		if (version !== bedVersion) return;

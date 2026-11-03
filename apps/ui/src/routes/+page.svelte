@@ -73,7 +73,11 @@
 	const bedPick = createMutation(() => ({
 		mutationFn: (itemId: string | null) =>
 			api<BedSettings>('/api/bed', { method: 'PUT', body: JSON.stringify({ itemId }) }),
-		onMutate: (itemId: string | null) => queryClient.setQueryData(['bed'], { itemId }),
+		onMutate: async (itemId: string | null) => {
+			await queryClient.cancelQueries({ queryKey: ['bed'] });
+			queryClient.setQueryData(['bed'], { itemId });
+		},
+		onSuccess: (saved: BedSettings) => queryClient.setQueryData(['bed'], saved),
 		onError: () => queryClient.invalidateQueries({ queryKey: ['bed'] }),
 	}));
 	let bedUrl = $state('');

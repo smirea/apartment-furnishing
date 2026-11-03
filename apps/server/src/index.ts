@@ -179,7 +179,7 @@ const server = Bun.serve({
 				return Response.json({ itemId: newest?.id ?? null } satisfies BedSettings);
 			},
 			PUT: async request => {
-				const { itemId } = (await request.json()) as Partial<BedSettings>;
+				const { itemId } = ((await request.json().catch(() => null)) ?? {}) as Partial<BedSettings>;
 				const item = typeof itemId === 'string' ? await readItem(itemId).catch(() => null) : null;
 				if (itemId !== null && item?.category !== 'bed')
 					return Response.json({ error: `No bed ${itemId}` }, { status: 400 });
