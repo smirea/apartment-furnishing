@@ -1,0 +1,44 @@
+{
+	"shell": {
+		"room": [199, 204, 120],
+		"tv_wall": [199, 0, 122, 120],
+		"column": [62.71, 21.19, 33, 120],
+		"south_glass_end": 142.71,
+		"island": [75.6, 204, 146.6, 245, 36],
+		"balcony_door": [151.01, 193.4],
+		"office_door": [203.44, 122, 238.5],
+		"recess_east": 251.84
+	},
+	"design": {
+		"id": "03-window-chaise",
+		"title": "Window-side chaise \u00b7 cream and stone",
+		"sofa": [40, 42, 82, 162],
+		"chaise": [82, 42, 112, 80],
+		"table": [106, 102, 142, 140],
+		"fabric": "#d1c6b4",
+		"wood": "#b78b58",
+		"rug": "#ccc1ae",
+		"panel": "broad",
+		"lamp": [140, 20],
+		"plant": [170, 22]
+	},
+	"footprints": {
+		"sofa": [40, 42, 82, 162],
+		"chaise": [82, 42, 112, 80],
+		"table": [106, 102, 142, 140],
+		"lamp": [133, 13, 147, 27],
+		"plant_pot": [161, 13, 179, 31],
+		"console": [180.7, 6, 197, 116]
+	},
+	"checks": {
+		"island_to_sofa": 42,
+		"west_route": 40,
+		"column_to_sofa": 4.310000000000002,
+		"tv_side_margin": 18.1,
+		"console_side_margin": 6,
+		"soundbar_gap": 3,
+		"office_route": 36,
+		"sofa_table": 24,
+		"east_clearance_above_tv_wall": 57
+	}
+}

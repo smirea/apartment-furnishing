@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width,initial-scale=1" />
+		<style>
+			:root {
+				font-family: var(--font-sans, system-ui);
+				color: var(--foreground, #262822);
+			}
+			* {
+				box-sizing: border-box;
+			}
+			body {
+				margin: 0;
+			}
+			p {
+				font-size: 14px;
+				line-height: 1.55;
+			}
+			header p {
+				margin: 0 0 18px;
+				color: var(--muted-foreground, #74766c);
+			}
+			.grid {
+				display: grid;
+				grid-template-columns: repeat(2, minmax(0, 1fr));
+				gap: 24px 18px;
+			}
+			figure {
+				margin: 0;
+				min-width: 0;
+			}
+			.image {
+				width: 100%;
+				aspect-ratio: 16/11;
+				object-fit: contain;
+				display: block;
+				border-radius: var(--radius, 8px);
+				cursor: zoom-in;
+			}
+			.image[hidden] {
+				display: none;
+			}
+			h3 {
+				font-size: 17px;
+				line-height: 1.3;
+				margin: 12px 0 5px;
+			}
+			figcaption p {
+				margin: 0 0 10px;
+				font-size: 13px;
+				color: var(--muted-foreground, #74766c);
+			}
+			.controls {
+				display: flex;
+				gap: 6px;
+				flex-wrap: wrap;
+			}
+			button {
+				font: inherit;
+				font-size: 12px;
+				padding: 6px 10px;
+				color: var(--foreground, #262822);
+				background: var(--secondary, #e9e7dd);
+				border: 1px solid var(--border, #ccc);
+				border-radius: var(--radius, 6px);
+				cursor: pointer;
+			}
+			button[aria-pressed='true'] {
+				border-color: var(--primary, #7e8d6d);
+				box-shadow: inset 0 0 0 1px var(--primary, #7e8d6d);
+			}
+			a {
+				color: inherit;
+				font-size: 12px;
+			}
+			.notes {
+				margin-top: 22px;
+				color: var(--muted-foreground, #74766c);
+				font-size: 13px;
+			}
+			dialog {
+				max-width: 96%;
+				padding: 12px;
+				background: var(--card, #fff);
+				color: var(--foreground, #262822);
+				border: 1px solid var(--border, #ccc);
+				border-radius: var(--radius, 8px);
+			}
+			dialog img {
+				display: block;
+				max-width: 100%;
+				max-height: 1100px;
+				margin-top: 8px;
+			}
+			dialog::backdrop {
+				background: rgba(0, 0, 0, 0.8);
+			}
+			@media (max-width: 560px) {
+				.grid {
+					grid-template-columns: 1fr;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<header>
+			<p>
+				Four furniture arrangements in the same dimensioned 3D room. Toggle each image to its matching overhead plan;
+				click either image to enlarge.
+			</p>
+		</header>
+		<main class="grid">
+			<figure>
+				<img class="image render" src="01-kitchen-chaise/render.png" alt="Kitchen-side chaise in the fixed room" /><img
+					class="image plan"
+					src="01-kitchen-chaise/plan.png"
+					alt="Dimensioned overhead plan of kitchen-side chaise"
+					hidden
+				/>
+				<figcaption>
+					<h3>1 · Kitchen-side chaise</h3>
+					<p>124″ sofa · 72″ overall chaise depth · pale oak slats · 38″ to island</p>
+					<div class="controls">
+						<button data-show="render" aria-pressed="true">Room view</button
+						><button data-show="plan" aria-pressed="false">Floor plan</button
+						><a href="01-kitchen-chaise/dimensions.md">Dimensions</a>
+					</div>
+				</figcaption>
+			</figure>
+			<figure>
+				<img
+					class="image render"
+					src="02-lounge-ottoman/render.png"
+					alt="Deep lounge and movable ottoman in the fixed room"
+				/><img
+					class="image plan"
+					src="02-lounge-ottoman/plan.png"
+					alt="Dimensioned overhead plan of lounge and ottoman"
+					hidden
+				/>
+				<figcaption>
+					<h3>2 · Deep lounge + ottoman</h3>
+					<p>120″ × 46″ sofa · 38″ × 44″ ottoman · walnut panels · 42″ to island</p>
+					<div class="controls">
+						<button data-show="render" aria-pressed="true">Room view</button
+						><button data-show="plan" aria-pressed="false">Floor plan</button
+						><a href="02-lounge-ottoman/dimensions.md">Dimensions</a>
+					</div>
+				</figcaption>
+			</figure>
+			<figure>
+				<img class="image render" src="03-window-chaise/render.png" alt="Window-side chaise in the fixed room" /><img
+					class="image plan"
+					src="03-window-chaise/plan.png"
+					alt="Dimensioned overhead plan of window-side chaise"
+					hidden
+				/>
+				<figcaption>
+					<h3>3 · Window-side chaise</h3>
+					<p>120″ sofa · 72″ overall chaise depth · cream and stone · 42″ to island</p>
+					<div class="controls">
+						<button data-show="render" aria-pressed="true">Room view</button
+						><button data-show="plan" aria-pressed="false">Floor plan</button
+						><a href="03-window-chaise/dimensions.md">Dimensions</a>
+					</div>
+				</figcaption>
+			</figure>
+			<figure>
+				<img
+					class="image render"
+					src="04-sofa-swivel/render.png"
+					alt="Sofa and olive swivel chair in the fixed room"
+				/><img
+					class="image plan"
+					src="04-sofa-swivel/plan.png"
+					alt="Dimensioned overhead plan of sofa and swivel chair"
+					hidden
+				/>
+				<figcaption>
+					<h3>4 · Sofa + swivel chair</h3>
+					<p>120″ sofa · 36″ swivel chair · olive and cognac · 38″ between chair and island</p>
+					<div class="controls">
+						<button data-show="render" aria-pressed="true">Room view</button
+						><button data-show="plan" aria-pressed="false">Floor plan</button
+						><a href="04-sofa-swivel/dimensions.md">Dimensions</a>
+					</div>
+				</figcaption>
+			</figure>
+		</main>
+		<p class="notes">
+			Fixed model: room 199″ × 204″, TV wall 122″, column Ø33″, island 71″ × 41″, TV 85.8″ × 48″ (98″ class). Actual
+			geometry is rendered directly. Column position, glazing divisions and office recess use calibrated trace details;
+			the unmeasured recess is reconciled to the taped TV-wall length. The original island remains in the foreground.
+		</p>
+		<dialog id="enlarged"><button id="close">Close</button><img id="enlarged-image" alt="Enlarged design" /></dialog>
+		<script>
+			document.querySelectorAll('[data-show]').forEach(button =>
+				button.addEventListener('click', () => {
+					const figure = button.closest('figure');
+					figure
+						.querySelectorAll('.image')
+						.forEach(image => (image.hidden = !image.classList.contains(button.dataset.show)));
+					figure.querySelectorAll('[data-show]').forEach(b => b.setAttribute('aria-pressed', String(b === button)));
+				}),
+			);
+			document.querySelectorAll('.image').forEach(image =>
+				image.addEventListener('click', () => {
+					const large = document.getElementById('enlarged-image');
+					large.src = image.src;
+					large.alt = image.alt;
+					document.getElementById('enlarged').showModal();
+				}),
+			);
+			document.getElementById('close').addEventListener('click', () => document.getElementById('enlarged').close());
+		</script>
+	</body>
+</html>

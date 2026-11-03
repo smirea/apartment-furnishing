@@ -1,3 +1,5 @@
+> **Superseded:** The earlier fit calculations mixed measured room spans with uncalibrated trace coordinates. In particular, the island position and advertised 37.4-inch clearance are inconsistent. Use [the fixed 3D scene revision](../living-room-fixed-scene/README.md) instead. These AI images also alter the architecture.
+
 # Fixed geometry and generation protocol
 
 Read README.md lines 25–43, apps/ui/src/lib/floorplan.ts and inspect the three original reference JPEGs before designing. Tape measurements supersede listing text and earlier concept prompts. Do not use output/living-room-concepts as a geometry reference.

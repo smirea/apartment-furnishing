@@ -1,0 +1,84 @@
+{
+	"01-kitchen-chaise": {
+		"fixed_geometry_sha256": "2b0a8a7fa6ee47d7507c1ac32d48c29dd5666a211caeca5482dd591ab2b0d385",
+		"actual_mesh_dimensions_pass": true,
+		"all_furniture_inside_camera_frame": true,
+		"floorboards_outside_glazing": false,
+		"packed_texture": true,
+		"render_size": [1600, 1100],
+		"render_sha256": "ef0effc45489132853b840d827c851427b863ce9525ad018e00fd057b2865ce3",
+		"checks": {
+			"island_to_sofa": 38,
+			"west_route": 40,
+			"column_to_sofa": 4.310000000000002,
+			"tv_side_margin": 18.1,
+			"console_side_margin": 6,
+			"soundbar_gap": 3,
+			"office_route": 36,
+			"sofa_table": 24,
+			"east_clearance_above_tv_wall": 87
+		}
+	},
+	"02-lounge-ottoman": {
+		"fixed_geometry_sha256": "2b0a8a7fa6ee47d7507c1ac32d48c29dd5666a211caeca5482dd591ab2b0d385",
+		"actual_mesh_dimensions_pass": true,
+		"all_furniture_inside_camera_frame": true,
+		"floorboards_outside_glazing": false,
+		"packed_texture": true,
+		"render_size": [1600, 1100],
+		"render_sha256": "fcfbe497fe1647e03cd77b97c43e6d4cfbe34b58edcd03b497112083e7260894",
+		"checks": {
+			"island_to_sofa": 42,
+			"west_route": 40,
+			"column_to_sofa": 4.310000000000002,
+			"tv_side_margin": 18.1,
+			"console_side_margin": 6,
+			"soundbar_gap": 3,
+			"office_route": 36,
+			"east_clearance_above_tv_wall": 73
+		}
+	},
+	"03-window-chaise": {
+		"fixed_geometry_sha256": "2b0a8a7fa6ee47d7507c1ac32d48c29dd5666a211caeca5482dd591ab2b0d385",
+		"actual_mesh_dimensions_pass": true,
+		"all_furniture_inside_camera_frame": true,
+		"floorboards_outside_glazing": false,
+		"packed_texture": true,
+		"render_size": [1600, 1100],
+		"render_sha256": "749a8674bc3898b637102b4724eab4379bb240686065c1d010afda0084ea3800",
+		"checks": {
+			"island_to_sofa": 42,
+			"west_route": 40,
+			"column_to_sofa": 4.310000000000002,
+			"tv_side_margin": 18.1,
+			"console_side_margin": 6,
+			"soundbar_gap": 3,
+			"office_route": 36,
+			"sofa_table": 24,
+			"east_clearance_above_tv_wall": 57
+		}
+	},
+	"04-sofa-swivel": {
+		"fixed_geometry_sha256": "2b0a8a7fa6ee47d7507c1ac32d48c29dd5666a211caeca5482dd591ab2b0d385",
+		"actual_mesh_dimensions_pass": true,
+		"all_furniture_inside_camera_frame": true,
+		"floorboards_outside_glazing": false,
+		"packed_texture": true,
+		"render_size": [1600, 1100],
+		"render_sha256": "b506de44481a0ee9d8b69fd547ea5c18a524a83e4de587f329b30cdfd18329c0",
+		"checks": {
+			"island_to_sofa": 42,
+			"west_route": 40,
+			"column_to_sofa": 4.310000000000002,
+			"tv_side_margin": 18.1,
+			"console_side_margin": 6,
+			"soundbar_gap": 3,
+			"office_route": 36,
+			"sofa_table": 23,
+			"east_clearance_above_tv_wall": 38,
+			"sofa_chair_gap": 43,
+			"table_chair_cross_route": 36,
+			"island_to_chair": 38
+		}
+	}
+}

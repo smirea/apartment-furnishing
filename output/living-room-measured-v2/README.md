@@ -1,3 +1,5 @@
+> **Superseded:** The earlier fit calculations mixed measured room spans with uncalibrated trace coordinates. In particular, the island position and advertised 37.4-inch clearance are inconsistent. Use [the fixed 3D scene revision](../living-room-fixed-scene/README.md) instead. These AI images also alter the architecture.
+
 # Living room concepts — measured revision
 
 Four independent design delegates generated these concepts using the built-in image_gen tool. Each concept.md records immutable geometry, an item dimension and coordinate schedule, numeric fit checks written before generation, final prompts and visual limitations. Open comparison.html to compare the four options.
