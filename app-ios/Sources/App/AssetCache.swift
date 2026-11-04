@@ -19,6 +19,8 @@ final class AssetCache {
     @ObservationIgnored private var wanted: Set<URL> = []
     @ObservationIgnored private var unmetered = false
     @ObservationIgnored private var prefetch: Task<Void, Never>?
+    // A pass that ended with downloads failed, so the next poll tries them again.
+    @ObservationIgnored private var retry = false
     @ObservationIgnored private let monitor = NWPathMonitor()
 
     private init() {
@@ -54,9 +56,10 @@ final class AssetCache {
     }
 
     // Every asset the server lists right now. On Wi-Fi the missing ones download one at a time and files nothing lists
-    // anymore go; off Wi-Fi nothing is fetched or deleted until Wi-Fi comes back.
+    // anymore go; off Wi-Fi nothing is fetched or deleted until Wi-Fi comes back. Every URL must be versioned (`?v=`),
+    // since a file on disk is never fetched again.
     func keep(_ urls: Set<URL>) {
-        guard urls != wanted else { return }
+        guard urls != wanted || retry else { return }
         wanted = urls
         restart()
     }
@@ -71,6 +74,7 @@ final class AssetCache {
     private func restart() {
         prefetch?.cancel()
         prefetch = nil
+        retry = false
         remaining = 0
         guard unmetered, !wanted.isEmpty else { return }
         let urls = wanted
@@ -82,12 +86,14 @@ final class AssetCache {
             }
             let missing = urls.filter { !FileManager.default.fileExists(atPath: path($0).path) }
             remaining = missing.count
+            var failed = false
             for url in missing {
                 guard !Task.isCancelled else { return }
-                _ = try? await file(for: url)
+                if (try? await file(for: url)) == nil { failed = true }
                 guard !Task.isCancelled else { return }
                 remaining -= 1
             }
+            retry = failed
         }
     }
 

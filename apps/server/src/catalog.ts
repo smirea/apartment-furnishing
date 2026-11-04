@@ -281,7 +281,8 @@ export function productKey(url: string) {
 	return `${u.hostname.replace(/^www\./, '')}:${id ?? u.pathname}`;
 }
 
-// Main photo as image.<ext> plus the listing gallery, into data/items/<id>/. Returns the main photo's asset URL.
+// Main photo as image.<ext> plus the listing gallery, into data/items/<id>/. Returns the main photo's asset URL, versioned
+// because a reimport overwrites the file and the iOS app keeps every asset URL on disk for good.
 export async function downloadPhotos(id: string, imageUrl: string | null, gallery: string[]): Promise<string | null> {
 	const dir = join(ASSET_DIR, id);
 	await rm(join(dir, GALLERY_DIR), { recursive: true, force: true });
@@ -294,7 +295,7 @@ export async function downloadPhotos(id: string, imageUrl: string | null, galler
 	if (!imageUrl) return null;
 	const ext = extension(imageUrl);
 	await download(imageUrl, join(dir, `image.${ext}`));
-	return `/api/assets/${id}/image.${ext}`;
+	return `/api/assets/${id}/image.${ext}?v=${Date.now()}`;
 }
 
 // `category` limits an import to one kind of product, so a link pasted in the Bed panel can't add a lamp nobody sees.
@@ -324,7 +325,7 @@ export async function importProducts(
 		let modelSource: CatalogItem['modelSource'] = null;
 		if (modelUrl) {
 			await download(modelUrl, join(dir, 'model.glb'));
-			model = `/api/assets/${id}/model.glb`;
+			model = `/api/assets/${id}/model.glb?v=${Date.now()}`;
 			modelSource = 'listing';
 		} else if (existing?.modelSource === 'generated') {
 			({ model, modelSource } = existing);
