@@ -32,6 +32,13 @@ struct ContentView: View {
             }
             VStack(spacing: 8) {
                 if let note = scene.note { caption(note) }
+                if AssetCache.shared.remaining > 0 {
+                    Label("Downloading \(AssetCache.shared.remaining) models and textures on Wi-Fi", systemImage: "arrow.down.circle")
+                        .font(.footnote)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .glassEffect(.regular, in: .capsule)
+                }
                 Spacer()
                 GlassEffectContainer {
                     if scene.phase == .placed, minimized {

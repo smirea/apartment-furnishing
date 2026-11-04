@@ -94,12 +94,7 @@ final class WallFinishes {
     private func texture(_ path: String, _ semantic: TextureResource.Semantic) async throws -> TextureResource {
         if let task = textures[path] { return try await task.value }
         let task = Task {
-            let (download, response) = try await URLSession.shared.download(from: API.assetURL(path))
-            guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
-            let file = FileManager.default.temporaryDirectory.appending(path: "\(UUID().uuidString).png")
-            try FileManager.default.moveItem(at: download, to: file)
-            defer { try? FileManager.default.removeItem(at: file) }
-            return try await TextureResource(contentsOf: file, options: .init(semantic: semantic))
+            try await TextureResource(contentsOf: AssetCache.shared.file(for: API.assetURL(path)), options: .init(semantic: semantic))
         }
         textures[path] = task
         do {
