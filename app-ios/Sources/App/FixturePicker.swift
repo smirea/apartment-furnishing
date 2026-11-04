@@ -121,7 +121,7 @@ struct FixturePicker: View {
                      image: String? = nil, symbol: String? = nil, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 12) {
-                thumbnail(image, symbol: symbol ?? (fixture.kind == .tv ? "tv" : "photo"))
+                Thumbnail(path: image, symbol: symbol ?? (fixture.kind == .tv ? "tv" : "photo"))
                 VStack(alignment: .leading, spacing: 2) {
                     Text(name).foregroundStyle(.primary).lineLimit(2)
                     if let detail, !detail.isEmpty { Text(detail).font(.caption).foregroundStyle(.secondary) }
@@ -137,17 +137,6 @@ struct FixturePicker: View {
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
-    private func thumbnail(_ path: String?, symbol: String) -> some View {
-        AsyncImage(url: path.map(API.assetURL)) { image in
-            image.resizable().scaledToFill()
-        } placeholder: {
-            Image(systemName: symbol).foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(.secondary.opacity(0.15))
-        }
-        .frame(width: 44, height: 44)
-        .clipShape(.rect(cornerRadius: 6))
-    }
-
     private func submit(_ fixture: Fixture) {
         let url = link.trimmingCharacters(in: .whitespacesAndNewlines)
         importing = true
@@ -160,6 +149,31 @@ struct FixturePicker: View {
                 self.error = error.localizedDescription
             }
             importing = false
+        }
+    }
+}
+
+private struct Thumbnail: View {
+    let path: String?
+    let symbol: String
+
+    @State private var image: UIImage?
+
+    var body: some View {
+        Group {
+            if let image {
+                Image(uiImage: image).resizable().scaledToFill()
+            } else {
+                Image(systemName: symbol).foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(.secondary.opacity(0.15))
+            }
+        }
+        .frame(width: 44, height: 44)
+        .clipShape(.rect(cornerRadius: 6))
+        .task(id: path) {
+            image = nil
+            guard let path, let file = try? await AssetCache.shared.file(for: API.assetURL(path)) else { return }
+            image = UIImage(contentsOfFile: file.path)
         }
     }
 }

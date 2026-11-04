@@ -120,6 +120,7 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
             apply(try await placements)
             (self.fixtures, self.textures) = (try await fixtures, try await textures)
             applyFixtures()
+            cacheAssets()
         } catch {
             phase = .failed("Can't reach \(API.baseURL.absoluteString): \(error.localizedDescription)")
             return
@@ -337,6 +338,7 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
                     textures = available
                     if edits == fixtureEdits, picksSaving == 0, incoming != fixtures { fixtures = incoming }
                     applyFixtures()
+                    cacheAssets()
                 }
                 let generation = saves
                 let incoming = try await API.placements()
@@ -479,6 +481,14 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
         }
     }
 
+    // Everything any room or picker could load, not just this room's, so switching rooms off Wi-Fi downloads nothing.
+    private func cacheAssets() {
+        var urls = Set(catalog.values.filter { $0.model != nil }.map(API.modelURL))
+        for tile in textures.compactMap(\.texture) { urls.formUnion([API.assetURL(tile.map), API.assetURL(tile.normalMap)]) }
+        urls.formUnion(fixtures.flatMap(\.options).compactMap(\.image).map(API.assetURL))
+        AssetCache.shared.keep(urls)
+    }
+
     private func show(_ key: String, signature: String?, build: () -> Entity) {
         guard shownFixtures[key]?.signature != signature else { return }
         shownFixtures[key]?.entity.removeFromParent()
@@ -558,12 +568,7 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
     // the footprint center of the bottom face.
     private static func loadModel(_ item: CatalogItem) async throws -> Entity {
         guard item.model != nil else { return box(item) }
-        let (download, response) = try await URLSession.shared.download(from: API.modelURL(item))
-        guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
-        let file = FileManager.default.temporaryDirectory.appending(path: "\(UUID().uuidString).usdz")
-        try FileManager.default.moveItem(at: download, to: file)
-        let model = try await Entity(contentsOf: file)
-        try? FileManager.default.removeItem(at: file)
+        let model = try await Entity(contentsOf: AssetCache.shared.file(for: API.modelURL(item)))
         for name in item.removeNodes { (model.findEntity(named: name) ?? model.findEntity(named: usdName(name)))?.removeFromParent() }
         let size = model.visualBounds(relativeTo: model).extents
         let scale = item.dimensions.map { $0.width / 12 / size.x } ?? 1 / metersPerFoot
