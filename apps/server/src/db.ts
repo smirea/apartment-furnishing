@@ -80,6 +80,9 @@ SELECT 'fixtures', json_patch(
 WHERE EXISTS (SELECT 1 FROM settings WHERE key IN ('bed', 'finishes'))
 ON CONFLICT(key) DO UPDATE SET value = excluded.value;
 DELETE FROM settings WHERE key IN ('bed', 'finishes');
+-- The TV only hung on the back wall before it had a placement.
+UPDATE settings SET value = json_set(value, '$.placement', 'backWall')
+WHERE key = 'tv' AND json_extract(value, '$.placement') IS NULL;
 `;
 
 function open() {

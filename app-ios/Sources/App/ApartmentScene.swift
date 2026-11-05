@@ -468,7 +468,8 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
             }
         }
         let area = room.flatMap { plan.rect(of: $0) }
-        devices.isEnabled = area.map { Plan.contains($0, [plan.tvMount.x - 1, plan.tvMount.z]) } ?? false
+        let backWall = plan.finishSurfaces.tvWall
+        devices.isEnabled = area.map { Plan.contains($0, [backWall.x - 1, (backWall.z1 + backWall.z2) / 2]) } ?? false
         for (device, entity) in zip(plan.tvWallDevices, devices.children) {
             entity.position.x = (device.rect[0] + device.rect[2]) / 2 - wallDepth
         }
@@ -499,11 +500,13 @@ final class ApartmentScene: NSObject, ARSessionDelegate {
         shownFixtures[key] = (signature, entity)
     }
 
-    // Rebuilt only when the size changes; height and tilt just move it, so a slider drag stays smooth.
+    // Rebuilt only when the size changes; placement, height and tilt just move it, so a slider drag stays smooth.
     private func showTV(_ fixture: Fixture, inRoom: Bool, plan: Plan, wallDepth: Float) {
         let tv = fixture.tv.flatMap { inRoom && $0.visible && fixture.selected != nil ? $0 : nil }
         show(fixture.key, signature: tv.map { "\($0.widthIn)x\($0.heightIn)" }) { TVEntity.make(tv!) }
-        if let tv { shownFixtures[fixture.key]?.entity.transform = TVEntity.transform(tv, mount: plan.tvMount, wallDepth: wallDepth) }
+        if let tv {
+            shownFixtures[fixture.key]?.entity.transform = TVEntity.transform(tv, spot: plan.tvSpots[tv.placement], wallDepth: wallDepth)
+        }
     }
 
     // Back flush to the fixture's wall face and centered on it, the way the web plan places it.
