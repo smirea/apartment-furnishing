@@ -338,6 +338,7 @@ export async function importProducts(
 			url: page.url.split('?')[0]!,
 			importedAt: new Date().toISOString(),
 			...product,
+			group: existing?.group ?? null,
 			image,
 			model,
 			modelSource,
@@ -348,5 +349,43 @@ export async function importProducts(
 		);
 		imported.push(item);
 	}
-	return imported;
+	await groupFurniture(log);
+	return imported.map(item => catalog.read(item.id));
+}
+
+// Names the type of every item that has none, in one call over the whole catalog so new imports join the groups
+// already in use instead of coining near-duplicates.
+export async function groupFurniture(log: (line: string) => void = () => {}) {
+	const all = catalog.all();
+	const missing = all.filter(item => !item.group);
+	if (!missing.length) return;
+	const groups = [...new Set(all.map(item => item.group).filter(Boolean))];
+	const { assignments } = await grokStructured<{ assignments: { id: string; group: string }[] }>(
+		`Group these furniture products by type, so a furniture list can show each type under a small section header. Keep types high level and plural, in sentence case: for example "Couches", "Chairs", "Dining tables", "Coffee tables", "Standing desks", "Beds", "Lamps", "Rugs". A sectional, a sofa and a loveseat are all "Couches"; an accent chair, a swivel chair and an armchair are all "Chairs". Never split a type by style, material, color or size. Reuse these existing groups where a product fits: ${groups.join(', ') || 'none yet'}.
+
+${missing.map(item => `${item.id}: ${item.name} (${item.category}). ${item.summary}`).join('\n')}`,
+		{
+			type: 'object',
+			additionalProperties: false,
+			required: ['assignments'],
+			properties: {
+				assignments: {
+					type: 'array',
+					items: {
+						type: 'object',
+						additionalProperties: false,
+						required: ['id', 'group'],
+						properties: { id: { type: 'string' }, group: { type: 'string' } },
+					},
+				},
+			},
+		},
+	);
+	const byId = new Map(assignments.map(a => [a.id, a.group]));
+	for (const item of missing) {
+		const group = byId.get(item.id);
+		if (!group) throw new Error(`grok assigned no group to ${item.id}`);
+		catalog.put({ ...catalog.read(item.id), group });
+	}
+	log(`grouped ${missing.length} item(s): ${[...new Set(byId.values())].join(', ')}`);
 }

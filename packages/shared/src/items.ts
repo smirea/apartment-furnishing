@@ -9,6 +9,9 @@ export type CatalogItem = {
 	price: number | null;
 	currency: string;
 	category: string;
+	// High-level type the furniture list groups under, e.g. "Couches" or "Standing desks"; one grok call names it
+	// against the groups already in use so the list doesn't splinter.
+	group: string | null;
 	// Inches; width runs side to side as seen from the front.
 	dimensions: { width: number; height: number; depth: number } | null;
 	dimensionsNote: string | null;

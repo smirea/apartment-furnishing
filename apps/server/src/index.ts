@@ -7,7 +7,7 @@ import {
 	type WallTextureEntry,
 } from '@repo/shared/items';
 import { join, normalize } from 'node:path';
-import { ASSET_DIR, catalog, importProducts, placements } from './catalog';
+import { ASSET_DIR, catalog, groupFurniture, importProducts, placements } from './catalog';
 import { modelJobs, startModelJob } from './generate-model';
 import { planGeometry } from '@repo/shared/plan';
 import { usdzPath } from './usdz';
@@ -243,3 +243,6 @@ async function staticFile(pathname: string) {
 }
 
 console.log(`server listening on http://${server.hostname}:${server.port}`);
+
+// Items imported before groups existed get one; the list shows them under "Other" until this lands.
+groupFurniture(console.log).catch(error => console.error('grouping furniture failed:', error));

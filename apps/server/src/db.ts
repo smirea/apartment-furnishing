@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS catalog_items (
 	price REAL,
 	currency TEXT NOT NULL,
 	category TEXT NOT NULL,
+	"group" TEXT,
 	dimensions TEXT,
 	dimensionsNote TEXT,
 	weightLb REAL,
@@ -92,6 +93,8 @@ function open() {
 	db.run('PRAGMA busy_timeout = 5000');
 	db.run(SCHEMA);
 	db.run(MIGRATIONS);
+	const catalogColumns = db.query<{ name: string }, []>("SELECT name FROM pragma_table_info('catalog_items')").all();
+	if (!catalogColumns.some(c => c.name === 'group')) db.run('ALTER TABLE catalog_items ADD COLUMN "group" TEXT');
 	return db;
 }
 
