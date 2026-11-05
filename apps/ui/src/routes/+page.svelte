@@ -42,8 +42,8 @@
 	let viewer = $state<ReturnType<typeof createViewer>>();
 	let measure = $state<MeasureState>({ tool: null, draft: null, done: [] });
 	const measureHints: Record<MeasureTool, string> = {
-		line: 'Click points on the floor, walls or furniture. Click the last point again or press Enter to finish.',
-		area: 'Click the corners. Click the first corner again or press Enter to close the shape.',
+		line: 'Click points on the floor. Click the last point again or press Enter to finish.',
+		area: 'Click the corners on the floor. Click the first corner again or press Enter to close the shape.',
 	};
 
 	async function api<T>(path: string, init?: RequestInit): Promise<T> {
@@ -756,7 +756,7 @@
 		{#if measure.tool || measure.done.length}
 			<section class="panel measure">
 				{#if measure.tool}
-					<p class="muted">{measureHints[measure.tool]} Shift keeps a segment on one axis.</p>
+					<p class="muted">{measureHints[measure.tool]} Shift keeps a segment straight.</p>
 					{#if measure.draft}
 						<div class="measure-row draft">
 							<span>{measure.draft.value} <span class="muted">{measure.draft.detail}</span></span>

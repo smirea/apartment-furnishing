@@ -755,7 +755,6 @@ export function createViewer(
 
 	const onGizmo = () => gizmos.some(g => g.dragging || g.axis !== null);
 
-	const notMeasurable = new Set<Object3D>([labelGroup, selection, ...gizmos.map(g => g.getHelper())]);
 	const measurer = createMeasurer(
 		scene,
 		camera,
@@ -764,7 +763,6 @@ export function createViewer(
 			setPointer(e);
 			return raycaster;
 		},
-		() => scene.children.filter(c => c !== measurer.root && !notMeasurable.has(c)),
 		onMeasure,
 	);
 	function setMeasureTool(tool: MeasureTool | null) {

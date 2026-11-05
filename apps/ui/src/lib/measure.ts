@@ -25,6 +25,7 @@ export type MeasureState = { tool: MeasureTool | null; draft: Measurement | null
 const SNAP_PX = 12;
 const COLOR = 0xfbbf24;
 const DRAFT_COLOR = 0x5eead4;
+const FLOOR = new Plane(new Vector3(0, 1, 0), 0);
 
 export function feetInches(feet: number) {
 	const halfInches = Math.round(feet * 24);
@@ -33,13 +34,8 @@ export function feetInches(feet: number) {
 	return ft ? `${ft}′ ${inches}″` : `${inches}″`;
 }
 
-function polygonArea(points: Vector3[]) {
-	// Newell's method: the summed cross products point along the plane's normal with twice the enclosed area.
-	const normal = new Vector3();
-	for (let i = 0; i < points.length; i++)
-		normal.add(new Vector3().crossVectors(points[i]!, points[(i + 1) % points.length]!));
-	return { area: normal.length() / 2, normal: normal.normalize() };
-}
+const onFloor = (points: Vector3[]) => points.map(p => new Vector2(p.x, p.z));
+const floorArea = (points: Vector3[]) => Math.abs(ShapeUtils.area(onFloor(points)));
 
 function pathLength(points: Vector3[], closed: boolean) {
 	let total = 0;
@@ -58,7 +54,7 @@ function summarize(id: number, tool: MeasureTool, points: Vector3[]): Measuremen
 			detail: segments > 1 ? `${segments} segments` : 'length',
 		};
 	}
-	const area = points.length > 2 ? polygonArea(points).area : 0;
+	const area = points.length > 2 ? floorArea(points) : 0;
 	return {
 		id,
 		tool,
@@ -94,12 +90,6 @@ function draw(tool: MeasureTool, points: Vector3[], draft: boolean) {
 	}
 	for (const p of points) group.add(label('', `measure-dot${draft ? ' draft' : ''}`, p));
 	if (closed) {
-		const { area, normal } = polygonArea(points);
-		const u = new Vector3(1, 0, 0).cross(normal);
-		if (u.lengthSq() < 1e-6) u.set(0, 1, 0).cross(normal);
-		u.normalize();
-		const v = new Vector3().crossVectors(normal, u);
-		const flat = points.map(p => new Vector2(p.dot(u), p.dot(v)));
 		const geometry = new BufferGeometry();
 		geometry.setAttribute(
 			'position',
@@ -108,7 +98,7 @@ function draw(tool: MeasureTool, points: Vector3[], draft: boolean) {
 				3,
 			),
 		);
-		geometry.setIndex(ShapeUtils.triangulateShape(flat, []).flat());
+		geometry.setIndex(ShapeUtils.triangulateShape(onFloor(points), []).flat());
 		const fill = new Mesh(
 			geometry,
 			new MeshBasicMaterial({ color, transparent: true, opacity: 0.22, side: DoubleSide, depthTest: false }),
@@ -116,7 +106,7 @@ function draw(tool: MeasureTool, points: Vector3[], draft: boolean) {
 		fill.renderOrder = 9;
 		group.add(fill);
 		const center = points.reduce((sum, p) => sum.add(p), new Vector3()).divideScalar(points.length);
-		group.add(label(`${area.toFixed(1)} ft²`, 'measure-label area', center));
+		group.add(label(`${floorArea(points).toFixed(1)} ft²`, 'measure-label area', center));
 	}
 	return group;
 }
@@ -132,16 +122,13 @@ function dispose(group: Group) {
 	group.removeFromParent();
 }
 
-const visible = (node: Object3D | null): boolean => !node || (node.visible && visible(node.parent));
-
-// Clicks drop points on whatever surface is under the cursor. Clicking the last point again ends a line and clicking
+// Clicks drop points on the floor, through any walls or furniture in the way. Clicking the last point again ends a line and clicking
 // the first point closes an area; Enter does either, Backspace drops the last point, and Escape drops the draft.
 export function createMeasurer(
 	parent: Object3D,
 	camera: Camera,
 	canvas: HTMLElement,
 	cast: (e: PointerEvent) => Raycaster,
-	targets: () => Object3D[],
 	onState: (state: MeasureState) => void,
 ) {
 	const root = new Group();
@@ -150,8 +137,6 @@ export function createMeasurer(
 	let nextId = 1;
 	const done: { measurement: Measurement; points: Vector3[]; group: Group }[] = [];
 	let points: Vector3[] = [];
-	// An area stays on the surface its first corner landed on, so furniture in the way doesn't lift a floor corner.
-	let plane: Plane | null = null;
 	let hover: Vector3 | null = null;
 	let draftGroup: Group | null = null;
 
@@ -185,28 +170,17 @@ export function createMeasurer(
 		return candidates.find(p => screen(p).distanceTo(at) < SNAP_PX) ?? null;
 	}
 
-	// Snaps to existing points, then to the surface under the cursor. Shift keeps the new segment on one axis.
-	function surface(e: PointerEvent) {
-		const raycaster = cast(e);
-		if (plane) {
-			const point = raycaster.ray.intersectPlane(plane, new Vector3());
-			return point && { point, normal: plane.normal };
-		}
-		const hit = raycaster.intersectObjects(targets(), true).find(h => visible(h.object));
-		if (!hit?.face) return null;
-		return { point: hit.point.clone(), normal: hit.face.normal.clone().transformDirection(hit.object.matrixWorld) };
-	}
-
+	// Snaps to existing points, then to the floor under the cursor. Shift keeps the new segment straight along x or z.
 	function locate(e: PointerEvent) {
-		const snapped = nearby(e, plane ? points : [...points, ...done.flatMap(d => d.points)]);
+		const snapped = nearby(e, [...points, ...done.flatMap(d => d.points)]);
 		if (snapped) return snapped;
-		const hit = surface(e);
-		if (!hit) return null;
+		const hit = cast(e).ray.intersectPlane(FLOOR, new Vector3());
 		const last = points.at(-1);
-		if (!e.shiftKey || !last) return hit.point;
-		const delta = hit.point.clone().sub(last);
-		const axis = (['x', 'y', 'z'] as const).reduce((a, b) => (Math.abs(delta[a]) >= Math.abs(delta[b]) ? a : b));
-		return last.clone().setComponent('xyz'.indexOf(axis), last[axis] + delta[axis]);
+		if (!hit || !e.shiftKey || !last) return hit;
+		const straight = last.clone();
+		if (Math.abs(hit.x - last.x) >= Math.abs(hit.z - last.z)) straight.x = hit.x;
+		else straight.z = hit.z;
+		return straight;
 	}
 
 	function finish() {
@@ -219,14 +193,12 @@ export function createMeasurer(
 			done.push({ measurement, points, group });
 		}
 		points = [];
-		plane = null;
 		hover = null;
 		redraw();
 	}
 
 	function cancel() {
 		points = [];
-		plane = null;
 		hover = null;
 		redraw();
 	}
@@ -239,7 +211,6 @@ export function createMeasurer(
 			else setTool(null);
 		} else if (e.key === 'Backspace' && points.length) {
 			points = points.slice(0, -1);
-			if (!points.length) plane = null;
 			redraw();
 		} else return;
 		e.preventDefault();
@@ -254,7 +225,6 @@ export function createMeasurer(
 	}
 
 	return {
-		root,
 		get active() {
 			return tool !== null;
 		},
@@ -271,10 +241,6 @@ export function createMeasurer(
 			if (tool === 'line' && p === points.at(-1)) return finish();
 			if (tool === 'area' && points.length > 2 && p === points[0]) return finish();
 			if (points.includes(p)) return;
-			if (tool === 'area' && !points.length) {
-				const normal = surface(e)?.normal ?? new Vector3(0, 1, 0);
-				plane = new Plane().setFromNormalAndCoplanarPoint(normal, p);
-			}
 			points = [...points, p];
 			redraw();
 		},
