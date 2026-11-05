@@ -349,13 +349,27 @@ export async function importProducts(
 		);
 		imported.push(item);
 	}
-	await groupFurniture(log);
+	// The group is only a list heading: a failed call leaves the items under "Other" and the next run retries them.
+	await groupFurniture(log).catch(error => log(`grouping failed, new items stay ungrouped: ${error}`));
 	return imported.map(item => catalog.read(item.id));
+}
+
+let groupingQueue = Promise.resolve();
+let groupingRuns = 0;
+export const groupingInProgress = () => groupingRuns > 0;
+
+// One run at a time, so the startup backfill and an import never both send the same ungrouped items, and each run
+// sees the groups the previous one coined.
+export function groupFurniture(log: (line: string) => void = () => {}) {
+	groupingRuns++;
+	const run = groupingQueue.then(() => assignGroups(log)).finally(() => groupingRuns--);
+	groupingQueue = run.catch(() => {});
+	return run;
 }
 
 // Names the type of every item that has none, in one call over the whole catalog so new imports join the groups
 // already in use instead of coining near-duplicates.
-export async function groupFurniture(log: (line: string) => void = () => {}) {
+async function assignGroups(log: (line: string) => void) {
 	const all = catalog.all();
 	const missing = all.filter(item => !item.group);
 	if (!missing.length) return;

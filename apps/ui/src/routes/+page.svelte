@@ -58,7 +58,8 @@
 	const catalogQuery = createQuery(() => ({
 		queryKey: ['catalog'],
 		queryFn: () => api<CatalogEntry[]>('/api/catalog'),
-		refetchInterval: query => (query.state.data?.some(item => item.modelJob?.state === 'running') ? 3000 : false),
+		refetchInterval: query =>
+			query.state.data?.some(item => item.modelJob?.state === 'running' || item.grouping) ? 3000 : false,
 	}));
 	const catalogList = $derived(catalogQuery.data ?? []);
 	const catalog = $derived(Object.fromEntries(catalogList.map(item => [item.id, item])));
