@@ -721,6 +721,8 @@ export function createViewer(
 		selectedKey = key && roots.has(key) ? key : null;
 		selection.visible = !!selectedKey;
 		if (selectedKey) {
+			// Measuring and a selection share Backspace and Escape, so selecting furniture ends the measuring.
+			measurer.setTool(null);
 			const root = roots.get(selectedKey)!;
 			selection.setFromObject(root);
 			move.attach(root);
