@@ -1,0 +1,697 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Living Room Layouts</title>
+		<style>
+			:root {
+				--bg: #f6f4ef;
+				--card: #ffffff;
+				--ink: #1d1d1b;
+				--muted: #6d6a62;
+				--line: #d9d5cb;
+				--floor: #efe6d6;
+				--wall: #2b2a27;
+				--glass: #6fa8c9;
+				--column: #8a8578;
+				--island: #cfc8b8;
+				--sofa: #8c6f56;
+				--sofa-back: #5e4a39;
+				--love: #a08a5c;
+				--love-back: #6f5f3c;
+				--table: #c9a77c;
+				--chair: #9b8a70;
+				--tv: #111;
+				--stand: #6b6b6b;
+				--coffee: #b9a58a;
+				--clear: rgba(214, 60, 60, 0.1);
+				--clear-line: rgba(214, 60, 60, 0.55);
+				--sight: rgba(70, 120, 220, 0.16);
+				--ok: #2f7d4a;
+				--warn: #b5651d;
+				--bad: #b3261e;
+			}
+			@media (prefers-color-scheme: dark) {
+				:root:not([data-theme='light']) {
+					--bg: #161614;
+					--card: #1f1f1c;
+					--ink: #ecebe6;
+					--muted: #a29f96;
+					--line: #37352f;
+					--floor: #2c2821;
+					--wall: #e8e4da;
+					--glass: #6fb3dc;
+					--column: #77736a;
+					--island: #4a463d;
+					--tv: #f2f2f2;
+					--stand: #9a9a9a;
+					--sight: rgba(110, 160, 255, 0.18);
+				}
+			}
+			:root[data-theme='dark'] {
+				--bg: #161614;
+				--card: #1f1f1c;
+				--ink: #ecebe6;
+				--muted: #a29f96;
+				--line: #37352f;
+				--floor: #2c2821;
+				--wall: #e8e4da;
+				--glass: #6fb3dc;
+				--column: #77736a;
+				--island: #4a463d;
+				--tv: #f2f2f2;
+				--stand: #9a9a9a;
+				--sight: rgba(110, 160, 255, 0.18);
+			}
+			* {
+				box-sizing: border-box;
+			}
+			body {
+				margin: 0;
+				background: var(--bg);
+				color: var(--ink);
+				font:
+					14px/1.45 -apple-system,
+					'SF Pro Text',
+					Inter,
+					system-ui,
+					sans-serif;
+			}
+			main {
+				max-width: 1320px;
+				margin: 0 auto;
+				padding: 24px 16px 48px;
+			}
+			h1 {
+				font-size: 22px;
+				margin: 0 0 4px;
+			}
+			.sub {
+				color: var(--muted);
+				margin: 0 0 16px;
+				max-width: 900px;
+			}
+			table.sum {
+				width: 100%;
+				border-collapse: collapse;
+				margin: 8px 0 24px;
+				font-size: 13px;
+			}
+			table.sum th,
+			table.sum td {
+				text-align: left;
+				padding: 6px 8px;
+				border-bottom: 1px solid var(--line);
+				vertical-align: top;
+			}
+			table.sum th {
+				color: var(--muted);
+				font-weight: 600;
+			}
+			.wrap {
+				overflow-x: auto;
+			}
+			.grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+				gap: 16px;
+			}
+			.card {
+				background: var(--card);
+				border: 1px solid var(--line);
+				border-radius: 12px;
+				padding: 14px;
+			}
+			.card.rejected {
+				opacity: 0.72;
+			}
+			.card h2 {
+				font-size: 16px;
+				margin: 0;
+			}
+			.chips {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 6px;
+				margin: 6px 0 8px;
+			}
+			.chip {
+				font-size: 11px;
+				padding: 2px 8px;
+				border-radius: 99px;
+				border: 1px solid var(--line);
+				color: var(--muted);
+			}
+			.chip.tv {
+				border-color: var(--ink);
+				color: var(--ink);
+			}
+			svg {
+				width: 100%;
+				height: auto;
+				display: block;
+			}
+			.tvbox {
+				display: grid;
+				grid-template-columns: repeat(3, 1fr);
+				gap: 6px;
+				margin: 8px 0;
+			}
+			.tvbox div {
+				border: 1px solid var(--line);
+				border-radius: 8px;
+				padding: 6px 8px;
+			}
+			.tvbox b {
+				display: block;
+				font-size: 18px;
+			}
+			.tvbox span {
+				font-size: 11px;
+				color: var(--muted);
+			}
+			ul {
+				margin: 6px 0 0;
+				padding-left: 18px;
+			}
+			li {
+				margin: 2px 0;
+			}
+			.ok {
+				color: var(--ok);
+			}
+			.warn {
+				color: var(--warn);
+			}
+			.bad {
+				color: var(--bad);
+			}
+			.legend {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 12px;
+				font-size: 12px;
+				color: var(--muted);
+				margin-bottom: 16px;
+			}
+			.legend i {
+				display: inline-block;
+				width: 14px;
+				height: 10px;
+				border-radius: 2px;
+				vertical-align: -1px;
+				margin-right: 4px;
+			}
+			.note {
+				font-size: 12px;
+				color: var(--muted);
+				margin-top: 6px;
+			}
+			@media (max-width: 440px) {
+				.grid {
+					grid-template-columns: 1fr;
+				}
+			}
+			body {
+				background: none !important;
+			}
+			main {
+				padding: 0 !important;
+			}
+		</style>
+	</head>
+	<body>
+		<main>
+			<h1>West Elm Harmony Modular in the living room</h1>
+			<p class="sub">
+				Plan view, north up, inches. Tape-measured room (199″ × 204″ to the island), 122″ solid TV wall (east), 33″
+				column by the south glass, island 71″ × 41″. Each layout is data; collisions, walkways and TV sizes are
+				computed, not drawn by hand. Blue wedge = sightline from the main seat to the recommended TV. Red hatch =
+				walkways that must stay clear.
+			</p>
+			<div class="legend">
+				<span><i style="background: var(--sofa)"></i>3-seat / L sofa</span>
+				<span><i style="background: var(--love)"></i>second couch</span>
+				<span><i style="background: var(--table)"></i>4-person table</span>
+				<span><i style="background: var(--coffee)"></i>coffee table</span>
+				<span><i style="background: var(--stand)"></i>TV console / stand</span>
+				<span><i style="background: var(--clear-line)"></i>keep-clear walkway</span>
+				<span><i style="background: var(--glass)"></i>glass</span>
+			</div>
+			<div class="wrap"><table class="sum" id="sum"></table></div>
+			<div class="grid" id="grid"></div>
+			<p class="note">
+				Sizes from westelm.com: overall widths from the collection page; 62″ chaise depth from the 2-piece chaise spec
+				(standard depth). Seat depth assumed 39″ (standard); the Deep option adds ~8″ and pushes eyes ~8″ closer. L
+				return length is estimated. TV: optimum = 40° of view (THX) capped by what fits.
+			</p>
+		</main>
+		<script>
+			const ROOM = { w: 199, d: 204 };
+			const COLUMN = { x: 62.71, y: 21.19, r: 16.5 };
+			const ISLAND = [75.6, 204, 146.6, 245];
+			const SOUTH_GLASS_END = 142.71;
+			const BALCONY_DOOR = [151, 193.4];
+			const TV_WALL = { x: 199, y1: 0, y2: 122, switchY: 115.5 };
+			const SIZES = [43, 50, 55, 65, 75, 77, 83, 85, 98, 100, 115, 116];
+			const W_PER_DIAG = 16 / Math.hypot(16, 9);
+
+			const KEEP_CLEAR = [
+				{ name: 'office / hallway route', rect: [163, 122, 199, 204] },
+				{ name: 'balcony door approach', rect: [0, 151, 36, 193.4] },
+				{ name: 'kitchen ↔ balcony walkway', rect: [0, 182, 40, 204] },
+			];
+
+			// Rects are [x1, y1, x2, y2]; x grows east from the west glass, y grows north from the south glass.
+			// `face` is the direction a seat looks; its back sits on the opposite side.
+			const sofa3 = (x1, y1, face, len = 90, dep = 38) =>
+				face === 'E' || face === 'W'
+					? { kind: 'sofa', rect: [x1, y1, x1 + dep, y1 + len], face, label: `3-seat ${len}″` }
+					: { kind: 'sofa', rect: [x1, y1, x1 + len, y1 + dep], face, label: `3-seat ${len}″` };
+			const love = (x1, y1, face) => ({ ...sofa3(x1, y1, face, 64, 36), kind: 'love', label: 'loveseat 64″' });
+			const chaise = rect => ({ kind: 'sofa', rect, chaise: true, label: 'chaise', group: 'L' });
+			const coffee = rect => ({ kind: 'coffee', rect, label: 'coffee' });
+			const nook = (cx, cy) => ({
+				kind: 'dining',
+				cx,
+				cy,
+				r: 18,
+				rect: [cx - 38, cy - 38, cx + 38, cy + 38],
+				label: '36″ table · 4',
+			});
+			const consoleEast = { kind: 'stand', rect: [181, 6, 199, 116], label: 'floating console' };
+			const standSouth = cx => ({ kind: 'stand', rect: [cx - 36, 2, cx + 36, 20], label: 'TV stand 72″' });
+
+			const tvEast = {
+				wall: 'E',
+				center: 61,
+				screen: 196,
+				fitWidth: Math.min(TV_WALL.y2 - TV_WALL.y1 - 12, 2 * (TV_WALL.switchY - 2 - 61)),
+			};
+			const tvSouth = cx => ({
+				wall: 'S',
+				center: cx,
+				screen: 12,
+				fitWidth: 2 * Math.min(cx - (COLUMN.x + COLUMN.r) - 2, ROOM.w - cx - 2),
+			});
+
+			// Harmony: 39" standard-depth seat modules, 62" chaise (West Elm spec for the 2-piece: 122"w x 62"d), ~40" chaise module.
+			const D = 39,
+				CD = 62,
+				CW = 40;
+			const runE = (y1, len, label) => ({
+				kind: 'sofa',
+				rect: [40, y1, 40 + D, y1 + len],
+				face: 'E',
+				group: 'H',
+				label,
+			});
+			const runS = (x1, len, label) => ({
+				kind: 'sofa',
+				rect: [x1, 204 - D, x1 + len, 204],
+				face: 'S',
+				group: 'H',
+				label,
+			});
+			const chE = (y2, w = CW) => ({
+				kind: 'sofa',
+				chaise: true,
+				group: 'H',
+				label: 'chaise',
+				rect: [40 + D, y2 - w, 40 + CD, y2],
+			});
+			const chS = (x2, w = CW) => ({
+				kind: 'sofa',
+				chaise: true,
+				group: 'H',
+				label: 'chaise',
+				rect: [x2 - w, 204 - CD, x2, 204 - D],
+			});
+			const ott = rect => ({ kind: 'coffee', rect, label: 'Harmony ottoman' });
+			const LAYOUTS = [
+				{
+					id: 'H1',
+					title: 'Harmony Sofa 92″ · TV on solid wall',
+					tv: tvEast,
+					eye: [56, 86],
+					couches: 'Harmony Modular Sofa, 92″ (3 seats)',
+					items: [runE(40, 92, 'Harmony sofa 92″'), coffee([102, 60, 142, 112]), consoleEast],
+					notes: ['Simplest; leaves the whole north side open.'],
+				},
+				{
+					id: 'H2',
+					title: 'Small 2-piece chaise 86″ · solid wall',
+					tv: tvEast,
+					eye: [56, 70],
+					couches: 'Small 2-Piece Chaise Sectional, 86″',
+					items: [runE(40, 86, 'small chaise sect. 86″'), chE(126), coffee([112, 46, 150, 82]), consoleEast],
+					notes: ['Tight 2.5 seats + chaise; a lot of spare floor.'],
+				},
+				{
+					id: 'H3',
+					title: '2-piece chaise 122″ · solid wall (best fit)',
+					tv: tvEast,
+					eye: [56, 80],
+					couches: '2-Piece Chaise Sectional, 122″ × 62″',
+					items: [runE(40, 122, '2-pc chaise sect. 122″'), chE(162), coffee([104, 56, 144, 112]), consoleEast],
+					notes: [
+						'Seats centered on the TV, chaise at the kitchen end out of the sightline.',
+						'42″ left between chaise end and island.',
+					],
+				},
+				{
+					id: 'H4',
+					title: 'Thin-arm 2-piece chaise 115″ · solid wall',
+					tv: tvEast,
+					eye: [56, 78],
+					couches: 'Thin Arm 2-Piece Chaise Sectional, 115″',
+					items: [runE(40, 115, 'thin-arm chaise 115″'), chE(155), coffee([104, 56, 144, 108]), consoleEast],
+					notes: ['Same seat count as H3 in 7″ less length.'],
+				},
+				{
+					id: 'H5',
+					title: 'Double-wide chaise 139″ · solid wall',
+					tv: tvEast,
+					eye: [56, 84],
+					couches: '2-Piece Double Wide Chaise Sectional, 139″',
+					items: [runE(40, 139, 'double chaise sect. 139″'), chE(179, 64), coffee([108, 50, 148, 106]), consoleEast],
+					notes: ['Fits, but the north end reaches 25″ from the island: kitchen-to-balcony path squeezes.'],
+				},
+				{
+					id: 'H6',
+					title: '3-piece L 118″ · solid wall',
+					tv: tvEast,
+					eye: [56, 80],
+					couches: '3-Piece L-Shaped Sectional, ~118″ × ~95″ (return length estimated)',
+					items: [
+						runE(40, 118, 'L long leg 118″'),
+						{ kind: 'sofa', group: 'H', face: 'S', label: 'L return', rect: [79, 119, 135, 158] },
+						coffee([104, 56, 144, 104]),
+						consoleEast,
+					],
+					notes: ['Return seats look south, side-on to the TV: extra seats for guests, not for watching.'],
+				},
+				{
+					id: 'H7',
+					title: 'Ottoman sectional 118″ · solid wall',
+					tv: tvEast,
+					eye: [56, 80],
+					couches: '3-Piece Ottoman Sectional, 118″ sofa + loose ottoman',
+					items: [runE(40, 118, 'sofa 118″'), ott([83, 120, 122, 158]), coffee([108, 56, 144, 104]), consoleEast],
+					notes: ['Ottoman moves: chaise for movies, footstool or extra seat otherwise.'],
+				},
+				{
+					id: 'H8',
+					title: '2-piece chaise 122″ against the island · TV on stand at pillar wall',
+					tv: tvSouth(132),
+					eye: [102, 188],
+					couches: '2-Piece Chaise Sectional, 122″, back on the island',
+					items: [runS(41, 122, '2-pc chaise sect. 122″'), chS(163), coffee([80, 110, 124, 140]), standSouth(132)],
+					notes: ['Longest viewing distance (14½ ft); TV backlit by the south glass; island stools go.'],
+				},
+				{
+					id: 'H9',
+					title: 'Thin-arm chaise 115″ against the island · stand',
+					tv: tvSouth(132),
+					eye: [105, 188],
+					couches: 'Thin Arm 2-Piece Chaise Sectional, 115″',
+					items: [runS(48, 115, 'thin-arm chaise 115″'), chS(163), coffee([84, 110, 128, 140]), standSouth(132)],
+					notes: ['A bit more room at the balcony end than H8.'],
+				},
+				{
+					id: 'H10',
+					title: 'U-shaped chaise 158″ · solid wall',
+					tv: tvEast,
+					eye: [56, 100],
+					couches: '3-Piece U-Shaped Chaise Sectional, 158″',
+					rejected: true,
+					items: [runE(36, 158, 'U sectional 158″'), chE(76), chE(194), consoleEast],
+					notes: ['Does not fit: runs into the column and the island walkway.'],
+				},
+				{
+					id: 'H11',
+					title: 'Double-wide chaise 139″ against the island · stand',
+					tv: tvSouth(132),
+					eye: [94, 188],
+					couches: '2-Piece Double Wide Chaise Sectional, 139″',
+					rejected: true,
+					items: [runS(24, 139, 'double chaise sect. 139″'), chS(163, 64), standSouth(132)],
+					notes: ['Does not fit: blocks the balcony door approach.'],
+				},
+			];
+			const svgNS = 'http://www.w3.org/2000/svg';
+			const VB = { x0: -16, y0: -10, x1: 260, y1: 252 };
+			const sx = x => x;
+			const sy = y => VB.y1 - y + VB.y0;
+			const el = (tag, attrs, parent) => {
+				const n = document.createElementNS(svgNS, tag);
+				for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+				parent?.appendChild(n);
+				return n;
+			};
+			const rectEl = (r, attrs, parent) =>
+				el('rect', { x: sx(r[0]), y: sy(r[3]), width: r[2] - r[0], height: r[3] - r[1], ...attrs }, parent);
+			const line = (x1, y1, x2, y2, attrs, parent) =>
+				el('line', { x1: sx(x1), y1: sy(y1), x2: sx(x2), y2: sy(y2), ...attrs }, parent);
+			const text = (x, y, s, attrs, parent) => {
+				const t = el(
+					'text',
+					{
+						x: sx(x),
+						y: sy(y),
+						'font-size': 7,
+						'text-anchor': 'middle',
+						'dominant-baseline': 'middle',
+						fill: 'var(--ink)',
+						...attrs,
+					},
+					parent,
+				);
+				t.textContent = s;
+				return t;
+			};
+
+			const overlap = (a, b) =>
+				Math.min(a[2], b[2]) - Math.max(a[0], b[0]) > 0.5 && Math.min(a[3], b[3]) - Math.max(a[1], b[1]) > 0.5;
+			const rectCircleGap = (r, c) =>
+				Math.hypot(Math.max(r[0] - c.x, 0, c.x - r[2]), Math.max(r[1] - c.y, 0, c.y - r[3])) - c.r;
+
+			function tvSizing(L) {
+				const d = L.tv.wall === 'E' ? L.tv.screen - L.eye[0] : L.eye[1] - L.tv.screen;
+				const diagAt = deg => (2 * d * Math.tan(((deg / 2) * Math.PI) / 180)) / W_PER_DIAG;
+				const fitDiag = L.tv.fitWidth / W_PER_DIAG;
+				const pick = limit => SIZES.filter(s => s <= limit * 1.02).at(-1);
+				const optimum = pick(Math.min(diagAt(40), fitDiag));
+				return { d, comfortable: pick(diagAt(30)), ideal40: diagAt(40), optimum, maxFit: pick(fitDiag) };
+			}
+
+			function checks(L) {
+				const out = [];
+				const solids = L.items;
+				for (let i = 0; i < solids.length; i++) {
+					const a = solids[i];
+					if (a.rect[0] < -0.1 || a.rect[1] < -0.1 || a.rect[2] > ROOM.w + 0.1 || a.rect[3] > ROOM.d + 0.1)
+						out.push(['bad', `${a.label} leaves the room`]);
+					const cg = rectCircleGap(a.rect, COLUMN);
+					if (cg < 0) out.push(['bad', `${a.label} hits the column`]);
+					for (const z of KEEP_CLEAR) if (overlap(a.rect, z.rect)) out.push(['bad', `${a.label} blocks the ${z.name}`]);
+					for (let j = i + 1; j < solids.length; j++) {
+						const b = solids[j];
+						if (a.group && a.group === b.group) continue;
+						if (overlap(a.rect, b.rect)) out.push(['bad', `${a.label} overlaps ${b.label}`]);
+					}
+				}
+				if (!out.length) out.push(['ok', 'No collisions; office route, balcony door and column clear']);
+				return out;
+			}
+
+			function sightTargets(L, size) {
+				const half = (size * W_PER_DIAG) / 2;
+				return L.tv.wall === 'E'
+					? [
+							[L.tv.screen, L.tv.center - half],
+							[L.tv.screen, L.tv.center + half],
+						]
+					: [
+							[L.tv.center - half, L.tv.screen],
+							[L.tv.center + half, L.tv.screen],
+						];
+			}
+
+			function drawSofa(it, g) {
+				const fill = it.kind === 'love' ? 'var(--love)' : 'var(--sofa)';
+				const back = it.kind === 'love' ? 'var(--love-back)' : 'var(--sofa-back)';
+				rectEl(it.rect, { fill, rx: 3 }, g);
+				if (it.face) {
+					const [x1, y1, x2, y2] = it.rect,
+						t = 9;
+					const b = {
+						E: [x1, y1, x1 + t, y2],
+						W: [x2 - t, y1, x2, y2],
+						S: [x1, y2 - t, x2, y2],
+						N: [x1, y1, x2, y1 + t],
+					}[it.face];
+					rectEl(b, { fill: back, rx: 3 }, g);
+				}
+				const [x1, y1, x2, y2] = it.rect;
+				const vertical = y2 - y1 > x2 - x1;
+				text(
+					(x1 + x2) / 2,
+					(y1 + y2) / 2,
+					it.chaise ? 'chaise' : it.label,
+					{
+						fill: '#fff',
+						'font-size': 6,
+						transform: vertical ? `rotate(-90 ${sx((x1 + x2) / 2)} ${sy((y1 + y2) / 2)})` : '',
+					},
+					g,
+				);
+			}
+
+			function drawDining(it, g) {
+				const { cx, cy, r } = it,
+					cw = 18,
+					cd = 18,
+					off = r + 2;
+				const chairs = [
+					[cx - cw / 2, cy + off, cx + cw / 2, cy + off + cd],
+					[cx - cw / 2, cy - off - cd, cx + cw / 2, cy - off],
+					[cx - off - cd, cy - cw / 2, cx - off, cy + cw / 2],
+					[cx + off, cy - cw / 2, cx + off + cd, cy + cw / 2],
+				];
+				for (const c of chairs) rectEl(c, { fill: 'var(--chair)', rx: 3 }, g);
+				el(
+					'circle',
+					{ cx: sx(cx), cy: sy(cy), r, fill: 'var(--table)', stroke: 'var(--sofa-back)', 'stroke-width': 0.6 },
+					g,
+				);
+				text(cx, cy, '4-top', { 'font-size': 6 }, g);
+			}
+
+			function drawPlan(L, tv) {
+				const svg = el('svg', {
+					viewBox: `${VB.x0} ${VB.y0} ${VB.x1 - VB.x0} ${VB.y1 - VB.y0}`,
+					role: 'img',
+					'aria-label': `${L.id} floor plan`,
+				});
+				const g = el('g', {}, svg);
+				rectEl([0, 0, ROOM.w, ROOM.d], { fill: 'var(--floor)' }, g);
+				rectEl([ROOM.w, 122, 252, 189], { fill: 'var(--floor)', opacity: 0.55 }, g);
+				text(226, 155, 'to office / hall', { 'font-size': 6, fill: 'var(--muted)' }, g);
+				rectEl(ISLAND, { fill: 'var(--island)', stroke: 'var(--muted)', 'stroke-width': 0.6 }, g);
+				text(111, 228, 'island 71×41', { 'font-size': 6, fill: 'var(--muted)' }, g);
+				text(160, 245, 'kitchen ↑', { 'font-size': 6, fill: 'var(--muted)' }, g);
+
+				for (const z of KEEP_CLEAR)
+					rectEl(
+						z.rect,
+						{ fill: 'var(--clear)', stroke: 'var(--clear-line)', 'stroke-dasharray': '2 2', 'stroke-width': 0.6 },
+						g,
+					);
+
+				const wall = { stroke: 'var(--wall)', 'stroke-width': 3, 'stroke-linecap': 'square' };
+				const glass = { stroke: 'var(--glass)', 'stroke-width': 2.4 };
+				line(0, 0, SOUTH_GLASS_END, 0, glass, g);
+				line(SOUTH_GLASS_END, 0, ROOM.w, 0, wall, g);
+				line(0, 0, 0, BALCONY_DOOR[0], glass, g);
+				line(0, BALCONY_DOOR[1], 0, ROOM.d, glass, g);
+				line(
+					0,
+					BALCONY_DOOR[0],
+					0,
+					BALCONY_DOOR[1],
+					{ stroke: 'var(--glass)', 'stroke-width': 1, 'stroke-dasharray': '3 2' },
+					g,
+				);
+				text(
+					-9,
+					(BALCONY_DOOR[0] + BALCONY_DOOR[1]) / 2,
+					'balcony door',
+					{ 'font-size': 5.5, fill: 'var(--muted)', transform: `rotate(-90 ${sx(-9)} ${sy(172)})` },
+					g,
+				);
+				line(ROOM.w, 0, ROOM.w, 122, wall, g);
+				text(
+					ROOM.w + 8,
+					61,
+					'solid wall 122″',
+					{ 'font-size': 5.5, fill: 'var(--muted)', transform: `rotate(90 ${sx(ROOM.w + 8)} ${sy(61)})` },
+					g,
+				);
+				text(70, -6, 'south glass', { 'font-size': 5.5, fill: 'var(--muted)' }, g);
+
+				const [t1, t2] = sightTargets(L, tv.optimum ?? tv.maxFit);
+				el(
+					'polygon',
+					{ points: [L.eye, t1, t2].map(p => `${sx(p[0])},${sy(p[1])}`).join(' '), fill: 'var(--sight)' },
+					g,
+				);
+
+				for (const it of L.items) {
+					if (it.kind === 'sofa' || it.kind === 'love') drawSofa(it, g);
+					else if (it.kind === 'dining') drawDining(it, g);
+					else if (it.kind === 'coffee') rectEl(it.rect, { fill: 'var(--coffee)', rx: 4 }, g);
+					else if (it.kind === 'stand') {
+						rectEl(it.rect, { fill: 'var(--stand)', rx: 1 }, g);
+					}
+				}
+
+				el('circle', { cx: sx(COLUMN.x), cy: sy(COLUMN.y), r: COLUMN.r, fill: 'var(--column)' }, g);
+				text(COLUMN.x, COLUMN.y, 'column', { 'font-size': 5.5, fill: '#fff' }, g);
+
+				line(t1[0], t1[1], t2[0], t2[1], { stroke: 'var(--tv)', 'stroke-width': 3.2 }, g);
+				const mid = [(t1[0] + t2[0]) / 2, (t1[1] + t2[1]) / 2];
+				const lab = L.tv.wall === 'E' ? [mid[0] - 10, mid[1]] : [mid[0], mid[1] + 13];
+				text(
+					lab[0],
+					lab[1],
+					`${tv.optimum ?? tv.maxFit}″ TV`,
+					{
+						'font-size': 7,
+						'font-weight': 700,
+						transform: L.tv.wall === 'E' ? `rotate(90 ${sx(lab[0])} ${sy(lab[1])})` : '',
+					},
+					g,
+				);
+				el(
+					'circle',
+					{ cx: sx(L.eye[0]), cy: sy(L.eye[1]), r: 2.2, fill: 'var(--glass)', stroke: '#fff', 'stroke-width': 0.6 },
+					g,
+				);
+				return svg;
+			}
+
+			const ftin = inches => `${Math.floor(inches / 12)}′${Math.round(inches % 12)}″`;
+			const grid = document.getElementById('grid');
+			const sum = document.getElementById('sum');
+			sum.innerHTML =
+				'<tr><th>Option</th><th>TV</th><th>Couches</th><th>Distance</th><th>Optimum / max TV</th><th>Checks</th></tr>';
+
+			for (const L of LAYOUTS) {
+				const tv = tvSizing(L);
+				const res = checks(L);
+				const pass = res.every(r => r[0] === 'ok') && !L.rejected;
+				const tvLabel = L.tv.wall === 'E' ? 'Solid wall, mounted' : 'Pillar wall, on stand';
+
+				const tr = document.createElement('tr');
+				tr.innerHTML = `<td><b>${L.id}</b>${L.rejected ? ' <span class="warn">(rejected)</span>' : ''}</td><td>${tvLabel}</td><td>${L.couches}</td><td>${ftin(tv.d)}</td><td>${L.rejected ? '—' : `<b>${tv.optimum}″</b> / ${tv.maxFit}″`}</td><td class="${pass ? 'ok' : 'bad'}">${pass ? 'pass' : 'fail'}</td>`;
+				sum.appendChild(tr);
+
+				const card = document.createElement('section');
+				card.className = 'card' + (L.rejected ? ' rejected' : '');
+				card.innerHTML = `<h2>${L.id} · ${L.title}</h2>
+		<div class="chips"><span class="chip tv">${tvLabel}</span>${L.rejected ? '<span class="chip bad">rejected</span>' : ''}</div>`;
+				card.appendChild(drawPlan(L, tv));
+				const box = document.createElement('div');
+				box.className = 'tvbox';
+				box.innerHTML = `<div><b>${L.rejected ? 'n/a' : tv.optimum + '″'}</b><span>optimum TV (40°, fits)</span></div><div><b>${tv.maxFit}″</b><span>max that fits</span></div><div><b>${ftin(tv.d)}</b><span>eye → screen${tv.comfortable ? ` · comfy ${tv.comfortable}″` : ''}</span></div>`;
+				card.appendChild(box);
+				const info = document.createElement('div');
+				info.innerHTML = `<div><b>Couches:</b> ${L.couches}</div><ul>${L.notes.map(n => `<li>${n}</li>`).join('')}${res.map(([c, m]) => `<li class="${c}">${m}</li>`).join('')}</ul>`;
+				card.appendChild(info);
+				grid.appendChild(card);
+			}
+		</script>
+	</body>
+</html>
