@@ -9,6 +9,7 @@
 		"./fixtures": "./src/fixtures.ts",
 		"./floorplan": "./src/floorplan.ts",
 		"./plan": "./src/plan.ts",
+		"./obstacles": "./src/obstacles.ts",
 		"./package.json": "./package.json"
 	},
 	"dependencies": {

@@ -7,7 +7,7 @@ import {
 	type WallTextureEntry,
 } from '@repo/shared/items';
 import { join, normalize } from 'node:path';
-import { ASSET_DIR, catalog, importProducts, placements } from './catalog';
+import { ASSET_DIR, catalog, groupFurniture, groupingInProgress, importProducts, placements } from './catalog';
 import { modelJobs, startModelJob } from './generate-model';
 import { planGeometry } from '@repo/shared/plan';
 import { usdzPath } from './usdz';
@@ -52,7 +52,11 @@ const server = Bun.serve({
 		'/api/catalog': {
 			GET: async () =>
 				Response.json(
-					catalog.all().map((item): CatalogEntry => ({ ...item, modelJob: modelJobs.get(item.id) ?? null })),
+					catalog.all().map((item): CatalogEntry => ({
+						...item,
+						modelJob: modelJobs.get(item.id) ?? null,
+						grouping: !item.group && groupingInProgress(),
+					})),
 				),
 		},
 		'/api/catalog/:id/model': {
@@ -243,3 +247,6 @@ async function staticFile(pathname: string) {
 }
 
 console.log(`server listening on http://${server.hostname}:${server.port}`);
+
+// Items imported before groups existed get one; the list shows them under "Other" until this lands.
+groupFurniture(console.log).catch(error => console.error('grouping furniture failed:', error));
