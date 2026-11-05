@@ -39,6 +39,7 @@
 		ideas: false,
 		...saved.open,
 	});
+	let collapsedGroups = $state<string[]>(saved.collapsedGroups ?? []);
 	let viewer = $state<ReturnType<typeof createViewer>>();
 	let measure = $state<MeasureState>({ tool: null, draft: null, done: [] });
 	const measureHints: Record<MeasureTool, string> = {
@@ -57,7 +58,8 @@
 	const catalogQuery = createQuery(() => ({
 		queryKey: ['catalog'],
 		queryFn: () => api<CatalogEntry[]>('/api/catalog'),
-		refetchInterval: query => (query.state.data?.some(item => item.modelJob?.state === 'running') ? 3000 : false),
+		refetchInterval: query =>
+			query.state.data?.some(item => item.modelJob?.state === 'running' || item.grouping) ? 3000 : false,
 	}));
 	const catalogList = $derived(catalogQuery.data ?? []);
 	const catalog = $derived(Object.fromEntries(catalogList.map(item => [item.id, item])));
@@ -80,6 +82,15 @@
 		new Map(fixtureList.flatMap(f => (f.kind === 'item' ? [[f.category, f.key] as const] : []))),
 	);
 	const furnitureList = $derived(catalogList.filter(item => !fixtureCategories.has(item.category)));
+	const furnitureGroups = $derived(
+		Object.entries(Object.groupBy(furnitureList, item => item.group ?? 'Other')).toSorted(([a], [b]) =>
+			a === 'Other' ? 1 : b === 'Other' ? -1 : a.localeCompare(b),
+		),
+	);
+	const toggleGroup = (group: string) =>
+		(collapsedGroups = collapsedGroups.includes(group)
+			? collapsedGroups.filter(g => g !== group)
+			: [...collapsedGroups, group]);
 	let picksSaving = 0;
 	// The newest pick per fixture; replies to older picks that land after it are dropped.
 	const latestPick: Partial<Record<FixtureKey, number>> = {};
@@ -401,7 +412,7 @@
 		const id = fixtures.wallTexture?.selected;
 		viewer?.setWallTexture(textureList.find(t => t.id === id) ?? null);
 	});
-	$effect(() => localStorage.setItem(OPTIONS_KEY, JSON.stringify({ cutaway, labels, open })));
+	$effect(() => localStorage.setItem(OPTIONS_KEY, JSON.stringify({ cutaway, labels, open, collapsedGroups })));
 </script>
 
 <svelte:window onkeydown={onKey} />
@@ -688,40 +699,55 @@
 					<p class="error">{importMutation.error.message}</p>
 				{/if}
 
-				<ul>
+				<div class="furniture-groups">
 					{#if importMutation.isPending}
-						<li>
-							<span class="thumb"></span>
-							<div>
-								<strong>{new URL(importMutation.variables).hostname.replace('www.', '')} link</strong>
-								<span class="status busy">Importing · reading the page (about a minute)</span>
-							</div>
-						</li>
+						<ul>
+							<li>
+								<span class="thumb"></span>
+								<div>
+									<strong>{new URL(importMutation.variables).hostname.replace('www.', '')} link</strong>
+									<span class="status busy">Importing · reading the page (about a minute)</span>
+								</div>
+							</li>
+						</ul>
 					{/if}
-					{#each furnitureList as item (item.id)}
-						<li>
-							{#if item.image}<img src={item.image} alt="" />{:else}<span class="thumb"></span>{/if}
-							<div>
-								<strong>{item.name}</strong>
-								{#if item.modelJob?.state === 'running'}
-									<span class="status busy">Building 3D model · 2–5 min</span>
-								{:else if item.modelJob?.state === 'failed'}
-									<span class="status failed" title={item.modelJob.error}>3D model failed · select it to retry</span>
-								{/if}
-								<span class="muted">{furnitureFacts(item)}</span>
-							</div>
-							<button type="button" onclick={() => addToRoom(item.id)}>Add</button>
-						</li>
+					{#each furnitureGroups as [group, items] (group)}
+						{@const expanded = !collapsedGroups.includes(group)}
+						<button
+							type="button"
+							class="section-toggle group-toggle"
+							aria-expanded={expanded}
+							onclick={() => toggleGroup(group)}
+						>
+							{group} <span class="muted">{items!.length}</span>
+						</button>
+						{#if expanded}
+							<ul>
+								{#each items! as item (item.id)}
+									<li>
+										{#if item.image}<img src={item.image} alt="" />{:else}<span class="thumb"></span>{/if}
+										<div>
+											<strong>{item.name}</strong>
+											{#if item.modelJob?.state === 'running'}
+												<span class="status busy">Building 3D model · 2–5 min</span>
+											{:else if item.modelJob?.state === 'failed'}
+												<span class="status failed" title={item.modelJob.error}
+													>3D model failed · select it to retry</span
+												>
+											{/if}
+											<span class="muted">{furnitureFacts(item)}</span>
+										</div>
+										<button type="button" onclick={() => addToRoom(item.id)}>Add</button>
+									</li>
+								{/each}
+							</ul>
+						{/if}
 					{:else}
-						<li class="muted">
-							{catalogQuery.isPending
-								? 'Loading…'
-								: importMutation.isPending
-									? ''
-									: 'No items yet. Paste a link above.'}
-						</li>
+						{#if !importMutation.isPending}
+							<p class="muted">{catalogQuery.isPending ? 'Loading…' : 'No items yet. Paste a link above.'}</p>
+						{/if}
 					{/each}
-				</ul>
+				</div>
 			{/if}
 		</section>
 	{/if}
@@ -1016,6 +1042,31 @@
 
 	.section-toggle[aria-expanded='false']::after {
 		transform: rotate(-90deg);
+	}
+
+	.furniture-groups {
+		display: grid;
+		align-content: start;
+		gap: 0.5rem;
+		min-height: 0;
+		overflow-y: auto;
+	}
+
+	.furniture-groups ul {
+		overflow: visible;
+	}
+
+	.group-toggle {
+		margin-top: 0.15rem;
+		padding-bottom: 0.15rem;
+		border-bottom: 1px solid var(--app-border);
+		border-radius: 0;
+		background: none;
+		color: var(--app-muted);
+		font-size: 0.7rem;
+		font-weight: 600;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
 	}
 
 	.items h3.group {

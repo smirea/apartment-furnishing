@@ -9,6 +9,9 @@ export type CatalogItem = {
 	price: number | null;
 	currency: string;
 	category: string;
+	// High-level type the furniture list groups under, e.g. "Couches" or "Standing desks"; one grok call names it
+	// against the groups already in use so the list doesn't splinter.
+	group: string | null;
 	// Inches; width runs side to side as seen from the front.
 	dimensions: { width: number; height: number; depth: number } | null;
 	dimensionsNote: string | null;
@@ -29,8 +32,9 @@ export type CatalogItem = {
 
 export type Job = { state: 'queued' } | { state: 'running' } | { state: 'failed'; error: string };
 
-// What GET /api/catalog returns: the stored item plus any in-flight model generation.
-export type CatalogEntry = CatalogItem & { modelJob: Job | null };
+// What GET /api/catalog returns: the stored item plus any in-flight model generation, and whether the server is still
+// naming its group.
+export type CatalogEntry = CatalogItem & { modelJob: Job | null; grouping: boolean };
 
 // One copy of a catalog item in the apartment. World units are feet, +x east, +z south,
 // y is the height of the item's bottom. The model's front is +z before rotation.
