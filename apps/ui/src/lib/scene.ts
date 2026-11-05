@@ -57,6 +57,7 @@ import {
 	type Wall,
 } from '@repo/shared/floorplan';
 import { TV_DEPTH_IN, tvPose } from '@repo/shared/plan';
+import { createMeasurer, type MeasureState, type MeasureTool } from './measure';
 
 export type Mode = 'orbit' | 'walk';
 
@@ -81,6 +82,7 @@ export function createViewer(
 	onMode: (mode: Mode) => void,
 	onSelect: (key: string | null) => void,
 	onChange: (key: string, position: Placement['position'], rotation: Placement['rotation']) => void,
+	onMeasure: (state: MeasureState) => void,
 ) {
 	const renderer = new WebGLRenderer({ antialias: true });
 	renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -719,6 +721,8 @@ export function createViewer(
 		selectedKey = key && roots.has(key) ? key : null;
 		selection.visible = !!selectedKey;
 		if (selectedKey) {
+			// Measuring and a selection share Backspace and Escape, so selecting furniture ends the measuring.
+			measurer.setTool(null);
 			const root = roots.get(selectedKey)!;
 			selection.setFromObject(root);
 			move.attach(root);
@@ -753,10 +757,25 @@ export function createViewer(
 
 	const onGizmo = () => gizmos.some(g => g.dragging || g.axis !== null);
 
+	const measurer = createMeasurer(
+		scene,
+		camera,
+		renderer.domElement,
+		e => {
+			setPointer(e);
+			return raycaster;
+		},
+		onMeasure,
+	);
+	function setMeasureTool(tool: MeasureTool | null) {
+		if (tool) select(null);
+		measurer.setTool(tool);
+	}
+
 	// Dragging an item's body slides it along the floor plane; the gizmo handles precise axes.
 	renderer.domElement.addEventListener('pointerdown', e => {
 		downAt = [e.clientX, e.clientY];
-		if (mode !== 'orbit' || e.button !== 0 || onGizmo()) return;
+		if (mode !== 'orbit' || e.button !== 0 || onGizmo() || measurer.active) return;
 		const root = pickItem(e);
 		if (!root) return;
 		floor.constant = -root.position.y;
@@ -767,6 +786,7 @@ export function createViewer(
 		renderer.domElement.setPointerCapture(e.pointerId);
 	});
 	renderer.domElement.addEventListener('pointermove', e => {
+		if (measurer.active && !e.buttons) measurer.hover(e);
 		if (!dragging) return;
 		setPointer(e);
 		if (!raycaster.ray.intersectPlane(floor, floorHit)) return;
@@ -784,6 +804,7 @@ export function createViewer(
 			return;
 		}
 		if (onGizmo() || !downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 4) return;
+		if (measurer.active) return measurer.click(e);
 		if (mode === 'walk' && !look.isLocked) return;
 		select(pickItem(e)?.userData.key ?? null);
 	});
@@ -817,6 +838,7 @@ export function createViewer(
 		orbit.enabled = next === 'orbit';
 		if (next === 'walk') {
 			select(null);
+			measurer.setTool(null);
 			camera.position.set(ft(380), EYE_FT, ft(780));
 			camera.lookAt(ft(380), EYE_FT, ft(400));
 			look.lock();
@@ -914,12 +936,17 @@ export function createViewer(
 			void setFinish('column', texture);
 		},
 		select,
+		setMeasureTool,
+		finishMeasurement: () => measurer.finish(),
+		removeMeasurement: (id: number) => measurer.remove(id),
+		clearMeasurements: () => measurer.clear(),
 		snapWhenLoaded: (key: string) => snapOnLoad.add(key),
 		dispose() {
 			renderer.setAnimationLoop(null);
 			observer.disconnect();
 			removeEventListener('keydown', onKeyDown);
 			removeEventListener('keyup', onKeyUp);
+			measurer.dispose();
 			look.dispose();
 			orbit.dispose();
 			renderer.dispose();

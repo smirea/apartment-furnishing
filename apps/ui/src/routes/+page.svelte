@@ -20,6 +20,7 @@
 	} from '@repo/shared/items';
 	import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { onMount, tick } from 'svelte';
+	import type { MeasureState, MeasureTool } from '../lib/measure';
 	import { createViewer, type Mode } from '../lib/scene';
 
 	// Living room, clear of the island and the column.
@@ -39,6 +40,11 @@
 		...saved.open,
 	});
 	let viewer = $state<ReturnType<typeof createViewer>>();
+	let measure = $state<MeasureState>({ tool: null, draft: null, done: [] });
+	const measureHints: Record<MeasureTool, string> = {
+		line: 'Click points on the floor. Click the last point again or press Enter to finish.',
+		area: 'Click the corners on the floor. Click the first corner again or press Enter to close the shape.',
+	};
 
 	async function api<T>(path: string, init?: RequestInit): Promise<T> {
 		const res = await fetch(path, { ...init, headers: { 'content-type': 'application/json' } });
@@ -364,6 +370,7 @@
 			next => (mode = next),
 			key => (selectedKey = key),
 			(key, position, rotation) => patchPlacement(key, { position, rotation }),
+			state => (measure = state),
 		);
 		viewer = v;
 		void api<Placement[]>('/api/placements').then(data => {
@@ -722,16 +729,62 @@
 
 <div class="right">
 	{#if mode === 'orbit'}
-		<section class="panel ideas" class:open={open.ideas}>
-			<button
-				type="button"
-				class="section-toggle"
-				aria-expanded={open.ideas}
-				onclick={() => (open.ideas = !open.ideas)}
-			>
-				Ideas
-			</button>
-			{#if open.ideas}
+		<div class="toolbar">
+			<div class="panel measure-tools" role="group" aria-label="Measure">
+				<span>Measure</span>
+				{#each ['line', 'area'] as const as tool (tool)}
+					<button
+						type="button"
+						aria-pressed={measure.tool === tool}
+						onclick={() => viewer?.setMeasureTool(measure.tool === tool ? null : tool)}
+					>
+						{tool === 'line' ? 'Line' : 'Area'}
+					</button>
+				{/each}
+			</div>
+			<div class="panel ideas-toggle">
+				<button
+					type="button"
+					class="section-toggle"
+					aria-expanded={open.ideas}
+					onclick={() => (open.ideas = !open.ideas)}
+				>
+					Ideas
+				</button>
+			</div>
+		</div>
+		{#if measure.tool || measure.done.length}
+			<section class="panel measure">
+				{#if measure.tool}
+					<p class="muted">{measureHints[measure.tool]} Shift keeps a segment straight.</p>
+					{#if measure.draft}
+						<div class="measure-row draft">
+							<span>{measure.draft.value} <span class="muted">{measure.draft.detail}</span></span>
+							<button type="button" onclick={() => viewer?.finishMeasurement()}>Done</button>
+						</div>
+					{/if}
+				{/if}
+				{#each measure.done as m (m.id)}
+					<div class="measure-row">
+						<span>
+							<span class="muted">{m.tool === 'line' ? 'Line' : 'Area'}</span>
+							<strong>{m.value}</strong> <span class="muted">{m.detail}</span>
+						</span>
+						<button
+							type="button"
+							class="remove"
+							aria-label="Remove measurement {m.value}"
+							onclick={() => viewer?.removeMeasurement(m.id)}>×</button
+						>
+					</div>
+				{/each}
+				{#if measure.done.length > 1}
+					<button type="button" class="clear" onclick={() => viewer?.clearMeasurements()}>Clear all</button>
+				{/if}
+			</section>
+		{/if}
+		{#if open.ideas}
+			<section class="panel ideas">
 				{#if ideasQuery.data}
 					<!-- Our own ideas/README.md, rendered by the server. -->
 					<div class="ideas-doc">{@html ideasQuery.data}</div>
@@ -740,8 +793,8 @@
 				{:else}
 					<p class="muted">Loading…</p>
 				{/if}
-			{/if}
-		</section>
+			</section>
+		{/if}
 	{/if}
 
 	{#if tip}
@@ -1291,19 +1344,116 @@
 		pointer-events: none;
 	}
 
-	.ideas {
+	.toolbar {
 		display: flex;
-		flex-direction: column;
-		gap: 0.6rem;
-		min-height: 0;
-		padding: 0.6rem 1rem;
+		gap: 0.5rem;
+		align-items: stretch;
+	}
+
+	.toolbar > .panel {
+		display: flex;
+		gap: 0.4rem;
+		align-items: center;
+		padding: 0.4rem 0.6rem;
 		font-size: 0.85rem;
 	}
 
-	.ideas.open {
+	.measure-tools > span {
+		padding: 0 0.2rem;
+		font-weight: 600;
+	}
+
+	.measure-tools button {
+		padding: 0.25rem 0.6rem;
+	}
+
+	.measure-tools button[aria-pressed='true'] {
+		border-color: var(--app-accent);
+		background: var(--app-accent);
+		color: var(--app-accent-ink);
+	}
+
+	.ideas-toggle {
+		padding-inline: 1rem;
+	}
+
+	.ideas-toggle .section-toggle {
+		width: auto;
+	}
+
+	.measure {
+		display: grid;
+		gap: 0.5rem;
+		width: 20rem;
+		max-width: 100%;
+		padding: 0.75rem 1rem;
+		font-size: 0.85rem;
+	}
+
+	.measure-row {
+		display: flex;
+		gap: 0.5rem;
+		align-items: center;
+		justify-content: space-between;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.measure-row.draft {
+		color: #5eead4;
+		font-weight: 600;
+	}
+
+	.measure-row button {
+		padding: 0.15rem 0.5rem;
+	}
+
+	.measure-row .remove {
+		border: none;
+		font-size: 1.1rem;
+		line-height: 1;
+	}
+
+	.measure .clear {
+		justify-self: end;
+		padding: 0.25rem 0.6rem;
+	}
+
+	:global(.measure-label) {
+		padding: 0.1rem 0.35rem;
+		border-radius: 0.25rem;
+		background: rgb(0 0 0 / 0.7);
+		color: #fbbf24;
+		font-size: 0.72rem;
+		font-weight: 650;
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+
+	:global(.measure-label.area) {
+		font-size: 0.8rem;
+	}
+
+	:global(.measure-dot) {
+		width: 0.5rem;
+		height: 0.5rem;
+		border: 2px solid #fbbf24;
+		border-radius: 50%;
+		background: #1c1f24;
+	}
+
+	:global(.measure-dot.draft) {
+		border-color: #5eead4;
+	}
+
+	.ideas {
+		display: flex;
 		flex: 1 1 0;
+		flex-direction: column;
+		gap: 0.6rem;
 		width: 100%;
 		min-height: 12rem;
+		padding: 0.6rem 1rem;
+		font-size: 0.85rem;
 	}
 
 	.ideas-doc {
@@ -1502,7 +1652,15 @@
 			max-height: 50vh;
 		}
 
-		.right:has(.ideas.open) {
+		.toolbar {
+			justify-content: flex-end;
+		}
+
+		.measure {
+			width: auto;
+		}
+
+		.right:has(.ideas) {
 			height: 50vh;
 		}
 
