@@ -1,3 +1,4 @@
+import { clearFraction, type Obstacles } from '@repo/shared/obstacles';
 import {
 	BufferGeometry,
 	DoubleSide,
@@ -122,13 +123,15 @@ function dispose(group: Group) {
 	group.removeFromParent();
 }
 
-// Clicks drop points on the floor, through any walls or furniture in the way. Clicking the last point again ends a line and clicking
+// Clicks drop points on the floor. A segment stops at the first wall, fixture or door in its way, like a laser measure;
+// furniture doesn't stop it. Clicking the last point again ends a line and clicking
 // the first point closes an area; Enter does either, Backspace drops the last point, and Escape drops the draft.
 export function createMeasurer(
 	parent: Object3D,
 	camera: Camera,
 	canvas: HTMLElement,
 	cast: (e: PointerEvent) => Raycaster,
+	obstacles: Obstacles,
 	onState: (state: MeasureState) => void,
 ) {
 	const root = new Group();
@@ -176,11 +179,12 @@ export function createMeasurer(
 		if (snapped) return snapped;
 		const hit = cast(e).ray.intersectPlane(FLOOR, new Vector3());
 		const last = points.at(-1);
-		if (!hit || !e.shiftKey || !last) return hit;
-		const straight = last.clone();
-		if (Math.abs(hit.x - last.x) >= Math.abs(hit.z - last.z)) straight.x = hit.x;
-		else straight.z = hit.z;
-		return straight;
+		if (!hit || !last) return hit;
+		const target = last.clone();
+		if (!e.shiftKey) target.copy(hit);
+		else if (Math.abs(hit.x - last.x) >= Math.abs(hit.z - last.z)) target.x = hit.x;
+		else target.z = hit.z;
+		return last.clone().lerp(target, clearFraction(last.x, last.z, target.x, target.z, obstacles));
 	}
 
 	function finish() {

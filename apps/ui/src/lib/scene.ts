@@ -58,6 +58,7 @@ import {
 } from '@repo/shared/floorplan';
 import { TV_DEPTH_IN, tvPose } from '@repo/shared/plan';
 import { createMeasurer, type MeasureState, type MeasureTool } from './measure';
+import type { Box, Segment } from '@repo/shared/obstacles';
 
 export type Mode = 'orbit' | 'walk';
 
@@ -74,8 +75,6 @@ const DEG = Math.PI / 180;
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
 const floorColors: Record<FloorKind, number> = { wood: 0xc9a672, tile: 0xe6e6e2, concrete: 0x9a9a98 };
-
-type Box = { x1: number; z1: number; x2: number; z2: number };
 
 export function createViewer(
 	container: HTMLElement,
@@ -234,6 +233,7 @@ export function createViewer(
 	}
 
 	const doorMat = new MeshStandardMaterial({ color: 0xfafaf7, roughness: 0.7 });
+	const doorLeaves = doors.map(door => door.map(ft) as Segment);
 	for (const [hx, hy, ex, ey] of doors) {
 		const length = ft(Math.hypot(ex - hx, ey - hy));
 		const mesh = new Mesh(new BoxGeometry(length, 7, 0.15), doorMat);
@@ -243,12 +243,16 @@ export function createViewer(
 		cutawayWalls.push({ mesh, fullHeight: 7, y: 0, glass: false });
 	}
 
+	// Walking treats the column as its bounding square; measuring uses the true circle.
+	const columnBoxes = new Set<Box>();
 	for (const c of columns) {
 		const mesh = new Mesh(new CylinderGeometry(ft(c.r), ft(c.r), CEILING_FT, 32), plaster);
 		mesh.position.set(ft(c.x), CEILING_FT / 2, ft(c.y));
 		wallGroup.add(mesh);
 		cutawayWalls.push({ mesh, fullHeight: CEILING_FT, y: 0, glass: false });
-		colliders.push({ x1: ft(c.x - c.r), z1: ft(c.y - c.r), x2: ft(c.x + c.r), z2: ft(c.y + c.r) });
+		const box = { x1: ft(c.x - c.r), z1: ft(c.y - c.r), x2: ft(c.x + c.r), z2: ft(c.y + c.r) };
+		colliders.push(box);
+		columnBoxes.add(box);
 	}
 
 	// Wall textures cover the TV wall's living-room face and sleeve the column, standing out from them by the panel
@@ -764,6 +768,11 @@ export function createViewer(
 		e => {
 			setPointer(e);
 			return raycaster;
+		},
+		{
+			boxes: colliders.filter(b => !columnBoxes.has(b)),
+			circles: columns.map(c => ({ x: ft(c.x), z: ft(c.y), r: ft(c.r) })),
+			segments: doorLeaves,
 		},
 		onMeasure,
 	);
