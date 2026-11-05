@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { finishAreasIn } from '@repo/shared/floorplan';
-	import { FIXTURE_KEYS, type Fixture, type FixtureKey } from '@repo/shared/fixtures';
+	import { FIXTURE_KEYS, type Fixture, type FixtureKey, type FixtureOption } from '@repo/shared/fixtures';
 	import { TV_MOUNT_IN } from '@repo/shared/plan';
 	import {
 		panelsNeeded,
@@ -20,6 +20,7 @@
 	} from '@repo/shared/items';
 	import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
 	import { onMount, tick } from 'svelte';
+	import type { Attachment } from 'svelte/attachments';
 	import type { MeasureState, MeasureTool } from '../lib/measure';
 	import { createViewer, type Mode } from '../lib/scene';
 
@@ -186,12 +187,92 @@
 			fixtureActions.wallTexture.select.mutate(applied(t) ? null : t.id);
 		else if (!t.textureJob || t.textureJob.state === 'failed') fixtureActions.wallTexture.build.mutate(t.id);
 	}
-	let tip = $state<{ texture: WallTextureEntry; x: number; y: number } | null>(null);
-	function showTip(texture: WallTextureEntry, el: HTMLElement) {
-		const r = el.getBoundingClientRect();
-		const width = 288;
-		const x = r.right + 8 + width > innerWidth ? Math.max(8, r.left - width - 8) : r.right + 8;
-		tip = { texture, x: Math.min(x, innerWidth - width - 8), y: Math.max(8, Math.min(r.top, innerHeight - 300)) };
+	type Product = {
+		name: string;
+		image: string | null;
+		url: string;
+		facts: string[];
+		summary: string | null;
+		warning: string | null;
+	};
+	type PeekContent = { kind: 'texture'; texture: WallTextureEntry } | { kind: 'product'; product: Product };
+	const itemProduct = (item: CatalogEntry, warning: string | null = null): Product => ({
+		name: item.name,
+		image: item.image,
+		url: item.url,
+		facts: [
+			[money(item), item.brand].filter(Boolean).join(' · '),
+			item.dimensions
+				? `${inches(item.dimensions.width)} W × ${inches(item.dimensions.height)} H × ${inches(item.dimensions.depth)} D` +
+					(item.weightLb ? ` · ${item.weightLb} lb` : '')
+				: '',
+		].filter(Boolean),
+		summary: item.summary,
+		warning,
+	});
+	function optionProduct(f: Fixture, option: FixtureOption): Product | null {
+		const item = f.kind === 'item' ? catalog[option.id] : undefined;
+		if (item) return itemProduct(item, option.warning);
+		// The hand-sized TV has no listing to show.
+		if (!option.url) return null;
+		const { name, image, url, warning } = option;
+		return { name, image, url, facts: [option.detail], summary: null, warning };
+	}
+	const host = (url: string) => new URL(url).hostname.replace('www.', '');
+
+	// The card takes the pointer so its link can be clicked, so leaving the row hides it only after long enough to
+	// cross into it. It sits beside the row's panel rather than the row so it never covers the neighboring rows.
+	let peek = $state<{ anchor: HTMLElement; content: PeekContent } | null>(null);
+	let peekTimer: ReturnType<typeof setTimeout> | undefined;
+	function keepPeek() {
+		clearTimeout(peekTimer);
+	}
+	function hidePeek() {
+		clearTimeout(peekTimer);
+		peekTimer = setTimeout(() => (peek = null), 150);
+	}
+	function peekOn(content: () => PeekContent | null): Attachment<HTMLElement> {
+		return el => {
+			const show = () => {
+				const next = content();
+				if (!next) return;
+				keepPeek();
+				peek = { anchor: el, content: next };
+			};
+			const enter = (e: PointerEvent) => e.pointerType === 'mouse' && show();
+			const focus = (e: FocusEvent) => (e.target as Element).matches(':focus-visible') && show();
+			el.addEventListener('pointerenter', enter);
+			el.addEventListener('pointerleave', hidePeek);
+			el.addEventListener('focusin', focus);
+			el.addEventListener('focusout', hidePeek);
+			return () => {
+				el.removeEventListener('pointerenter', enter);
+				el.removeEventListener('pointerleave', hidePeek);
+				el.removeEventListener('focusin', focus);
+				el.removeEventListener('focusout', hidePeek);
+				// A removed row never fires pointerleave.
+				if (peek?.anchor === el) peek = null;
+			};
+		};
+	}
+	function placePeek(anchor: HTMLElement): Attachment<HTMLElement> {
+		return el => {
+			const place = () => {
+				const row = anchor.getBoundingClientRect();
+				const side = (anchor.closest('.panel') ?? anchor).getBoundingClientRect();
+				const { offsetWidth: w, offsetHeight: h } = el;
+				const x = side.right + 8 + w > innerWidth ? side.left - w - 8 : side.right + 8;
+				el.style.left = `${Math.max(8, Math.min(x, innerWidth - w - 8))}px`;
+				el.style.top = `${Math.max(8, Math.min(row.top, innerHeight - h - 8))}px`;
+			};
+			const observer = new ResizeObserver(place);
+			observer.observe(el);
+			addEventListener('scroll', place, { capture: true, passive: true });
+			return () => {
+				observer.disconnect();
+				removeEventListener('scroll', place, { capture: true });
+			};
+		};
 	}
 
 	function estimate(t: WallTexture, surface: FinishSurface) {
@@ -558,10 +639,7 @@
 											: 'cover'}
 										aria-label={t.name}
 										onclick={() => clickSwatch(t)}
-										onpointerenter={e => showTip(t, e.currentTarget)}
-										onpointerleave={() => (tip = null)}
-										onfocus={e => showTip(t, e.currentTarget)}
-										onblur={() => (tip = null)}
+										{@attach peekOn(() => ({ kind: 'texture', texture: t }))}
 									>
 									</button>
 								{/each}
@@ -577,14 +655,21 @@
 									<span class="pick">
 										<span class="thumb"></span>
 										<span class="text">
-											<strong>{new URL(actions.import.variables).hostname.replace('www.', '')} link</strong>
+											<strong>{host(actions.import.variables)} link</strong>
 											<span class="status busy">Importing · reading the page (about a minute)</span>
 										</span>
 									</span>
 								</li>
 							{/if}
 							{#each f.options as option (option.id)}
-								<li class="fixture-option" class:current={option.id === f.selected}>
+								<li
+									class="fixture-option"
+									class:current={option.id === f.selected}
+									{@attach peekOn(() => {
+										const product = optionProduct(f, option);
+										return product && { kind: 'product', product };
+									})}
+								>
 									<button
 										type="button"
 										class="pick"
@@ -693,13 +778,13 @@
 						<li>
 							<span class="thumb"></span>
 							<div>
-								<strong>{new URL(importMutation.variables).hostname.replace('www.', '')} link</strong>
+								<strong>{host(importMutation.variables)} link</strong>
 								<span class="status busy">Importing · reading the page (about a minute)</span>
 							</div>
 						</li>
 					{/if}
 					{#each furnitureList as item (item.id)}
-						<li>
+						<li {@attach peekOn(() => ({ kind: 'product', product: itemProduct(item) }))}>
 							{#if item.image}<img src={item.image} alt="" />{:else}<span class="thumb"></span>{/if}
 							<div>
 								<strong>{item.name}</strong>
@@ -797,36 +882,6 @@
 		{/if}
 	{/if}
 
-	{#if tip}
-		{@const t = textureList.find(x => x.id === tip?.texture.id) ?? tip.texture}
-		<div class="tip panel" role="tooltip" style:left="{tip.x}px" style:top="{tip.y}px">
-			{#if t.texture}<span class="tip-swatch" style:background-image="url({t.texture.map})"></span>{/if}
-			<strong>{t.name}</strong>
-			{#if t.textureJob?.state === 'queued'}
-				<span class="status busy">Waiting for a texture builder</span>
-			{:else if t.textureJob?.state === 'running'}
-				<span class="status busy">Building texture · 2–5 min</span>
-			{:else if t.textureJob?.state === 'failed'}
-				<span class="error">Texture failed: {t.textureJob.error.slice(0, 160)} · click to retry</span>
-			{:else if !t.texture}
-				<span class="muted">No texture yet · click to build it</span>
-			{/if}
-			<span>
-				{t.price === null ? 'No price' : t.price.toLocaleString('en-US', { style: 'currency', currency: t.currency })}
-				{#if t.panelsPerPack > 1}for {t.panelsPerPack} panels{/if}{#if t.brand}
-					· {t.brand}{/if}
-			</span>
-			{#if t.panel}
-				<span class="muted">Panel {t.panel.width}" × {t.panel.height}" × {t.panel.depth}"</span>
-				<span>TV wall: {estimate(t, 'tvWall')}</span>
-				<span>Column: {estimate(t, 'column')}</span>
-			{/if}
-			<p class="muted">{t.summary}</p>
-			{#if t.texture}<p class="note">{t.texture.note}</p>{/if}
-			{#if applied(t)}<span class="applied">On the TV wall and column</span>{/if}
-		</div>
-	{/if}
-
 	{#if selected && selectedPlacement}
 		<aside class="panel card">
 			<button type="button" class="close" aria-label="Close" onclick={() => viewer?.select(null)}>×</button>
@@ -904,12 +959,58 @@
 					{#each selected.highlights as h (h)}<li>{h}</li>{/each}
 				</ul>
 			{/if}
-			<a href={selected.url} target="_blank" rel="noreferrer"
-				>View on {new URL(selected.url).hostname.replace('www.', '')} ↗</a
-			>
+			<a href={selected.url} target="_blank" rel="noreferrer">View on {host(selected.url)} ↗</a>
 		</aside>
 	{/if}
 </div>
+
+{#if peek}
+	<div
+		class="peek panel"
+		role="tooltip"
+		{@attach placePeek(peek.anchor)}
+		onpointerenter={keepPeek}
+		onpointerleave={hidePeek}
+	>
+		{#if peek.content.kind === 'texture'}
+			{@const id = peek.content.texture.id}
+			{@const t = textureList.find(x => x.id === id) ?? peek.content.texture}
+			{#if t.texture}<span class="tip-swatch" style:background-image="url({t.texture.map})"></span>{/if}
+			<strong>{t.name}</strong>
+			{#if t.textureJob?.state === 'queued'}
+				<span class="status busy">Waiting for a texture builder</span>
+			{:else if t.textureJob?.state === 'running'}
+				<span class="status busy">Building texture · 2–5 min</span>
+			{:else if t.textureJob?.state === 'failed'}
+				<span class="error">Texture failed: {t.textureJob.error.slice(0, 160)} · click to retry</span>
+			{:else if !t.texture}
+				<span class="muted">No texture yet · click to build it</span>
+			{/if}
+			<span>
+				{t.price === null ? 'No price' : t.price.toLocaleString('en-US', { style: 'currency', currency: t.currency })}
+				{#if t.panelsPerPack > 1}for {t.panelsPerPack} panels{/if}{#if t.brand}
+					· {t.brand}{/if}
+			</span>
+			{#if t.panel}
+				<span class="muted">Panel {t.panel.width}" × {t.panel.height}" × {t.panel.depth}"</span>
+				<span>TV wall: {estimate(t, 'tvWall')}</span>
+				<span>Column: {estimate(t, 'column')}</span>
+			{/if}
+			<p class="muted">{t.summary}</p>
+			{#if t.texture}<p class="note">{t.texture.note}</p>{/if}
+			{#if applied(t)}<span class="applied">On the TV wall and column</span>{/if}
+			<a href={t.url} target="_blank" rel="noreferrer">View on {host(t.url)} ↗</a>
+		{:else}
+			{@const p = peek.content.product}
+			{#if p.image}<img src={p.image} alt={p.name} />{/if}
+			<strong>{p.name}</strong>
+			{#each p.facts as fact (fact)}<span>{fact}</span>{/each}
+			{#if p.warning}<span class="error">{p.warning}</span>{/if}
+			{#if p.summary}<p class="muted summary">{p.summary}</p>{/if}
+			<a href={p.url} target="_blank" rel="noreferrer">View on {host(p.url)} ↗</a>
+		{/if}
+	</div>
+{/if}
 
 <style>
 	.viewer {
@@ -1118,21 +1219,47 @@
 		text-decoration: none;
 	}
 
-	.tip {
+	.peek {
 		position: fixed;
 		z-index: 10;
 		display: grid;
 		gap: 0.3rem;
-		width: 18rem;
+		width: 20rem;
+		max-height: calc(100vh - 1rem);
+		overflow-y: auto;
+		background: var(--app-panel);
 		font-size: 0.8rem;
-		pointer-events: none;
 	}
 
-	.tip p {
+	.peek p {
 		margin: 0;
 	}
 
-	.tip .note {
+	.peek img {
+		width: 100%;
+		height: 14rem;
+		margin-bottom: 0.2rem;
+		border-radius: 0.375rem;
+		background: #fff;
+		object-fit: contain;
+	}
+
+	.peek .summary {
+		display: -webkit-box;
+		overflow: hidden;
+		-webkit-box-orient: vertical;
+		-webkit-line-clamp: 5;
+		line-clamp: 5;
+	}
+
+	.peek a {
+		justify-self: start;
+		margin-top: 0.2rem;
+		color: var(--app-accent);
+		font-weight: 600;
+	}
+
+	.peek .note {
 		font-size: 0.72rem;
 		color: var(--app-muted);
 	}
@@ -1143,7 +1270,7 @@
 		background-size: 3rem auto;
 	}
 
-	.tip .applied {
+	.peek .applied {
 		color: var(--app-accent);
 		font-weight: 600;
 	}
