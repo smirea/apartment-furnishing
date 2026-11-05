@@ -85,10 +85,18 @@ export function panelsNeeded(panel: { width: number; height: number }, area: { w
 	return columns * full + Math.ceil(columns / Math.floor(panel.height / rest));
 }
 
-// The living-room TV: always wall-mounted on the TV wall, centered on its measured span. Width and height are the
-// source of truth; the diagonal and the aspect ratio are derived from them.
+// Where the living-room TV hangs: centered on the back (TV) wall's measured span, on the pillar wall centered between
+// the column and the back wall, or across the corner where those two walls meet.
+export const TV_PLACEMENTS = { backWall: 'Back wall', pillarWall: 'Pillar wall', corner: 'Corner' } as const;
+export type TvPlacement = keyof typeof TV_PLACEMENTS;
+export const isTvPlacement = (value: unknown): value is TvPlacement =>
+	typeof value === 'string' && Object.hasOwn(TV_PLACEMENTS, value);
+
+// The living-room TV, always wall-mounted. Width and height are the source of truth; the diagonal and the aspect ratio
+// are derived from them.
 export type TvSettings = {
 	visible: boolean;
+	placement: TvPlacement;
 	widthIn: number;
 	heightIn: number;
 	// Height of the screen's center above the floor.
@@ -110,7 +118,13 @@ export function tvSize(diagonalIn: number, [w, h]: readonly [number, number]) {
 	return { widthIn: k * w, heightIn: k * h };
 }
 
-export const DEFAULT_TV: TvSettings = { visible: true, ...tvSize(98, [16, 9]), centerIn: 48, tiltDeg: 0 };
+export const DEFAULT_TV: TvSettings = {
+	visible: true,
+	placement: 'backWall',
+	...tvSize(98, [16, 9]),
+	centerIn: 48,
+	tiltDeg: 0,
+};
 
 // A TV whose size was read off a product page, kept so the TV panel can switch between candidates.
 export type TvModel = { id: string; url: string; importedAt: string; name: string; widthIn: number; heightIn: number };

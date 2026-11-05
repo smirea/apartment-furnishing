@@ -1,11 +1,14 @@
 <script lang="ts">
 	import { finishAreasIn } from '@repo/shared/floorplan';
 	import { FIXTURE_KEYS, type Fixture, type FixtureKey } from '@repo/shared/fixtures';
+	import { TV_MOUNT_IN } from '@repo/shared/plan';
 	import {
 		panelsNeeded,
+		TV_PLACEMENTS,
 		TV_RATIOS,
 		tvDiagonal,
 		tvSize,
+		type TvPlacement,
 		type TvSettings,
 		type CatalogEntry,
 		type CatalogItem,
@@ -335,6 +338,13 @@
 	const tvRatio = $derived(
 		tv ? TV_RATIOS.findIndex(([w, h]) => Math.abs(tv!.widthIn / tv!.heightIn - w / h) < 0.01) : -1,
 	);
+	// The corner TV's back edge clears both walls by the mount's standoff, so it reaches (mount + width) / √2 along each.
+	const tvWhere = (tv: TvSettings) =>
+		({
+			backWall: 'centered on the back wall',
+			pillarWall: 'centered between the column and the back wall',
+			corner: `across the corner, reaching ${round1((TV_MOUNT_IN + tv.widthIn) / Math.SQRT2)}″ along each wall`,
+		})[tv.placement];
 	function setDiagonal(value: string) {
 		const diagonal = positive(value);
 		if (!tv || !diagonal) return;
@@ -433,9 +443,18 @@
 								checked={tv.visible}
 								onchange={e => updateTv({ visible: e.currentTarget.checked })}
 							/>
-							On the TV wall</label
+							Show the TV</label
 						>
 						<div class="tv-fields">
+							<label class="wide"
+								>Placement
+								<select
+									value={tv.placement}
+									onchange={e => updateTv({ placement: e.currentTarget.value as TvPlacement })}
+								>
+									{#each Object.entries(TV_PLACEMENTS) as [value, label] (value)}<option {value}>{label}</option>{/each}
+								</select>
+							</label>
 							<label
 								>Diagonal
 								<input
@@ -509,7 +528,7 @@
 						<p class="muted">
 							Inches. Bottom edge {round1(tv.centerIn - tv.heightIn / 2)}″ off the floor, top {round1(
 								tv.centerIn + tv.heightIn / 2,
-							)}″, centered on the wall.
+							)}″, {tvWhere(tv)}.
 						</p>
 						{#if tvError}<p class="error">{tvError}</p>{/if}
 					{/if}
@@ -907,6 +926,10 @@
 		padding: 0.4rem 0.5rem;
 		background: var(--app-bg);
 		color: var(--app-text);
+	}
+
+	.tv-fields .wide {
+		grid-column: 1 / -1;
 	}
 
 	.check {

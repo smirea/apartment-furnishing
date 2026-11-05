@@ -62,8 +62,12 @@ struct FixturePicker: View {
         .presentationBackgroundInteraction(.enabled(upThrough: .medium))
     }
 
-    // The web plan's Center and Tilt fields, in inches and degrees.
+    // The web plan's Placement, Center and Tilt fields, in inches and degrees.
     @ViewBuilder private func mount(_ tv: TVSettings) -> some View {
+        Picker("Placement", selection: binding(tv, \.placement)) {
+            ForEach(TVSettings.Placement.allCases, id: \.self) { Text($0.label).tag($0) }
+        }
+        .pickerStyle(.segmented)
         let ceiling = Double(scene.plan?.ceiling ?? 10) * 12
         let half = tv.heightIn / 2
         let lowest = half.rounded(.up), highest = (ceiling - half).rounded(.down)
@@ -85,7 +89,7 @@ struct FixturePicker: View {
         }
     }
 
-    private func binding(_ tv: TVSettings, _ field: WritableKeyPath<TVSettings, Double>) -> Binding<Double> {
+    private func binding<Value>(_ tv: TVSettings, _ field: WritableKeyPath<TVSettings, Value>) -> Binding<Value> {
         Binding(get: { scene.fixtures.first { $0.kind == .tv }?.tv?[keyPath: field] ?? tv[keyPath: field] }) { value in
             guard var current = scene.fixtures.first(where: { $0.kind == .tv })?.tv else { return }
             current[keyPath: field] = value

@@ -32,7 +32,19 @@ struct Plan: Decodable {
         let column: Column
     }
 
-    struct Point: Decodable { let x, z: Float }
+    // Where the TV can hang; see TvSpot in packages/shared/src/plan.ts.
+    struct TVSpot: Decodable { let x, z, yaw: Float; let onBackWall, corner: Bool }
+    struct TVSpots: Decodable {
+        let backWall, pillarWall, corner: TVSpot
+
+        subscript(placement: TVSettings.Placement) -> TVSpot {
+            switch placement {
+            case .backWall: backWall
+            case .pillarWall: pillarWall
+            case .corner: corner
+            }
+        }
+    }
     struct Device: Decodable { let rect: [Float]; let y, height: Float; let color: Int }
 
     let walls: [Wall]
@@ -40,7 +52,7 @@ struct Plan: Decodable {
     let rooms: [Room]
     let ceiling: Float
     let finishSurfaces: FinishSurfaces
-    let tvMount: Point
+    let tvSpots: TVSpots
     let tvWallDevices: [Device]
 }
 
@@ -105,7 +117,21 @@ struct Fixture: Decodable, Identifiable, Equatable {
 
 // Doubles, so saving a new height writes the size back exactly as the web plan stored it.
 struct TVSettings: Codable, Equatable {
+    // TV_PLACEMENTS in packages/shared/src/items.ts.
+    enum Placement: String, Codable, CaseIterable {
+        case backWall, pillarWall, corner
+
+        var label: String {
+            switch self {
+            case .backWall: "Back wall"
+            case .pillarWall: "Pillar wall"
+            case .corner: "Corner"
+            }
+        }
+    }
+
     var visible: Bool
+    var placement: Placement
     var widthIn, heightIn, centerIn, tiltDeg: Double
 }
 

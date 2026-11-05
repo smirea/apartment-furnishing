@@ -1,4 +1,11 @@
-import type { CatalogEntry, Placement, TvSettings, WallTextureEntry } from '@repo/shared/items';
+import {
+	isTvPlacement,
+	TV_PLACEMENTS,
+	type CatalogEntry,
+	type Placement,
+	type TvSettings,
+	type WallTextureEntry,
+} from '@repo/shared/items';
 import { join, normalize } from 'node:path';
 import { ASSET_DIR, catalog, importProducts, placements } from './catalog';
 import { modelJobs, startModelJob } from './generate-model';
@@ -143,17 +150,21 @@ const server = Bun.serve({
 				const sizes = [tv.widthIn, tv.heightIn, tv.centerIn];
 				if (
 					typeof tv.visible !== 'boolean' ||
+					!isTvPlacement(tv.placement) ||
 					!sizes.every(n => typeof n === 'number' && n > 0 && n < 240) ||
 					typeof tv.tiltDeg !== 'number' ||
 					tv.tiltDeg < 0 ||
 					tv.tiltDeg > 30
 				)
 					return Response.json(
-						{ error: 'Expected visible, widthIn, heightIn, centerIn and a 0–30° tiltDeg' },
+						{
+							error: `Expected visible, a placement (${Object.keys(TV_PLACEMENTS).join(', ')}), widthIn, heightIn, centerIn and a 0–30° tiltDeg`,
+						},
 						{ status: 400 },
 					);
 				const saved: TvSettings = {
 					visible: tv.visible,
+					placement: tv.placement,
 					widthIn: tv.widthIn!,
 					heightIn: tv.heightIn!,
 					centerIn: tv.centerIn!,

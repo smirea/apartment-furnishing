@@ -1,4 +1,13 @@
 import { CEILING_FT, columns, finishAreasIn, fixtures, ft, rooms, tvWallFace, walls, type Rect } from './floorplan';
+import type { TvPlacement, TvSettings } from './items';
+
+// A spot the TV can hang at, in plan feet: the point on the bare wall behind the screen's center and the way the screen
+// faces, as Placement.rotation[1] (-90 west, 180 north). `onBackWall` spots move out with a wall texture on the back
+// wall. A `corner` spot is the corner itself, and the TV stands out from it until its back edges clear both walls.
+export type TvSpot = { x: number; z: number; yaw: number; onBackWall: boolean; corner: boolean };
+
+export const TV_DEPTH_IN = 1.2;
+export const TV_MOUNT_IN = 2.5;
 
 // The floor plan as the AR app needs it, in feet (+x east, +z south): the floor footprint of every wall run between
 // door openings, so the outline's edges are the wall faces you can line up against in the room.
@@ -13,8 +22,7 @@ export type PlanGeometry = {
 		tvWall: { x: number; z1: number; z2: number };
 		column: { x: number; z: number; radius: number };
 	};
-	// Where the TV hangs: the middle of the TV wall's measured span on its living-room face, before any wall texture.
-	tvMount: { x: number; z: number };
+	tvSpots: Record<TvPlacement, TvSpot>;
 	// The switch, outlets, data jack and smoke alarm on the TV wall, which move out onto any wall texture there. `rect`
 	// is their footprint against the bare wall, `y` the bottom edge, `color` 0xRRGGBB.
 	tvWallDevices: { rect: Rect; y: number; height: number; color: number }[];
@@ -23,8 +31,46 @@ export type PlanGeometry = {
 const round = (n: number) => Math.round(n * 1000) / 1000;
 const toFeet = (rect: Rect) => rect.map(px => round(ft(px))) as Rect;
 
+// The back wall is the TV wall; the pillar wall is the south wall the column stands against, whose solid pier meets the
+// back wall at the corner.
+const column = columns[0]!;
+const backX = round(ft(tvWallFace.x));
+const pillarZ = round(ft(tvWallFace.y2));
+export const tvSpots: Record<TvPlacement, TvSpot> = {
+	backWall: {
+		x: backX,
+		z: round(ft(tvWallFace.y2) - finishAreasIn.tvWall.width / 24),
+		yaw: -90,
+		onBackWall: true,
+		corner: false,
+	},
+	pillarWall: {
+		x: round(ft((column.x + column.r + tvWallFace.x) / 2)),
+		z: pillarZ,
+		yaw: 180,
+		onBackWall: false,
+		corner: false,
+	},
+	corner: { x: backX, z: pillarZ, yaw: -135, onBackWall: true, corner: true },
+};
+
+// The TV body's center in plan feet and its yaw in degrees. `backWallDepthFt` is how far a wall texture stands out from
+// the back wall. Tilting about the center swings the bottom edge toward the wall, so the mount holds it out by that much.
+export function tvPose(tv: TvSettings, backWallDepthFt: number) {
+	const spot = tvSpots[tv.placement];
+	const out =
+		(TV_MOUNT_IN + TV_DEPTH_IN / 2 + (spot.corner ? tv.widthIn / 2 : 0)) / 12 +
+		(tv.heightIn / 24) * Math.sin((tv.tiltDeg * Math.PI) / 180);
+	const yaw = (spot.yaw * Math.PI) / 180;
+	return {
+		x: spot.x - (spot.onBackWall ? backWallDepthFt : 0) + out * Math.sin(yaw),
+		y: tv.centerIn / 12,
+		z: spot.z + out * Math.cos(yaw),
+		yaw: spot.yaw,
+	};
+}
+
 export function planGeometry(): PlanGeometry {
-	const column = columns[0]!;
 	return {
 		walls: walls.flatMap(({ line: [x1, y1, x2, y2], thickness = 10, gaps = [], glass = false }) => {
 			const horizontal = y1 === y2;
@@ -52,7 +98,7 @@ export function planGeometry(): PlanGeometry {
 			tvWall: { x: round(ft(tvWallFace.x)), z1: round(ft(tvWallFace.y1)), z2: round(ft(tvWallFace.y2)) },
 			column: { x: round(ft(column.x)), z: round(ft(column.y)), radius: round(ft(column.r)) },
 		},
-		tvMount: { x: round(ft(tvWallFace.x)), z: round(ft(tvWallFace.y2) - finishAreasIn.tvWall.width / 24) },
+		tvSpots,
 		tvWallDevices: fixtures
 			.filter(f => f.tvWall)
 			.map(f => ({ rect: toFeet(f.rect), y: f.y ?? 0, height: f.height, color: f.color })),

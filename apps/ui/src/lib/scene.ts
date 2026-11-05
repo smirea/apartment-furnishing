@@ -48,7 +48,6 @@ import {
 	fixtures,
 	footprint,
 	ft,
-	finishAreasIn,
 	PX_PER_FT,
 	rooms,
 	tvWallFace,
@@ -57,6 +56,7 @@ import {
 	type Rect,
 	type Wall,
 } from '@repo/shared/floorplan';
+import { TV_DEPTH_IN, tvPose } from '@repo/shared/plan';
 
 export type Mode = 'orbit' | 'walk';
 
@@ -333,9 +333,7 @@ export function createViewer(
 		depth => columnFinish.scale.set(ft(column.r) + depth, columnFinish.scale.y, ft(column.r) + depth),
 	);
 
-	// The TV hangs on a tilting mount centered on the TV wall's measured span, out from any wall texture.
-	const TV_DEPTH_IN = 1.2;
-	const TV_MOUNT_IN = 2.5;
+	// The TV hangs on a tilting mount at one of its spots, out from any wall texture on the back wall.
 	const TV_BEZEL_IN = 0.3;
 	let tvWallDepthFt = 0;
 	let tvSettings: TvSettings | null = null;
@@ -348,8 +346,6 @@ export function createViewer(
 	);
 	const tvScreenMat = new MeshStandardMaterial({ color: 0xffffff, roughness: 0.25, metalness: 0.1 });
 	const tvScreen = new Mesh(new PlaneGeometry(1, 1), tvScreenMat);
-	// Faces west, into the living room.
-	tvScreen.rotation.y = -Math.PI / 2;
 	tvGroup.add(tvBody, tvScreen);
 
 	function tvLabel({ widthIn, heightIn }: TvSettings) {
@@ -381,17 +377,13 @@ export function createViewer(
 		tvGroup.visible = !!tv?.visible;
 		if (!tv) return;
 		const [w, h, d] = [tv.widthIn / 12, tv.heightIn / 12, TV_DEPTH_IN / 12];
-		tvBody.scale.set(d, h, w);
+		tvBody.scale.set(w, h, d);
 		tvScreen.scale.set(w - (2 * TV_BEZEL_IN) / 12, h - (2 * TV_BEZEL_IN) / 12, 1);
-		tvScreen.position.x = -d / 2 - 0.002;
-		// Rotating about the wall-parallel axis through the screen center tips the top out and the screen down.
-		tvGroup.rotation.z = tv.tiltDeg * DEG;
-		tvGroup.position.set(
-			// Tilting about the center swings the bottom edge toward the wall; the mount holds it out by that much.
-			ft(tvWallFace.x) - tvWallDepthFt - TV_MOUNT_IN / 12 - d / 2 - (h / 2) * Math.sin(tv.tiltDeg * DEG),
-			tv.centerIn / 12,
-			ft(tvWallFace.y2) - finishAreasIn.tvWall.width / 24,
-		);
+		tvScreen.position.z = d / 2 + 0.002;
+		const pose = tvPose(tv, tvWallDepthFt);
+		tvGroup.position.set(pose.x, pose.y, pose.z);
+		// Turned to face out of its wall, then tipped about its own horizontal axis so the top leans out.
+		tvGroup.rotation.set(tv.tiltDeg * DEG, pose.yaw * DEG, 0, 'YXZ');
 	}
 
 	function setTv(tv: TvSettings) {
