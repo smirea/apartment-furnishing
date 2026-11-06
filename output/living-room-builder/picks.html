@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Living room layouts</title>
+		<style>
+			.lr-plan {
+				--lr-sofa: #9c7b5c;
+				--lr-wood: #b8925f;
+				--lr-plant: #6e9a5c;
+				--lr-glass: #4f9bd0;
+				width: 100%;
+				height: auto;
+				display: block;
+				font-family: var(--font-sans, system-ui, sans-serif);
+			}
+			.lr-plan .floor {
+				fill: color-mix(in srgb, var(--foreground, #222) 5%, transparent);
+			}
+			.lr-plan .floor2 {
+				fill: color-mix(in srgb, var(--foreground, #222) 2.5%, transparent);
+			}
+			.lr-plan .wall {
+				stroke: var(--foreground, #222);
+				stroke-width: 3;
+				stroke-linecap: square;
+			}
+			.lr-plan .glass {
+				stroke: var(--lr-glass);
+				stroke-width: 2.2;
+			}
+			.lr-plan .open {
+				stroke: var(--muted-foreground, #888);
+				stroke-width: 0.6;
+				stroke-dasharray: 3 2;
+			}
+			.lr-plan .fixed {
+				fill: color-mix(in srgb, var(--foreground, #222) 14%, transparent);
+				stroke: var(--muted-foreground, #888);
+				stroke-width: 0.5;
+			}
+			.lr-plan .column {
+				fill: color-mix(in srgb, var(--foreground, #222) 45%, transparent);
+			}
+			.lr-plan .rug {
+				fill: color-mix(in srgb, var(--lr-wood) 16%, transparent);
+				stroke: color-mix(in srgb, var(--lr-wood) 60%, transparent);
+				stroke-width: 0.6;
+				stroke-dasharray: 2 1.5;
+			}
+			.lr-plan .sofa {
+				fill: color-mix(in srgb, var(--lr-sofa) 55%, transparent);
+				stroke: var(--lr-sofa);
+				stroke-width: 0.8;
+			}
+			.lr-plan .sofaback {
+				fill: color-mix(in srgb, var(--lr-sofa) 85%, black 10%);
+			}
+			.lr-plan .cushion {
+				fill: color-mix(in srgb, var(--lr-sofa) 30%, transparent);
+				stroke: color-mix(in srgb, var(--lr-sofa) 70%, transparent);
+				stroke-width: 0.4;
+			}
+			.lr-plan .table {
+				fill: color-mix(in srgb, var(--lr-wood) 70%, transparent);
+				stroke: var(--lr-wood);
+				stroke-width: 0.6;
+			}
+			.lr-plan .console {
+				fill: color-mix(in srgb, var(--foreground, #222) 30%, transparent);
+				stroke: var(--foreground, #222);
+				stroke-width: 0.4;
+			}
+			.lr-plan .tv {
+				fill: var(--foreground, #111);
+			}
+			.lr-plan .chair {
+				fill: color-mix(in srgb, var(--lr-wood) 45%, transparent);
+				stroke: var(--lr-wood);
+				stroke-width: 0.5;
+			}
+			.lr-plan .pull {
+				fill: none;
+				stroke: color-mix(in srgb, var(--lr-wood) 55%, transparent);
+				stroke-width: 0.4;
+				stroke-dasharray: 1.5 1.5;
+			}
+			.lr-plan .decor {
+				fill: color-mix(in srgb, var(--lr-plant) 55%, transparent);
+			}
+
+			.lr-plan .prime {
+				stroke: var(--success, #2f7d4a);
+				fill: var(--success, #2f7d4a);
+			}
+			.lr-plan .good {
+				stroke: var(--warning, #b5651d);
+				fill: var(--warning, #b5651d);
+			}
+			.lr-plan .side {
+				stroke: var(--destructive, #b3261e);
+				fill: var(--destructive, #b3261e);
+			}
+
+			.lr-plan .lbl {
+				font-size: 5.5px;
+				fill: var(--foreground, #222);
+				text-anchor: middle;
+				dominant-baseline: middle;
+			}
+			.lr-plan .mut {
+				font-size: 5px;
+				fill: var(--muted-foreground, #777);
+				text-anchor: middle;
+				dominant-baseline: middle;
+			}
+			.lr-plan .big {
+				font-size: 7px;
+				font-weight: 700;
+				fill: var(--foreground, #222);
+				text-anchor: middle;
+				dominant-baseline: middle;
+			}
+			.lr-plan .seatn {
+				font-size: 5px;
+				font-weight: 700;
+				text-anchor: middle;
+				dominant-baseline: middle;
+				stroke: none;
+			}
+			.lr-plan .dim {
+				stroke: var(--foreground, #222);
+				stroke-width: 0.4;
+			}
+
+			.lr {
+				font-family: var(--font-sans, system-ui, sans-serif);
+				color: var(--foreground, #1d1d1b);
+				font-size: 13px;
+				line-height: 1.45;
+			}
+			.lr h2 {
+				font-size: 15px;
+				margin: 0 0 2px;
+			}
+			.lr .card {
+				border: 1px solid var(--border, #d9d5cb);
+				border-radius: var(--radius, 10px);
+				padding: 14px;
+				margin: 0 0 16px;
+				background: var(--card, transparent);
+			}
+
+			.lr .kv {
+				display: flex;
+				justify-content: space-between;
+				gap: 8px;
+				border-bottom: 1px solid var(--border, #e5e2da);
+				padding: 2px 0;
+			}
+			.lr .kv span {
+				color: var(--muted-foreground, #6d6a62);
+			}
+
+			.lr ul.issues {
+				margin: 6px 0 0;
+				padding-left: 16px;
+			}
+			.lr li.bad {
+				color: var(--destructive, #b3261e);
+			}
+
+			.lr .dot {
+				display: inline-block;
+				width: 8px;
+				height: 8px;
+				border-radius: 50%;
+				margin-right: 4px;
+			}
+			.lr .dot.prime {
+				background: var(--success, #2f7d4a);
+			}
+			.lr .dot.good {
+				background: var(--warning, #b5651d);
+			}
+			.lr .dot.side {
+				background: var(--destructive, #b3261e);
+			}
+
+			.lr .legend {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 10px;
+				font-size: 12px;
+				color: var(--muted-foreground, #6d6a62);
+				margin: 0 0 12px;
+			}
+
+			.lr .grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+				gap: 12px;
+			}
+			.lr .grid .card {
+				margin: 0;
+			}
+			.lr .note {
+				color: var(--muted-foreground, #6d6a62);
+				margin: 2px 0 6px;
+				font-size: 12px;
+			}
+		</style>
+		<style>
+			:root {
+				--background: #f6f4ef;
+				--foreground: #1d1d1b;
+				--muted-foreground: #6d6a62;
+				--border: #d9d5cb;
+				--card: #fff;
+				--success: #2f7d4a;
+				--warning: #b5651d;
+				--destructive: #b3261e;
+			}
+			@media (prefers-color-scheme: dark) {
+				:root {
+					--background: #161614;
+					--foreground: #ecebe6;
+					--muted-foreground: #a29f96;
+					--border: #37352f;
+					--card: #1f1f1c;
+					--success: #5cb27a;
+					--warning: #e09a50;
+					--destructive: #ef6b62;
+				}
+			}
+			body {
+				margin: 0;
+				background: var(--background);
+			}
+			body {
+				padding: 12px;
+			}
+		</style>
+	</head>
+	<body>
+		<div class="lr">
+			<svg width="0" height="0" style="position: absolute" aria-hidden="true">
+				<defs>
+					<g id="lr-under" style="--lr-glass: #4f9bd0; font-family: var(--font-sans, system-ui, sans-serif)">
+						<polygon
+							style="fill: color-mix(in srgb, var(--foreground, #222) 5%, transparent)"
+							points="0,228 199,228 199,24 0,24"
+						/>
+						<polygon
+							style="fill: color-mix(in srgb, var(--foreground, #222) 2.5%, transparent)"
+							points="35,24 199,24 199,-22 35,-22"
+						/>
+						<polygon
+							style="fill: color-mix(in srgb, var(--foreground, #222) 2.5%, transparent)"
+							points="199,106 262,106 262,53 199,53"
+						/>
+						<polygon
+							style="fill: color-mix(in srgb, var(--foreground, #222) 2.5%, transparent)"
+							points="-38,226 -1,226 -1,24 -38,24"
+						/>
+						<text
+							style="
+								font-size: 5px;
+								fill: var(--muted-foreground, #777);
+								text-anchor: middle;
+								dominant-baseline: middle;
+							"
+							x="-20"
+							y="128"
+							transform="rotate(-90 -20 128)"
+						>
+							balcony
+						</text>
+						<text
+							style="
+								font-size: 5px;
+								fill: var(--muted-foreground, #777);
+								text-anchor: middle;
+								dominant-baseline: middle;
+							"
+							x="232"
+							y="80"
+						>
+							office
+						</text>
+						<text
+							style="
+								font-size: 5px;
+								fill: var(--muted-foreground, #777);
+								text-anchor: middle;
+								dominant-baseline: middle;
+							"
+							x="232"
+							y="87"
+						>
+							landing
+						</text>
+						<text
+							style="
+								font-size: 5px;
+								fill: var(--muted-foreground, #777);
+								text-anchor: middle;
+								dominant-baseline: middle;
+							"
+							x="218"
+							y="31"
+						>
+							bath 2
+						</text>
+						<polygon
+							style="
+								fill: color-mix(in srgb, var(--foreground, #222) 14%, transparent);
+								stroke: var(--muted-foreground, #888);
+								stroke-width: 0.5;
+							"
+							points="78,32.5 149,32.5 149,-8.5 78,-8.5"
+						/>
+						<text
+							style="
+								font-size: 5px;
+								fill: var(--muted-foreground, #777);
+								text-anchor: middle;
+								dominant-baseline: middle;
+							"
+							x="113.5"
+							y="12"
+						>
+							island 71×41
+						</text>
+						<polygon
+							style="
+								fill: color-mix(in srgb, var(--foreground, #222) 14%, transparent);
+								stroke: var(--muted-foreground, #888);
+								stroke-width: 0.5;
+							"
+							points="7,24 35,24 35,-22 7,-22"
+						/>
+						<text
+							style="
+								font-size: 5px;
+								fill: var(--muted-foreground, #777);
+								text-anchor: middle;
+								dominant-baseline: middle;
+							"
+							x="21"
+							y="0"
+							transform="rotate(-90 21 0)"
+						>
+							counter
+						</text>
+						<text
+							style="
+								font-size: 5px;
+								fill: var(--muted-foreground, #777);
+								text-anchor: middle;
+								dominant-baseline: middle;
+							"
+							x="175"
+							y="-12"
+						>
+							kitchen / entry ↑
+						</text>
+					</g>
+					<g id="lr-over" style="--lr-glass: #4f9bd0; font-family: var(--font-sans, system-ui, sans-serif)">
+						<circle
+							style="fill: color-mix(in srgb, var(--foreground, #222) 45%, transparent)"
+							cx="61.5"
+							cy="207.5"
+							r="16.5"
+						/>
+						<text
+							style="
+								font-size: 5px;
+								fill: var(--muted-foreground, #777);
+								text-anchor: middle;
+								dominant-baseline: middle;
+							"
+							x="61.5"
+							y="207.5"
+						>
+							column
+						</text>
+						<line style="stroke: var(--lr-glass); stroke-width: 2.2" x1="0" y1="228" x2="146" y2="228" />
+						<line
+							style="stroke: var(--foreground, #222); stroke-width: 3; stroke-linecap: square"
+							x1="146"
+							y1="228"
+							x2="199"
+							y2="228"
+						/>
+						<line style="stroke: var(--lr-glass); stroke-width: 2.2" x1="0" y1="228" x2="0" y2="84" />
+						<line style="stroke: var(--lr-glass); stroke-width: 2.2" x1="0" y1="43" x2="0" y2="24" />
+						<line
+							style="stroke: var(--muted-foreground, #888); stroke-width: 0.6; stroke-dasharray: 3 2"
+							x1="0"
+							y1="84"
+							x2="-30"
+							y2="72"
+						/>
+						<text
+							style="
+								font-size: 5px;
+								fill: var(--muted-foreground, #777);
+								text-anchor: middle;
+								dominant-baseline: middle;
+							"
+							x="-9"
+							y="63.5"
+							transform="rotate(-90 -9 63.5)"
+						>
+							door
+						</text>
+						<line
+							style="stroke: var(--foreground, #222); stroke-width: 3; stroke-linecap: square"
+							x1="199"
+							y1="228"
+							x2="199"
+							y2="106"
+						/>
+						<line
+							style="stroke: var(--foreground, #222); stroke-width: 3; stroke-linecap: square"
+							x1="199"
+							y1="53"
+							x2="199"
+							y2="48"
+						/>
+						<line
+							style="stroke: var(--foreground, #222); stroke-width: 3; stroke-linecap: square"
+							x1="199"
+							y1="13"
+							x2="199"
+							y2="-22"
+						/>
+						<line
+							style="stroke: var(--foreground, #222); stroke-width: 3; stroke-linecap: square"
+							x1="199"
+							y1="106"
+							x2="300"
+							y2="106"
+						/>
+						<line
+							style="stroke: var(--foreground, #222); stroke-width: 3; stroke-linecap: square"
+							x1="213"
+							y1="53"
+							x2="300"
+							y2="53"
+						/>
+						<line
+							style="stroke: var(--foreground, #222); stroke-width: 3; stroke-linecap: square"
+							x1="0"
+							y1="24"
+							x2="35"
+							y2="24"
+						/>
+						<line
+							style="stroke: var(--muted-foreground, #888); stroke-width: 0.6; stroke-dasharray: 3 2"
+							x1="35"
+							y1="32.5"
+							x2="199"
+							y2="32.5"
+						/>
+						<text
+							style="
+								font-size: 5px;
+								fill: var(--muted-foreground, #777);
+								text-anchor: middle;
+								dominant-baseline: middle;
+							"
+							x="70"
+							y="236"
+						>
+							south glass (lake)
+						</text>
+						<text
+							style="
+								font-size: 5px;
+								fill: var(--muted-foreground, #777);
+								text-anchor: middle;
+								dominant-baseline: middle;
+							"
+							x="172"
+							y="236"
+						>
+							solid
+						</text>
+						<text
+							style="
+								font-size: 5px;
+								fill: var(--muted-foreground, #777);
+								text-anchor: middle;
+								dominant-baseline: middle;
+							"
+							x="-9"
+							y="158"
+							transform="rotate(-90 -9 158)"
+						>
+							west glass
+						</text>
+						<text
+							style="
+								font-size: 5px;
+								fill: var(--muted-foreground, #777);
+								text-anchor: middle;
+								dominant-baseline: middle;
+							"
+							x="208"
+							y="167"
+							transform="rotate(90 208 167)"
+						>
+							TV wall 122″
+						</text>
+						<line style="stroke: var(--foreground, #222); stroke-width: 0.4" x1="150" y1="244" x2="198" y2="244" />
+						<line style="stroke: var(--foreground, #222); stroke-width: 0.4" x1="150" y1="242" x2="150" y2="246" />
+						<line style="stroke: var(--foreground, #222); stroke-width: 0.4" x1="198" y1="242" x2="198" y2="246" />
+						<text
+							style="
+								font-size: 5px;
+								fill: var(--muted-foreground, #777);
+								text-anchor: middle;
+								dominant-baseline: middle;
+							"
+							x="210"
+							y="244"
+						>
+							4 ft
+						</text>
+						<text
+							style="font-size: 5.5px; fill: var(--foreground, #222); text-anchor: middle; dominant-baseline: middle"
+							x="245"
+							y="218"
+						>
+							N ↑
+						</text>
+					</g>
+				</defs>
+			</svg>
+			<div class="legend">
+				<span><span class="dot prime"></span>prime seat (≤30° off-axis, ≤35° head turn, screen fills 26–46°)</span
+				><span><span class="dot good"></span>good seat (≤45° off-axis, ≤50° head turn)</span
+				><span
+					><span class="dot side"></span>side seat (anything else: turns more than 50°, sits more than 45° off-axis, or
+					the screen fills more than 50°)</span
+				>
+			</div>
+			<div class="grid">
+				<section class="card">
+					<h2>H2 · 85″ wall TV at 8 ft · 4-seat sofa east of the column · 6-seat dining off the island</h2>
+					<p class="note">
+						The sofa moves east of the column, 8 ft from the TV wall, so an 85″ screen fills 38–42° of view: more
+						picture than a 98″ at 13 ft (28–31°).
+					</p>
+					<svg
+						class="lr-plan"
+						viewBox="-40 -22 302 272"
+						xmlns="http://www.w3.org/2000/svg"
+						role="img"
+						aria-label="85″ wall TV at 8 ft · 4-seat sofa east of the column · 6-seat dining off the island floor plan"
+					>
+						<use href="#lr-under" />
+						<g data-id="rug"><polygon class="rug" points="94,222 190,222 190,110 94,110" /></g>
+						<g data-id="sofa">
+							<polygon class="sofa" points="82,112 82,220 120,220 120,112" />
+							<polygon class="sofaback" points="82,112 82,220 91,220 91,112" />
+							<polygon class="sofaback" points="82,112 82,116 120,116 120,112" />
+							<polygon class="sofaback" points="82,216 82,220 120,220 120,216" />
+						</g>
+						<g data-id="console"><polygon class="console" points="199,206 199,126 185,126 185,206" /></g>
+						<g data-id="ottoman"><polygon class="table" points="135,138 135,194 161,194 161,138" /></g>
+						<g data-id="din">
+							<polygon class="table" points="102,34 102,106 138,106 138,34" />
+							<polygon class="chair" points="142,54 142,38 158,38 158,54" />
+							<polygon class="pull" points="162,56 162,36 174,36 174,56" />
+							<polygon class="chair" points="142,78 142,62 158,62 158,78" />
+							<polygon class="pull" points="162,80 162,60 174,60 174,80" />
+							<polygon class="chair" points="142,102 142,86 158,86 158,102" />
+							<polygon class="pull" points="162,104 162,84 174,84 174,104" />
+							<polygon class="chair" points="98,38 98,54 82,54 82,38" />
+							<polygon class="pull" points="78,36 78,56 66,56 66,36" />
+							<polygon class="chair" points="98,62 98,78 82,78 82,62" />
+							<polygon class="pull" points="78,60 78,80 66,80 66,60" />
+							<polygon class="chair" points="98,86 98,102 82,102 82,86" />
+							<polygon class="pull" points="78,84 78,104 66,104 66,84" />
+						</g>
+						<g data-id="chair"><polygon class="sofa" points="8.5,152 32,175.5 55.5,152 32,128.5" /></g>
+						<g data-id="lamp"><circle class="decor" cx="14" cy="178" r="6" /></g>
+						<polygon class="cushion" points="91,116 91,141 120,141 120,116" />
+						<circle class="prime" cx="100" cy="128.5" r="2.6" stroke="white" stroke-width=".5" />
+						<text class="seatn" fill="white" x="100" y="128.7">1</text>
+						<polygon class="cushion" points="91,141 91,166 120,166 120,141" />
+						<circle class="prime" cx="100" cy="153.5" r="2.6" stroke="white" stroke-width=".5" />
+						<text class="seatn" fill="white" x="100" y="153.7">2</text>
+						<polygon class="cushion" points="91,166 91,191 120,191 120,166" />
+						<circle class="prime" cx="100" cy="178.5" r="2.6" stroke="white" stroke-width=".5" />
+						<text class="seatn" fill="white" x="100" y="178.7">3</text>
+						<polygon class="cushion" points="91,191 91,216 120,216 120,191" />
+						<circle class="prime" cx="100" cy="203.5" r="2.6" stroke="white" stroke-width=".5" />
+						<text class="seatn" fill="white" x="100" y="203.7">4</text>
+						<g data-id="tv">
+							<polygon class="tv" points="196.5,203.5 196.5,128.5 194,128.5 194,203.5" />
+							<polygon class="console" points="199,180 199,152 196.5,152 196.5,180" />
+						</g>
+						<use href="#lr-over" />
+						<text class="big" x="186" y="166" transform="rotate(-90 186 166)">85″ TV</text>
+						<text class="lbl" x="147" y="156">7′11″ · 42°</text>
+					</svg>
+					<div class="kv"><span>TV</span><b>85″ wall-mounted</b></div>
+					<div class="kv"><span>Seats</span><b>4 (4 prime, 0 good, 0 side)</b></div>
+					<div class="kv"><span>Seat run</span><b>108″</b></div>
+					<div class="kv"><span>Eye → screen</span><b>7′11″ – 8′5″</b></div>
+					<div class="kv"><span>Coffee table gap</span><b>15″</b></div>
+				</section>
+				<section class="card">
+					<h2>G2 · 98″ corner TV · 6-seat L facing it</h2>
+					<p class="note">
+						The TV angles across the south-east corner on a 56″ corner console, so the main run and the return both face
+						it: no seat looks away from the screen.
+					</p>
+					<svg
+						class="lr-plan"
+						viewBox="-40 -22 302 272"
+						xmlns="http://www.w3.org/2000/svg"
+						role="img"
+						aria-label="98″ corner TV · 6-seat L facing it floor plan"
+					>
+						<use href="#lr-under" />
+						<g data-id="rug"><polygon class="rug" points="34,183 178,183 178,83 34,83" /></g>
+						<g data-id="sofa">
+							<polygon class="sofa" points="18,81 18,187 62,187 62,125 154,125 154,81" />
+							<polygon class="sofaback" points="18,81 18,187 27,187 27,81" />
+							<polygon class="sofaback" points="18,81 18,90 154,90 154,81" />
+							<polygon class="sofaback" points="149,81 149,125 154,125 154,81" />
+							<polygon class="sofaback" points="18,182 18,187 62,187 62,182" />
+						</g>
+						<g data-id="console"><polygon class="console" points="158.5,226 198,186.5 185,173.5 145.5,213" /></g>
+						<g data-id="ottoman"><polygon class="table" points="78,168 144,168 144,141 78,141" /></g>
+						<g data-id="side"><ellipse class="table" cx="15" cy="208" rx="9" ry="9" transform="rotate(0 15 208)" /></g>
+						<g data-id="lamp"><circle class="decor" cx="34" cy="218" r="6" /></g>
+						<g data-id="plant"><circle class="decor" cx="186" cy="132" r="9" /></g>
+						<polygon class="cushion" points="120,90 120,125 149,125 149,90" />
+						<circle class="prime" cx="134.5" cy="99" r="2.6" stroke="white" stroke-width=".5" />
+						<text class="seatn" fill="white" x="134.5" y="99.2">1</text>
+						<polygon class="cushion" points="91,90 91,125 120,125 120,90" />
+						<circle class="prime" cx="105.5" cy="99" r="2.6" stroke="white" stroke-width=".5" />
+						<text class="seatn" fill="white" x="105.5" y="99.2">2</text>
+						<polygon class="cushion" points="62,90 62,125 91,125 91,90" />
+						<circle class="good" cx="76.5" cy="99" r="2.6" stroke="white" stroke-width=".5" />
+						<text class="seatn" fill="white" x="76.5" y="99.2">3</text>
+						<polygon class="cushion" points="27,90 27,125 62,125 62,90" />
+						<circle class="prime" cx="33.5" cy="96.5" r="2.6" stroke="white" stroke-width=".5" />
+						<text class="seatn" fill="white" x="33.5" y="96.7">4</text>
+						<polygon class="cushion" points="27,125 27,153.5 62,153.5 62,125" />
+						<circle class="prime" cx="36" cy="139.5" r="2.6" stroke="white" stroke-width=".5" />
+						<text class="seatn" fill="white" x="36" y="139.7">5</text>
+						<polygon class="cushion" points="27,153.5 27,182 62,182 62,153.5" />
+						<circle class="good" cx="36" cy="168" r="2.6" stroke="white" stroke-width=".5" />
+						<text class="seatn" fill="white" x="36" y="168.2">6</text>
+						<g data-id="tv"><polygon class="tv" points="136.5,225.5 197.5,164.5 196,163 135,224" /></g>
+						<use href="#lr-over" />
+						<text class="big" x="159.5" y="187.5" transform="rotate(-45 159.5 187.5)">98″ TV</text>
+						<text class="lbl" x="99.5" y="141">13′8″ · 29°</text>
+					</svg>
+					<div class="kv"><span>TV</span><b>98″ on a stand</b></div>
+					<div class="kv"><span>Seats</span><b>6 (4 prime, 2 good, 0 side)</b></div>
+					<div class="kv"><span>Seat run</span><b>198″</b></div>
+					<div class="kv"><span>Eye → screen</span><b>8′3″ – 13′8″</b></div>
+					<div class="kv"><span>Coffee table gap</span><b>16″</b></div>
+				</section>
+			</div>
+		</div>
+	</body>
+</html>

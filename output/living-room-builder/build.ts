@@ -9,6 +9,12 @@ import { PLAN_CSS, renderElevation, renderPlan, roomDefs, seatTable } from './re
 
 const dir = import.meta.dir;
 
+// Standalone pages carry their own light and dark colors; framed renderers supply theirs instead.
+export const THEME_CSS = `:root{--background:#f6f4ef;--foreground:#1d1d1b;--muted-foreground:#6d6a62;--border:#d9d5cb;--card:#fff;--success:#2f7d4a;--warning:#b5651d;--destructive:#b3261e}
+@media (prefers-color-scheme:dark){:root{--background:#161614;--foreground:#ecebe6;--muted-foreground:#a29f96;--border:#37352f;--card:#1f1f1c;--success:#5cb27a;--warning:#e09a50;--destructive:#ef6b62}}
+body{margin:0;background:var(--background)}
+`;
+
 export const PAGE_CSS = `
 ${PLAN_CSS}
 .lr{font-family:var(--font-sans,system-ui,sans-serif);color:var(--foreground,#1d1d1b);font-size:13px;line-height:1.45}
@@ -65,7 +71,7 @@ export function compactGallery(layouts: Layout[]) {
 }
 
 export function gallery(layouts: Layout[], title = 'Living room layouts') {
-	return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title><style>${PAGE_CSS}</style></head><body><div class="lr">${LEGEND}${layouts.map(card).join('')}</div></body></html>`;
+	return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${title}</title><style>${THEME_CSS}${PAGE_CSS}</style></head><body><div class="lr" style="max-width:1200px;margin:0 auto;padding:16px">${LEGEND}${layouts.map(card).join('')}</div></body></html>`;
 }
 
 async function builder() {

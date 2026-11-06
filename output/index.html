@@ -1,0 +1,435 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Living room plans</title>
+		<style>
+			:root {
+				--bg: #f6f4ef;
+				--fg: #1d1d1b;
+				--muted: #6d6a62;
+				--line: #d9d5cb;
+				--card: #fff;
+				--accent: #8c6f56;
+				--pass: #2f7d4a;
+			}
+			@media (prefers-color-scheme: dark) {
+				:root {
+					--bg: #141412;
+					--fg: #ecebe6;
+					--muted: #a29f96;
+					--line: #33312c;
+					--card: #1e1d1a;
+					--accent: #c9a77c;
+					--pass: #5cb27a;
+				}
+			}
+			* {
+				box-sizing: border-box;
+			}
+			body {
+				margin: 0;
+				background: var(--bg);
+				color: var(--fg);
+				font:
+					15px/1.5 -apple-system,
+					system-ui,
+					sans-serif;
+			}
+			header {
+				padding: 32px 16px 8px;
+				max-width: 1240px;
+				margin: 0 auto;
+			}
+			h1 {
+				font-size: 28px;
+				margin: 0 0 6px;
+				letter-spacing: -0.01em;
+			}
+			header p {
+				color: var(--muted);
+				margin: 0;
+				max-width: 760px;
+			}
+			nav {
+				position: sticky;
+				top: 0;
+				z-index: 5;
+				background: color-mix(in srgb, var(--bg) 88%, transparent);
+				backdrop-filter: blur(8px);
+				border-bottom: 1px solid var(--line);
+			}
+			nav div {
+				max-width: 1240px;
+				margin: 0 auto;
+				padding: 10px 16px;
+				display: flex;
+				gap: 18px;
+				overflow-x: auto;
+				white-space: nowrap;
+			}
+			nav a {
+				color: var(--muted);
+				text-decoration: none;
+				font-size: 14px;
+			}
+			nav a:hover {
+				color: var(--fg);
+			}
+			main {
+				max-width: 1240px;
+				margin: 0 auto;
+				padding: 8px 16px 64px;
+			}
+			section {
+				padding: 28px 0 8px;
+				scroll-margin-top: 48px;
+			}
+			.head h2 {
+				font-size: 20px;
+				margin: 0 0 4px;
+			}
+			.head p {
+				margin: 0 0 14px;
+				color: var(--muted);
+				max-width: 820px;
+			}
+			.cards {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+				gap: 12px;
+				margin: 0 0 16px;
+			}
+			.card {
+				background: var(--card);
+				border: 1px solid var(--line);
+				border-radius: 12px;
+				padding: 14px 16px;
+			}
+			.card h3 {
+				margin: 0 0 4px;
+				font-size: 16px;
+			}
+			.card p {
+				margin: 0;
+				color: var(--muted);
+				font-size: 14px;
+			}
+			.badge {
+				display: inline-block;
+				font-size: 12px;
+				font-weight: 600;
+				color: var(--pass);
+				border: 1px solid currentColor;
+				border-radius: 99px;
+				padding: 0 8px;
+				margin-bottom: 6px;
+			}
+			.frame {
+				margin: 0 0 18px;
+				background: var(--card);
+				border: 1px solid var(--line);
+				border-radius: 12px;
+				overflow: hidden;
+			}
+			.frame figcaption {
+				display: flex;
+				justify-content: space-between;
+				gap: 12px;
+				padding: 10px 14px;
+				border-bottom: 1px solid var(--line);
+				font-size: 14px;
+			}
+			.frame figcaption span {
+				color: var(--muted);
+			}
+			.frame figcaption b {
+				color: var(--fg);
+			}
+			.frame a {
+				color: var(--accent);
+				text-decoration: none;
+				white-space: nowrap;
+			}
+			.frame iframe {
+				display: block;
+				width: 100%;
+				border: 0;
+				background: var(--bg);
+			}
+			.tabs {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 6px;
+			}
+			.tabs input {
+				position: absolute;
+				opacity: 0;
+			}
+			.tabs label {
+				padding: 6px 12px;
+				border: 1px solid var(--line);
+				border-radius: 99px;
+				cursor: pointer;
+				font-size: 14px;
+				color: var(--muted);
+			}
+			.tabs input:checked + label {
+				color: var(--fg);
+				border-color: var(--accent);
+				background: color-mix(in srgb, var(--accent) 14%, transparent);
+			}
+			.tab {
+				display: none;
+				flex-basis: 100%;
+				margin-top: 8px;
+			}
+			#council-0:checked ~ .tab[data-for='council-0'],
+			#council-1:checked ~ .tab[data-for='council-1'] {
+				display: block;
+			}
+			details.study {
+				margin: 0 0 10px;
+				background: var(--card);
+				border: 1px solid var(--line);
+				border-radius: 12px;
+			}
+			details.study summary {
+				cursor: pointer;
+				padding: 12px 14px;
+				font-weight: 600;
+			}
+			details.study summary span {
+				font-weight: 400;
+				color: var(--muted);
+			}
+			details.study .frame {
+				margin: 0;
+				border: 0;
+				border-top: 1px solid var(--line);
+				border-radius: 0;
+			}
+		</style>
+	</head>
+	<body>
+		<header>
+			<h1>Living room plans</h1>
+			<p>
+				Everything worked out for the B4 living room: the measured layout builder, every layout tried, and the review
+				rounds that picked a winner. Each panel below is the live page; use <b>Open ↗</b> for full screen.
+			</p>
+		</header>
+		<nav>
+			<div>
+				<a href="#picks">Picks</a><a href="#builder">Builder</a><a href="#layouts">All layouts</a
+				><a href="#council">Council rounds (with dining)</a><a href="#panel">Panel rounds (couch + TV)</a
+				><a href="#earlier">Earlier studies</a>
+			</div>
+		</nav>
+		<main>
+			<section id="picks">
+				<div class="head">
+					<h2>The picks</h2>
+					<p>Two winners, depending on whether the room needs a dining table.</p>
+				</div>
+				<div class="cards">
+					<div class="card">
+						<span class="badge">Council 4/5 at 9+</span>
+						<h3>H2 · with dining</h3>
+						<p>85″ wall TV at 8 ft, a 4-seat sofa east of the column, and a 72″ six-seat table off the island.</p>
+					</div>
+					<div class="card">
+						<span class="badge">Panel 3/3 at 9+</span>
+						<h3>G2 · without dining</h3>
+						<p>
+							98″ TV across the south-east corner, a 6-seat L sectional facing it, and an Aries ottoman with a walnut
+							tray.
+						</p>
+					</div>
+				</div>
+				<figure class="frame">
+					<figcaption>
+						<span><b>H2 and G2</b> · plans and headline numbers</span
+						><a href="living-room-builder/picks.html" target="_blank" rel="noopener">Open ↗</a>
+					</figcaption>
+					<iframe src="living-room-builder/picks.html" title="H2 and G2" style="height: 660px"></iframe>
+				</figure>
+			</section>
+			<section id="builder">
+				<div class="head">
+					<h2>Layout builder</h2>
+					<p>
+						Drag, rotate and resize every piece; every layout is re-scored live for sightlines, legroom, routes and
+						dining pull-out room.
+					</p>
+				</div>
+				<figure class="frame">
+					<figcaption>
+						<span><b>Builder</b> · opens on H2; pick any layout from the menu</span
+						><a href="living-room-builder/builder.html#H2" target="_blank" rel="noopener">Open ↗</a>
+					</figcaption>
+					<iframe
+						src="living-room-builder/builder.html#H2"
+						title="Builder"
+						style="height: 1150px"
+						loading="lazy"
+					></iframe>
+				</figure>
+			</section>
+			<section id="layouts">
+				<div class="head">
+					<h2>Every layout tried</h2>
+					<p>Each layout with its plan, metrics, TV-wall elevation and seat table.</p>
+				</div>
+				<figure class="frame">
+					<figcaption>
+						<span><b>Gallery</b> · 16 layouts</span
+						><a href="living-room-builder/gallery.html" target="_blank" rel="noopener">Open ↗</a>
+					</figcaption>
+					<iframe src="living-room-builder/gallery.html" title="Gallery" style="height: 1400px" loading="lazy"></iframe>
+				</figure>
+			</section>
+			<section id="council">
+				<div class="head">
+					<h2>Council rounds · couch + TV + dining</h2>
+					<p>
+						Five harnesses (claude-sonnet-5-5, grok-4.7, gemini-4-argon, composer-2.5, gpt-6.1-terra) scored each
+						submission; the goal was 9+ from at least four.
+					</p>
+				</div>
+				<div class="tabs">
+					<input type="radio" name="council" id="council-0" /><label for="council-0">Round 1 · H1</label
+					><input type="radio" name="council" id="council-1" checked /><label for="council-1">Round 2 · H2</label>
+					<div class="tab" data-for="council-0">
+						<figure class="frame">
+							<figcaption>
+								<span><b>Round 1 · H1</b> · 2/5 councillors at 9+</span
+								><a href="living-room-builder/council/round-1.html" target="_blank" rel="noopener">Open ↗</a>
+							</figcaption>
+							<iframe
+								src="living-room-builder/council/round-1.html"
+								title="Round 1 · H1"
+								style="height: 1500px"
+								loading="lazy"
+							></iframe>
+						</figure>
+					</div>
+					<div class="tab" data-for="council-1">
+						<figure class="frame">
+							<figcaption>
+								<span><b>Round 2 · H2</b> · 4/5 councillors at 9+</span
+								><a href="living-room-builder/council/round-2.html" target="_blank" rel="noopener">Open ↗</a>
+							</figcaption>
+							<iframe
+								src="living-room-builder/council/round-2.html"
+								title="Round 2 · H2"
+								style="height: 1500px"
+								loading="lazy"
+							></iframe>
+						</figure>
+					</div>
+				</div>
+			</section>
+			<section id="panel">
+				<div class="head">
+					<h2>Panel rounds · couch + TV</h2>
+					<p>The earlier three-reviewer panel, from the first 115″ L sectional to the 98″ corner-TV pick.</p>
+				</div>
+				<figure class="frame">
+					<figcaption>
+						<span><b>Panel rounds</b> · 5 rounds</span
+						><a href="living-room-builder/panel-rounds.html" target="_blank" rel="noopener">Open ↗</a>
+					</figcaption>
+					<iframe
+						src="living-room-builder/panel-rounds.html"
+						title="Panel rounds"
+						style="height: 1300px"
+						loading="lazy"
+					></iframe>
+				</figure>
+			</section>
+			<section id="earlier">
+				<div class="head">
+					<h2>Earlier studies</h2>
+					<p>Work in output/ from before the builder. Each loads when opened.</p>
+				</div>
+				<details class="study">
+					<summary>Layout permutations <span>· first computed fit checks and TV sizing</span></summary>
+					<figure class="frame">
+						<figcaption>
+							<span><b>Layout permutations</b> · first computed fit checks and TV sizing</span
+							><a href="living-room-layouts/index.html" target="_blank" rel="noopener">Open ↗</a>
+						</figcaption>
+						<iframe
+							src="living-room-layouts/index.html"
+							title="Layout permutations"
+							style="height: 1100px"
+							loading="lazy"
+						></iframe>
+					</figure>
+				</details>
+				<details class="study">
+					<summary>West Elm Harmony fit study <span>· one modular sofa, measured</span></summary>
+					<figure class="frame">
+						<figcaption>
+							<span><b>West Elm Harmony fit study</b> · one modular sofa, measured</span
+							><a href="living-room-layouts/harmony.html" target="_blank" rel="noopener">Open ↗</a>
+						</figcaption>
+						<iframe
+							src="living-room-layouts/harmony.html"
+							title="West Elm Harmony fit study"
+							style="height: 1100px"
+							loading="lazy"
+						></iframe>
+					</figure>
+				</details>
+				<details class="study">
+					<summary>Fixed 3D scene renders <span>· four arrangements rendered in Blender</span></summary>
+					<figure class="frame">
+						<figcaption>
+							<span><b>Fixed 3D scene renders</b> · four arrangements rendered in Blender</span
+							><a href="living-room-fixed-scene/comparison.html" target="_blank" rel="noopener">Open ↗</a>
+						</figcaption>
+						<iframe
+							src="living-room-fixed-scene/comparison.html"
+							title="Fixed 3D scene renders"
+							style="height: 1100px"
+							loading="lazy"
+						></iframe>
+					</figure>
+				</details>
+				<details class="study">
+					<summary>Measured design concepts <span>· AI renders from measured geometry</span></summary>
+					<figure class="frame">
+						<figcaption>
+							<span><b>Measured design concepts</b> · AI renders from measured geometry</span
+							><a href="living-room-measured-v2/comparison.html" target="_blank" rel="noopener">Open ↗</a>
+						</figcaption>
+						<iframe
+							src="living-room-measured-v2/comparison.html"
+							title="Measured design concepts"
+							style="height: 1100px"
+							loading="lazy"
+						></iframe>
+					</figure>
+				</details>
+				<details class="study">
+					<summary>First design concepts <span>· four moodboard concepts</span></summary>
+					<figure class="frame">
+						<figcaption>
+							<span><b>First design concepts</b> · four moodboard concepts</span
+							><a href="living-room-concepts/comparison.html" target="_blank" rel="noopener">Open ↗</a>
+						</figcaption>
+						<iframe
+							src="living-room-concepts/comparison.html"
+							title="First design concepts"
+							style="height: 1100px"
+							loading="lazy"
+						></iframe>
+					</figure>
+				</details>
+			</section>
+		</main>
+	</body>
+</html>

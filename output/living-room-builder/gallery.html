@@ -5,6 +5,33 @@
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>Living room layouts</title>
 		<style>
+			:root {
+				--background: #f6f4ef;
+				--foreground: #1d1d1b;
+				--muted-foreground: #6d6a62;
+				--border: #d9d5cb;
+				--card: #fff;
+				--success: #2f7d4a;
+				--warning: #b5651d;
+				--destructive: #b3261e;
+			}
+			@media (prefers-color-scheme: dark) {
+				:root {
+					--background: #161614;
+					--foreground: #ecebe6;
+					--muted-foreground: #a29f96;
+					--border: #37352f;
+					--card: #1f1f1c;
+					--success: #5cb27a;
+					--warning: #e09a50;
+					--destructive: #ef6b62;
+				}
+			}
+			body {
+				margin: 0;
+				background: var(--background);
+			}
+
 			.lr-plan {
 				--lr-sofa: #9c7b5c;
 				--lr-wood: #b8925f;
@@ -280,7 +307,7 @@
 		</style>
 	</head>
 	<body>
-		<div class="lr">
+		<div class="lr" style="max-width: 1200px; margin: 0 auto; padding: 16px">
 			<div class="legend">
 				<span><span class="dot prime"></span>prime seat (≤30° off-axis, ≤35° head turn, screen fills 26–46°)</span
 				><span><span class="dot good"></span>good seat (≤45° off-axis, ≤50° head turn)</span
@@ -289,6 +316,244 @@
 					the screen fills more than 50°)</span
 				><span>shaded lines: walking routes from the kitchen, labeled at their narrowest point</span>
 			</div>
+			<section class="card">
+				<h2>H2 · 85″ wall TV at 8 ft · 4-seat sofa east of the column · 6-seat dining off the island</h2>
+				<ul class="notes">
+					<li>
+						The sofa moves east of the column, 8 ft from the TV wall, so an 85″ screen fills 38–42° of view: more
+						picture than a 98″ at 13 ft (28–31°).
+					</li>
+					<li>
+						Dining stays by the kitchen: the 72″ × 36″ table off the island with three chairs a side, now 48″ of
+						pull-out room each.
+					</li>
+					<li>
+						The freed lake corner behind the sofa becomes a reading nook: a swivel lounge chair and lamp by the column,
+						the balcony route behind.
+					</li>
+				</ul>
+				<div class="cols">
+					<div>
+						<svg
+							class="lr-plan"
+							viewBox="-40 -22 302 272"
+							xmlns="http://www.w3.org/2000/svg"
+							role="img"
+							aria-label="85″ wall TV at 8 ft · 4-seat sofa east of the column · 6-seat dining off the island floor plan"
+						>
+							<polygon class="floor" points="0,228 199,228 199,24 0,24" />
+							<polygon class="floor2" points="35,24 199,24 199,-22 35,-22" />
+							<polygon class="floor2" points="199,106 262,106 262,53 199,53" />
+							<polygon class="floor2" points="-38,226 -1,226 -1,24 -38,24" />
+							<text class="mut" x="-20" y="128" transform="rotate(-90 -20 128)">balcony</text>
+							<text class="mut" x="232" y="80">office</text>
+							<text class="mut" x="232" y="87">landing</text>
+							<text class="mut" x="218" y="31">bath 2</text>
+							<polygon class="fixed" points="78,32.5 149,32.5 149,-8.5 78,-8.5" />
+							<text class="mut" x="113.5" y="12">island 71×41</text>
+							<polygon class="fixed" points="7,24 35,24 35,-22 7,-22" />
+							<text class="mut" x="21" y="0" transform="rotate(-90 21 0)">counter</text>
+							<text class="mut" x="175" y="-12">kitchen / entry ↑</text>
+							<g data-id="rug"><polygon class="rug" points="94,222 190,222 190,110 94,110" /></g>
+							<polyline
+								class="route rok"
+								stroke-width="37"
+								points="262.5,77.5 195.5,71.5 190.5,69.5 185.5,65.5 180.5,58.5 180.5,32.5 175.5,-34.5"
+							/>
+							<polyline
+								class="routec rok"
+								points="262.5,77.5 195.5,71.5 190.5,69.5 185.5,65.5 180.5,58.5 180.5,32.5 175.5,-34.5"
+							/>
+							<text class="mut" x="188.5" y="63.5">37″</text>
+							<polyline
+								class="route rok"
+								stroke-width="35"
+								points="262.5,30.5 195.5,29.5 189.5,26.5 183.5,20.5 175.5,-34.5"
+							/>
+							<polyline class="routec rok" points="262.5,30.5 195.5,29.5 189.5,26.5 183.5,20.5 175.5,-34.5" />
+							<text class="mut" x="192.5" y="23.5">35″</text>
+							<polyline
+								class="route rok"
+								stroke-width="41"
+								points="-29.5,63.5 4.5,59.5 44.5,37.5 61.5,20.5 61.5,-11.5 64.5,-17.5 75.5,-28.5 175.5,-34.5"
+							/>
+							<polyline
+								class="routec rok"
+								points="-29.5,63.5 4.5,59.5 44.5,37.5 61.5,20.5 61.5,-11.5 64.5,-17.5 75.5,-28.5 175.5,-34.5"
+							/>
+							<text class="mut" x="7.5" y="53.5">41″</text>
+							<polygon class="wedge" points="100,153.5 194,203 194,129" />
+							<line class="sight prime" x1="100" y1="128.5" x2="194" y2="166" />
+							<line class="sight prime" x1="100" y1="153.5" x2="194" y2="166" />
+							<line class="sight prime" x1="100" y1="178.5" x2="194" y2="166" />
+							<line class="sight prime" x1="100" y1="203.5" x2="194" y2="166" />
+							<g data-id="sofa">
+								<polygon class="sofa" points="82,112 82,220 120,220 120,112" />
+								<polygon class="sofaback" points="82,112 82,220 91,220 91,112" />
+								<polygon class="sofaback" points="82,112 82,116 120,116 120,112" />
+								<polygon class="sofaback" points="82,216 82,220 120,220 120,216" />
+							</g>
+							<g data-id="console"><polygon class="console" points="199,206 199,126 185,126 185,206" /></g>
+							<g data-id="ottoman"><polygon class="table" points="135,138 135,194 161,194 161,138" /></g>
+							<g data-id="din">
+								<polygon class="table" points="102,34 102,106 138,106 138,34" />
+								<polygon class="chair" points="142,54 142,38 158,38 158,54" />
+								<polygon class="pull" points="162,56 162,36 174,36 174,56" />
+								<polygon class="chair" points="142,78 142,62 158,62 158,78" />
+								<polygon class="pull" points="162,80 162,60 174,60 174,80" />
+								<polygon class="chair" points="142,102 142,86 158,86 158,102" />
+								<polygon class="pull" points="162,104 162,84 174,84 174,104" />
+								<polygon class="chair" points="98,38 98,54 82,54 82,38" />
+								<polygon class="pull" points="78,36 78,56 66,56 66,36" />
+								<polygon class="chair" points="98,62 98,78 82,78 82,62" />
+								<polygon class="pull" points="78,60 78,80 66,80 66,60" />
+								<polygon class="chair" points="98,86 98,102 82,102 82,86" />
+								<polygon class="pull" points="78,84 78,104 66,104 66,84" />
+							</g>
+							<g data-id="chair"><polygon class="sofa" points="8.5,152 32,175.5 55.5,152 32,128.5" /></g>
+							<g data-id="lamp"><circle class="decor" cx="14" cy="178" r="6" /></g>
+							<polygon class="cushion" points="91,116 91,141 120,141 120,116" />
+							<circle class="prime" cx="100" cy="128.5" r="2.6" stroke="white" stroke-width=".5" />
+							<text class="seatn" fill="white" x="100" y="128.7">1</text>
+							<polygon class="cushion" points="91,141 91,166 120,166 120,141" />
+							<circle class="prime" cx="100" cy="153.5" r="2.6" stroke="white" stroke-width=".5" />
+							<text class="seatn" fill="white" x="100" y="153.7">2</text>
+							<polygon class="cushion" points="91,166 91,191 120,191 120,166" />
+							<circle class="prime" cx="100" cy="178.5" r="2.6" stroke="white" stroke-width=".5" />
+							<text class="seatn" fill="white" x="100" y="178.7">3</text>
+							<polygon class="cushion" points="91,191 91,216 120,216 120,191" />
+							<circle class="prime" cx="100" cy="203.5" r="2.6" stroke="white" stroke-width=".5" />
+							<text class="seatn" fill="white" x="100" y="203.7">4</text>
+							<g data-id="tv">
+								<polygon class="tv" points="196.5,203.5 196.5,128.5 194,128.5 194,203.5" />
+								<polygon class="console" points="199,180 199,152 196.5,152 196.5,180" />
+							</g>
+							<circle class="column" cx="61.5" cy="207.5" r="16.5" />
+							<text class="mut" x="61.5" y="207.5">column</text>
+							<line class="glass" x1="0" y1="228" x2="146" y2="228" />
+							<line class="wall" x1="146" y1="228" x2="199" y2="228" />
+							<line class="glass" x1="0" y1="228" x2="0" y2="84" />
+							<line class="glass" x1="0" y1="43" x2="0" y2="24" />
+							<line class="open" x1="0" y1="84" x2="-30" y2="72" />
+							<text class="mut" x="-9" y="63.5" transform="rotate(-90 -9 63.5)">door</text>
+							<line class="wall" x1="199" y1="228" x2="199" y2="106" />
+							<line class="wall" x1="199" y1="53" x2="199" y2="48" />
+							<line class="wall" x1="199" y1="13" x2="199" y2="-22" />
+							<line class="wall" x1="199" y1="106" x2="300" y2="106" />
+							<line class="wall" x1="213" y1="53" x2="300" y2="53" />
+							<line class="wall" x1="0" y1="24" x2="35" y2="24" />
+							<line class="open" x1="35" y1="32.5" x2="199" y2="32.5" />
+							<text class="mut" x="70" y="236">south glass (lake)</text>
+							<text class="mut" x="172" y="236">solid</text>
+							<text class="mut" x="-9" y="158" transform="rotate(-90 -9 158)">west glass</text>
+							<text class="mut" x="208" y="167" transform="rotate(90 208 167)">TV wall 122″</text>
+							<line class="dim" x1="150" y1="244" x2="198" y2="244" />
+							<line class="dim" x1="150" y1="242" x2="150" y2="246" />
+							<line class="dim" x1="198" y1="242" x2="198" y2="246" />
+							<text class="mut" x="210" y="244">4 ft</text>
+							<text class="lbl" x="245" y="218">N ↑</text>
+							<text class="big" x="186" y="166" transform="rotate(-90 186 166)">85″ TV</text>
+							<text class="lbl" x="147" y="156">7′11″ · 42°</text>
+						</svg>
+					</div>
+					<div>
+						<div class="kv"><span>TV</span><b>85″ wall-mounted</b></div>
+						<div class="kv"><span>Seats</span><b>4 (4 prime, 0 good, 0 side)</b></div>
+						<div class="kv"><span>Seat run</span><b>108″</b></div>
+						<div class="kv"><span>Eye → screen</span><b>7′11″ – 8′5″</b></div>
+						<div class="kv"><span>Screen fills</span><b>38–42°</b></div>
+						<div class="kv"><span>Coffee table gap</span><b>15″</b></div>
+						<div class="kv"><span>Dining</span><b>6 chairs, 72″ × 36″</b></div>
+						<div class="kv"><span>Chair pull-out</span><b>48″ min</b></div>
+						<div class="kv"><span>Island clearance</span><b>79″</b></div>
+						<div class="kv"><span>Open floor</span><b>77″ × 96″</b></div>
+						<div class="kv"><span>Office / guest door</span><b>37″</b></div>
+						<div class="kv"><span>Bath 2 door</span><b>35″</b></div>
+						<div class="kv"><span>Balcony door</span><b>41″</b></div>
+						<ul class="issues">
+							<li class="ok">No collisions; every route clear</li>
+						</ul>
+						<div class="elev">
+							<svg
+								class="lr-plan"
+								viewBox="0 0 142 135"
+								xmlns="http://www.w3.org/2000/svg"
+								role="img"
+								aria-label="TV elevation"
+							>
+								<rect class="floor" x="10" y="7" width="122" height="120" />
+								<line class="wall" x1="10" y1="127" x2="132" y2="127" />
+								<line class="open" x1="10" y1="7" x2="132" y2="7" />
+								<rect class="console" x="30" y="107" width="80" height="10" />
+								<rect class="tv" x="32.5" y="59.5" width="75" height="42.5" rx="1" />
+								<text class="lbl" style="fill: var(--background, #fff)" x="70" y="81">85″ · 75″ × 42.5″</text>
+								<line class="dim" x1="10" y1="87" x2="132" y2="87" stroke-dasharray="2 2" />
+								<text class="mut" x="118" y="84">eye 40″</text>
+								<rect class="console" x="15" y="77.5" width="3" height="4.5" />
+								<text class="mut" x="25.5" y="73.5">switch</text>
+								<circle class="console" cx="38" cy="22" r="2.5" />
+								<text class="mut" x="38" y="17">smoke</text>
+								<rect class="console" x="67" y="109" width="4" height="4" />
+								<text class="mut" x="69" y="121">outlet</text>
+								<text class="mut" x="14" y="132">N</text>
+								<text class="mut" x="128" y="132">S</text>
+								<text class="mut" x="71" y="13">TV wall, seen from the sofa (122″ × 120″)</text>
+							</svg>
+						</div>
+					</div>
+				</div>
+				<table class="seats">
+					<thead>
+						<tr>
+							<th>Seat</th>
+							<th>Type</th>
+							<th>To screen</th>
+							<th>Fills</th>
+							<th>Off-axis</th>
+							<th>Head turn</th>
+							<th>Width</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td><span class="dot prime"></span>1</td>
+							<td>main</td>
+							<td>8′5″</td>
+							<td>38°</td>
+							<td>22°</td>
+							<td>22°</td>
+							<td>25″</td>
+						</tr>
+						<tr>
+							<td><span class="dot prime"></span>2</td>
+							<td>main</td>
+							<td>7′11″</td>
+							<td>42°</td>
+							<td>8°</td>
+							<td>8°</td>
+							<td>25″</td>
+						</tr>
+						<tr>
+							<td><span class="dot prime"></span>3</td>
+							<td>main</td>
+							<td>7′11″</td>
+							<td>42°</td>
+							<td>8°</td>
+							<td>8°</td>
+							<td>25″</td>
+						</tr>
+						<tr>
+							<td><span class="dot prime"></span>4</td>
+							<td>main</td>
+							<td>8′5″</td>
+							<td>38°</td>
+							<td>22°</td>
+							<td>22°</td>
+							<td>25″</td>
+						</tr>
+					</tbody>
+				</table>
+			</section>
 			<section class="card">
 				<h2>H1 · 98″ wall TV · 4-seat sofa · 6-seat dining table off the island</h2>
 				<ul class="notes">
