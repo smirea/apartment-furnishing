@@ -13,7 +13,7 @@ for (const l of pick) {
 	for (const [k, v] of Object.entries(ev.summary)) console.log(`  ${k.padEnd(20)} ${v}`);
 	for (const s of ev.seats)
 		console.log(
-			`  seat ${s.n} ${s.kind.padEnd(6)} ${s.rating.padEnd(5)} dist ${s.dist.toFixed(0)} fov ${s.fov.toFixed(0)}° off ${s.offAxis.toFixed(0)}° turn ${s.turn.toFixed(0)}° w ${s.width.toFixed(0)} access ${s.access.toFixed(0)}`,
+			`  seat ${s.n} ${s.kind.padEnd(6)} ${s.rating.padEnd(5)} dist ${s.dist.toFixed(0)} fov ${s.fov.toFixed(0)}° off ${s.offAxis.toFixed(0)}° turn ${s.turn.toFixed(0)}° w ${Math.round(s.width * 2) / 2} access ${s.access.toFixed(0)}`,
 		);
 	for (const i of ev.issues) console.log(`  [${i.level}] ${i.msg}`);
 }

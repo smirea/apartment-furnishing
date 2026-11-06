@@ -127,10 +127,19 @@
 			"space": 9,
 			"floorPlan": 10
 		},
-		"grok-4.7": "pending"
+		"grok-4.7": {
+			"overall": 9,
+			"seating": 9,
+			"tv": 9,
+			"coffeeTable": 10,
+			"space": 9,
+			"floorPlan": 9
+		}
 	},
 	"findings": [
 		"terra: no measured shortfall with a buildable fix; tape the column north edge (modeled y 37) and check door hardware before ordering.",
-		"sonnet: nothing to fix; seats 3 and 6 stay good, not prime, and no alternative fixes that without losing a seat. The seat table rounded 28.5-inch seats to 29 (fixed)."
-	]
+		"sonnet: nothing to fix; seats 3 and 6 stay good, not prime, and no alternative fixes that without losing a seat. The seat table rounded 28.5-inch seats to 29 (fixed).",
+		"grok: would not move it again. The only residue is the north edge 3 inches past the balcony jamb (y 147 vs 144), forced by a 106-inch run; a 102-inch run fixes it at the cost of 26.5-inch main seats, which grok would not take."
+	],
+	"outcome": "All three reviewers at 9 or above on every criterion. Final layout."
 }

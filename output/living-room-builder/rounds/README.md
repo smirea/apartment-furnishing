@@ -8,5 +8,6 @@ Each round, one layout went to a panel of three reviewers (grok-4.7, gpt-6.1-ter
 | 2     | A7: the same L, clear of the door and column, walnut-topped ottoman | 7.5            | 7.5   | 8      | Shortened and shifted the main run for 4″ margins, switched to a buyable ottoman and tray, kept the rug under the sofa, added a sightline-occlusion check and stricter seat ratings |
 | 3     | A8: the same L at 115″, buyable Aries ottoman and tray, 4″ margins  | — (superseded) | 9     | 8.5    | The owner capped the TV at 98″, so every layout was re-searched; a corner TV beat every wall-TV pose                                                                                |
 | 4     | G2: 98″ corner TV, 6-seat L facing it                               | 8              | 9     | 9      | Moved the sofa, ottoman and rug 4″ north to clear the column (grok's numbers)                                                                                                       |
+| 5     | G2 final: the same, 4″ clear of the column                          | 9              | 10    | 9      | Final: every reviewer at 9 or above on every criterion                                                                                                                              |
 
 Sub-scores per reviewer (seating, TV, coffee table, use of space, floor-plan adherence) are in each JSON file.
