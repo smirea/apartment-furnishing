@@ -99,9 +99,14 @@ export function carpetSpawn(size: Pick<CarpetSize, 'widthIn' | 'lengthIn'>, plan
 	return null;
 }
 
-// Moves a carpet from where it lies toward `to` as far as the walls let it: a move that crosses a wall slides along it,
-// first east-west, then north-south, and stops flush against it. A turn that would cross a wall is refused. A carpet
-// that already crosses a wall moves freely, so it can be pulled clear.
+// Steps a move is checked in, under the thinnest wall run (about 5″) so no step can carry a rug through one.
+const SWEEP_FT = 0.1;
+const SWEEP_DEG = 1;
+
+// Moves a carpet from where it lies toward `to` as far as the walls let it, checking the whole path so a fast drag
+// can't jump a wall: a move that would cross one slides along it, first east-west, then north-south, and stops flush
+// against it. A turn that would sweep through a wall is refused. A carpet that already crosses a wall moves freely, so
+// it can be pulled clear.
 export function moveCarpet(
 	from: CarpetPose,
 	to: CarpetPose,
@@ -109,22 +114,31 @@ export function moveCarpet(
 	plan: Obstacles,
 ): CarpetPose {
 	const fits = (pose: CarpetPose) => !carpetHitsWalls(pose, size, plan);
-	if (fits(to) || !fits(from)) return to;
-	if (Math.abs(to.yaw - from.yaw) > 1e-6) return from;
-	let pose = from;
-	for (const axis of ['x', 'z'] as const) {
-		const along = (t: number) => ({ ...pose, [axis]: pose[axis] + (to[axis] - pose[axis]) * t });
-		if (fits(along(1))) {
-			pose = along(1);
-			continue;
-		}
-		let [lo, hi] = [0, 1];
-		for (let i = 0; i < 16; i++) {
-			const mid = (lo + hi) / 2;
-			if (fits(along(mid))) lo = mid;
-			else hi = mid;
-		}
-		pose = along(lo);
+	if (!fits(from)) return to;
+	const turn = to.yaw - from.yaw;
+	if (Math.abs(turn) > 1e-6) {
+		const steps = Math.ceil(Math.abs(turn) / SWEEP_DEG);
+		for (let i = 1; i <= steps; i++) if (!fits({ ...from, yaw: from.yaw + (turn * i) / steps })) return from;
+		return to;
 	}
-	return pose;
+	// The farthest pose clear of walls on the straight path from `start` to `end`.
+	const farthest = (start: CarpetPose, end: CarpetPose) => {
+		const at = (t: number) => ({ ...start, x: start.x + (end.x - start.x) * t, z: start.z + (end.z - start.z) * t });
+		const steps = Math.max(1, Math.ceil(Math.hypot(end.x - start.x, end.z - start.z) / SWEEP_FT));
+		for (let i = 1; i <= steps; i++) {
+			if (fits(at(i / steps))) continue;
+			let [lo, hi] = [(i - 1) / steps, i / steps];
+			for (let j = 0; j < 12; j++) {
+				const mid = (lo + hi) / 2;
+				if (fits(at(mid))) lo = mid;
+				else hi = mid;
+			}
+			return { pose: at(lo), blocked: true };
+		}
+		return { pose: end, blocked: false };
+	};
+	const straight = farthest(from, to);
+	if (!straight.blocked) return to;
+	const alongX = farthest(from, { ...from, x: to.x }).pose;
+	return farthest(alongX, { ...alongX, z: to.z }).pose;
 }

@@ -58,3 +58,13 @@ test('a turn that would swing a rug into a wall leaves it where it was', () => {
 	const flush = { x: 24.388 - 4, z: 30, yaw: 0 };
 	expect(moveCarpet(flush, { ...flush, yaw: 15 }, rug(8, 10), plan)).toEqual(flush);
 });
+
+test('a drag that jumps a small rug clean past the TV wall stops it flush on this side', () => {
+	const moved = moveCarpet({ x: 22, z: 30, yaw: 0 }, { x: 27, z: 30, yaw: 0 }, rug(2, 2), plan);
+	expect(moved.x).toBeCloseTo(24.388 - 1, 2);
+});
+
+test('a big turn that would sweep a corner through a wall is refused even if it ends clear', () => {
+	const flush = { x: 24.388 - 4, z: 30, yaw: 0 };
+	expect(moveCarpet(flush, { ...flush, yaw: 180 }, rug(8, 10), plan)).toEqual(flush);
+});

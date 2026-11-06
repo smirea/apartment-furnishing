@@ -999,6 +999,8 @@
 									<span class="status failed" title={carpet.textureJob.error}>Image failed · select it to retry</span>
 								{/if}
 								<span class="muted">{carpetFacts(carpet)}</span>
+								<!-- A carpet out of the room has no card to open, so its row picks the size, say one that fits. -->
+								{#if !carpet.placement && carpet.sizes.length > 1}{@render sizePicker(carpet)}{/if}
 							</div>
 							{#if carpet.placement}
 								<button type="button" onclick={() => removeCarpet(carpet)}>Remove</button>
@@ -1170,7 +1172,6 @@
 
 	{#if selectedCarpet}
 		{@const c = selectedCarpet}
-		{@const current = c.sizes.findIndex(s => s.widthIn === c.size.widthIn && s.lengthIn === c.size.lengthIn)}
 		<aside class="panel card">
 			<button type="button" class="close" aria-label="Close" onclick={() => viewer?.select(null)}>×</button>
 			{#if c.texture ?? c.image}<img src={c.texture?.map ?? c.image} alt={c.name} />{/if}
@@ -1184,20 +1185,7 @@
 			<div class="controls">
 				<label class="row">
 					<span>Size</span>
-					<select
-						value={current}
-						onchange={e => {
-							if (!resizeCarpet(c, c.sizes[Number(e.currentTarget.value)]!)) e.currentTarget.value = String(current);
-						}}
-					>
-						{#each c.sizes as size, i (i)}
-							<option value={i}
-								>{sizeLabel(size)}{size.price === null
-									? ''
-									: ` · ${size.price.toLocaleString('en-US', { style: 'currency', currency: c.currency })}`}</option
-							>
-						{/each}
-					</select>
+					{@render sizePicker(c)}
 				</label>
 				<div class="row">
 					<span>Turn</span>
@@ -1232,6 +1220,24 @@
 		</aside>
 	{/if}
 </div>
+
+{#snippet sizePicker(c: CarpetEntry)}
+	{@const current = c.sizes.findIndex(s => s.widthIn === c.size.widthIn && s.lengthIn === c.size.lengthIn)}
+	<select
+		value={current}
+		onchange={e => {
+			if (!resizeCarpet(c, c.sizes[Number(e.currentTarget.value)]!)) e.currentTarget.value = String(current);
+		}}
+	>
+		{#each c.sizes as size, i (i)}
+			<option value={i}
+				>{sizeLabel(size)}{size.price === null
+					? ''
+					: ` · ${size.price.toLocaleString('en-US', { style: 'currency', currency: c.currency })}`}</option
+			>
+		{/each}
+	</select>
+{/snippet}
 
 {#if peek}
 	<div
