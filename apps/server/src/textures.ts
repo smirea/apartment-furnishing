@@ -1,6 +1,6 @@
 // Wall textures: wall-panel products imported like furniture (page capture, grok, photos), then turned into a
 // seamless tile by Codex instead of a 3D model. The wallTexture fixture (fixtures.ts) picks which one the living room wears.
-import type { Job, WallTexture } from '@repo/shared/items';
+import type { WallTexture } from '@repo/shared/items';
 import { copyFile, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -16,6 +16,7 @@ import {
 } from './catalog';
 import { table } from './db';
 import { collectPhotos, runCodex } from './generate-model';
+import { jobQueue } from './jobs';
 
 // Spec-sheet text saved next to the photos at import, so texture builds (and rebuilds) get exact slat sizes.
 const SPEC_FILE = 'spec.txt';
@@ -213,40 +214,6 @@ export async function generateTexture(texture: WallTexture, log: (line: string) 
 	log(`codex: texture ${texture.id} done, ${JSON.stringify(size.repeat)} (${work})`);
 }
 
-export const textureJobs = new Map<string, Job>();
-
-// Each job is a Codex session; a store import can queue dozens, so only a few run at once.
-const TEXTURE_CONCURRENCY = 3;
-const queue: WallTexture[] = [];
-let active = 0;
-
-export function startTextureJob(texture: WallTexture) {
-	const state = textureJobs.get(texture.id)?.state;
-	if (state === 'running' || state === 'queued') return;
-	textureJobs.set(texture.id, { state: 'queued' });
-	queue.push(texture);
-	runQueue();
-}
-
-function runQueue() {
-	while (active < TEXTURE_CONCURRENCY && queue.length) {
-		const texture = queue.shift()!;
-		active++;
-		textureJobs.set(texture.id, { state: 'running' });
-		generateTexture(texture, console.log)
-			.then(
-				() => textureJobs.delete(texture.id),
-				(error: unknown) => {
-					console.error(error);
-					textureJobs.set(texture.id, {
-						state: 'failed',
-						error: error instanceof Error ? error.message : String(error),
-					});
-				},
-			)
-			.finally(() => {
-				active--;
-				runQueue();
-			});
-	}
-}
+const queue = jobQueue<WallTexture>(3, texture => generateTexture(texture, console.log));
+export const textureJobs = queue.jobs;
+export const startTextureJob = queue.start;

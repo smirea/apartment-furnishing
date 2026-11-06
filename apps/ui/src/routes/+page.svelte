@@ -1,7 +1,15 @@
 <script lang="ts">
 	import { finishAreasIn } from '@repo/shared/floorplan';
 	import { FIXTURE_KEYS, type Fixture, type FixtureKey, type FixtureOption } from '@repo/shared/fixtures';
-	import { TV_MOUNT_IN } from '@repo/shared/plan';
+	import { planGeometry, TV_MOUNT_IN } from '@repo/shared/plan';
+	import {
+		carpetHitsWalls,
+		carpetSpawn,
+		sizeLabel,
+		type Carpet,
+		type CarpetEntry,
+		type CarpetSize,
+	} from '@repo/shared/carpets';
 	import {
 		panelsNeeded,
 		TV_PLACEMENTS,
@@ -22,7 +30,7 @@
 	import { onMount, tick } from 'svelte';
 	import type { Attachment } from 'svelte/attachments';
 	import type { MeasureState, MeasureTool } from '../lib/measure';
-	import { createViewer, type Mode } from '../lib/scene';
+	import { createViewer, type Mode, type Selection } from '../lib/scene';
 
 	// Living room, clear of the island and the column.
 	const SPAWN = { x: 15.5, z: 28 };
@@ -34,8 +42,9 @@
 	const saved = JSON.parse(localStorage.getItem(OPTIONS_KEY) ?? '{}');
 	let cutaway = $state<boolean>(saved.cutaway ?? true);
 	let labels = $state<boolean>(saved.labels ?? false);
-	let open = $state<Record<FixtureKey | 'furniture' | 'ideas', boolean>>({
+	let open = $state<Record<FixtureKey | 'furniture' | 'carpets' | 'ideas', boolean>>({
 		furniture: true,
+		carpets: true,
 		...(Object.fromEntries(FIXTURE_KEYS.map(key => [key, true])) as Record<FixtureKey, boolean>),
 		ideas: false,
 		...saved.open,
@@ -333,7 +342,8 @@
 		updatePlacements(placements.map(p => (p.key === key ? { ...p, ...patch } : p)));
 	}
 
-	let selectedKey = $state<string | null>(null);
+	let selection = $state<Selection | null>(null);
+	const selectedKey = $derived(selection?.kind === 'item' ? selection.key : null);
 	const selectedPlacement = $derived(placements.find(p => p.key === selectedKey) ?? null);
 	const selected = $derived(selectedPlacement ? catalog[selectedPlacement.itemId] : null);
 	const placedCount = (itemId: string) => placements.filter(p => p.itemId === itemId).length;
@@ -355,7 +365,7 @@
 		viewer?.snapWhenLoaded(key);
 		updatePlacements([...placements, { key, itemId, position: [SPAWN.x, elevation, SPAWN.z], rotation: [0, 0, 0] }]);
 		await tick();
-		viewer?.select(key);
+		viewer?.select({ kind: 'item', key });
 	}
 
 	function rotate(delta: number) {
@@ -375,8 +385,109 @@
 	function removeSelected() {
 		if (!selectedKey) return;
 		updatePlacements(placements.filter(p => p.key !== selectedKey));
-		selectedKey = null;
+		selection = null;
 	}
+
+	const plan = planGeometry();
+	let carpetSavesPending = 0;
+	let carpetSaves = 0;
+	const carpetsQuery = createQuery(() => ({
+		queryKey: ['carpets'],
+		// A poll answered while a move is saving would put the carpet back for a cycle.
+		queryFn: async () => {
+			const data = await api<CarpetEntry[]>('/api/carpets');
+			return carpetSavesPending ? (queryClient.getQueryData<CarpetEntry[]>(['carpets']) ?? data) : data;
+		},
+		refetchInterval: query =>
+			query.state.data?.some(c => c.textureJob && c.textureJob.state !== 'failed') ? 3000 : false,
+	}));
+	const carpetList = $derived(carpetsQuery.data ?? []);
+	const selectedCarpet = $derived(
+		selection?.kind === 'carpet' ? (carpetList.find(c => c.id === (selection as { id: string }).id) ?? null) : null,
+	);
+	let carpetError = $state<string | null>(null);
+	const storeCarpet = (next: CarpetEntry) =>
+		queryClient.setQueryData<CarpetEntry[]>(['carpets'], list => list?.map(c => (c.id === next.id ? next : c)));
+
+	// Saved optimistically; a reply to an older save that lands after a newer one is dropped.
+	async function saveCarpet(id: string, patch: Partial<Pick<Carpet, 'size' | 'placement'>>) {
+		const n = ++carpetSaves;
+		carpetError = null;
+		carpetSavesPending++;
+		void queryClient.cancelQueries({ queryKey: ['carpets'] });
+		queryClient.setQueryData<CarpetEntry[]>(['carpets'], list =>
+			list?.map(c => (c.id === id ? { ...c, ...patch } : c)),
+		);
+		try {
+			const next = await api<CarpetEntry>(`/api/carpets/${id}`, { method: 'PUT', body: JSON.stringify(patch) });
+			if (n === carpetSaves) storeCarpet(next);
+		} catch (error) {
+			carpetError = (error as Error).message;
+			if (n === carpetSaves) void queryClient.invalidateQueries({ queryKey: ['carpets'] });
+		} finally {
+			carpetSavesPending--;
+		}
+	}
+
+	async function addCarpet(carpet: CarpetEntry) {
+		const placement = carpetSpawn(carpet.size, plan);
+		if (!placement) {
+			carpetError = `At ${sizeLabel(carpet.size)} it doesn't fit in the middle of the living room`;
+			return;
+		}
+		void saveCarpet(carpet.id, { placement });
+		await tick();
+		viewer?.select({ kind: 'carpet', id: carpet.id });
+	}
+	function removeCarpet(carpet: CarpetEntry) {
+		if (selectedCarpet?.id === carpet.id) viewer?.select(null);
+		void saveCarpet(carpet.id, { placement: null });
+	}
+	function turnCarpet(carpet: CarpetEntry, delta: number) {
+		if (!carpet.placement) return;
+		const yaw = ((((carpet.placement.yaw + delta + 180) % 360) + 360) % 360) - 180;
+		const placement = { ...carpet.placement, yaw };
+		if (carpetHitsWalls(placement, carpet.size, plan)) {
+			carpetError = 'No room to turn it here. Drag it away from the wall first.';
+			return;
+		}
+		void saveCarpet(carpet.id, { placement });
+	}
+	function resizeCarpet(carpet: CarpetEntry, size: CarpetSize) {
+		if (carpet.placement && carpetHitsWalls(carpet.placement, size, plan)) {
+			carpetError = `At ${sizeLabel(size)} it would cross a wall here. Drag it into open floor first.`;
+			return false;
+		}
+		void saveCarpet(carpet.id, { size });
+		return true;
+	}
+	const carpetPrice = (c: Carpet) =>
+		c.size.price === null ? null : c.size.price.toLocaleString('en-US', { style: 'currency', currency: c.currency });
+	const carpetFacts = (c: Carpet) =>
+		[sizeLabel(c.size), carpetPrice(c), c.sizes.length > 1 ? `${c.sizes.length} sizes` : null]
+			.filter(Boolean)
+			.join(' · ');
+
+	let carpetUrl = $state('');
+	const carpetImport = createMutation(() => ({
+		mutationFn: (url: string) =>
+			api<CarpetEntry>('/api/carpets/import', { method: 'POST', body: JSON.stringify({ url }) }),
+		onSuccess: async (carpet: CarpetEntry) => {
+			carpetUrl = '';
+			carpetError = null;
+			await queryClient.invalidateQueries({ queryKey: ['carpets'] });
+			if (!carpet.placement) {
+				carpetError = `At ${sizeLabel(carpet.size)} it doesn't fit in the middle of the living room`;
+				return;
+			}
+			await tick();
+			viewer?.select({ kind: 'carpet', id: carpet.id });
+		},
+	}));
+	const carpetBuild = createMutation(() => ({
+		mutationFn: (id: string) => api<CarpetEntry>(`/api/carpets/${id}/build`, { method: 'POST' }),
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: ['carpets'] }),
+	}));
 
 	let importUrl = $state('');
 	const importMutation = createMutation(() => ({
@@ -451,17 +562,20 @@
 	}
 
 	function onKey(e: KeyboardEvent) {
-		if (!selectedKey || mode !== 'orbit' || (e.target as HTMLElement).closest('input, textarea')) return;
-		if (e.key === 'Delete' || e.key === 'Backspace') removeSelected();
-		else if (e.key === 'Escape') viewer?.select(null);
+		if (!selection || mode !== 'orbit' || (e.target as HTMLElement).closest('input, textarea, select')) return;
+		if (e.key === 'Delete' || e.key === 'Backspace') {
+			if (selectedCarpet) removeCarpet(selectedCarpet);
+			else removeSelected();
+		} else if (e.key === 'Escape') viewer?.select(null);
 	}
 
 	onMount(() => {
 		const v = createViewer(
 			container,
 			next => (mode = next),
-			key => (selectedKey = key),
+			next => (selection = next),
 			(key, position, rotation) => patchPlacement(key, { position, rotation }),
+			(id, placement) => void saveCarpet(id, { placement }),
 			state => (measure = state),
 		);
 		viewer = v;
@@ -488,6 +602,9 @@
 	});
 	$effect(() => {
 		if (viewer && (placementsLoaded || placements.length)) viewer.setPlacements($state.snapshot(placements), catalog);
+	});
+	$effect(() => {
+		viewer?.setCarpets($state.snapshot(carpetList));
 	});
 	$effect(() => {
 		const id = fixtures.wallTexture?.selected;
@@ -835,6 +952,68 @@
 				</div>
 			{/if}
 		</section>
+
+		<section class="panel items">
+			<button
+				type="button"
+				class="section-toggle"
+				aria-expanded={open.carpets}
+				onclick={() => (open.carpets = !open.carpets)}
+			>
+				Carpets <span class="muted">{carpetList.length}</span>
+			</button>
+			{#if open.carpets}
+				<form
+					class="import"
+					onsubmit={e => {
+						e.preventDefault();
+						if (carpetUrl.trim()) carpetImport.mutate(carpetUrl.trim());
+					}}
+				>
+					<input type="url" placeholder="Paste a rug link" bind:value={carpetUrl} disabled={carpetImport.isPending} />
+					<button type="submit" class="primary" disabled={carpetImport.isPending || !carpetUrl.trim()}>
+						{carpetImport.isPending ? 'Importing…' : 'Import'}
+					</button>
+				</form>
+				{#if carpetImport.isError}<p class="error">{carpetImport.error.message}</p>{/if}
+				{#if carpetError && !selectedCarpet}<p class="error">{carpetError}</p>{/if}
+				<ul>
+					{#if carpetImport.isPending}
+						<li>
+							<span class="thumb"></span>
+							<div>
+								<strong>{host(carpetImport.variables)} link</strong>
+								<span class="status busy">Importing · reading the page (about a minute)</span>
+							</div>
+						</li>
+					{/if}
+					{#each carpetList as carpet (carpet.id)}
+						{@const thumb = carpet.texture?.map ?? carpet.image}
+						<li>
+							{#if thumb}<img src={thumb} alt="" />{:else}<span class="thumb"></span>{/if}
+							<div>
+								<strong>{carpet.name}</strong>
+								{#if carpet.textureJob?.state === 'queued' || carpet.textureJob?.state === 'running'}
+									<span class="status busy">Drawing the rug · 2–5 min</span>
+								{:else if carpet.textureJob?.state === 'failed'}
+									<span class="status failed" title={carpet.textureJob.error}>Image failed · select it to retry</span>
+								{/if}
+								<span class="muted">{carpetFacts(carpet)}</span>
+							</div>
+							{#if carpet.placement}
+								<button type="button" onclick={() => removeCarpet(carpet)}>Remove</button>
+							{:else}
+								<button type="button" onclick={() => addCarpet(carpet)}>Add</button>
+							{/if}
+						</li>
+					{:else}
+						{#if !carpetImport.isPending}
+							<p class="muted">{carpetsQuery.isPending ? 'Loading…' : 'No carpets yet. Paste a rug link above.'}</p>
+						{/if}
+					{/each}
+				</ul>
+			{/if}
+		</section>
 	{/if}
 </div>
 
@@ -986,6 +1165,70 @@
 				</ul>
 			{/if}
 			<a href={selected.url} target="_blank" rel="noreferrer">View on {host(selected.url)} ↗</a>
+		</aside>
+	{/if}
+
+	{#if selectedCarpet}
+		{@const c = selectedCarpet}
+		{@const current = c.sizes.findIndex(s => s.widthIn === c.size.widthIn && s.lengthIn === c.size.lengthIn)}
+		<aside class="panel card">
+			<button type="button" class="close" aria-label="Close" onclick={() => viewer?.select(null)}>×</button>
+			{#if c.texture ?? c.image}<img src={c.texture?.map ?? c.image} alt={c.name} />{/if}
+			<h2>{c.name}</h2>
+			<p class="meta">
+				{#if carpetPrice(c)}<strong>{carpetPrice(c)}</strong>{/if}
+				{#if c.brand}<span>{c.brand}</span>{/if}
+				<span>Carpet</span>
+			</p>
+
+			<div class="controls">
+				<label class="row">
+					<span>Size</span>
+					<select
+						value={current}
+						onchange={e => {
+							if (!resizeCarpet(c, c.sizes[Number(e.currentTarget.value)]!)) e.currentTarget.value = String(current);
+						}}
+					>
+						{#each c.sizes as size, i (i)}
+							<option value={i}
+								>{sizeLabel(size)}{size.price === null
+									? ''
+									: ` · ${size.price.toLocaleString('en-US', { style: 'currency', currency: c.currency })}`}</option
+							>
+						{/each}
+					</select>
+				</label>
+				<div class="row">
+					<span>Turn</span>
+					<button type="button" onclick={() => turnCarpet(c, -90)}>↺ 90°</button>
+					<button type="button" onclick={() => turnCarpet(c, -15)}>−15°</button>
+					<button type="button" onclick={() => turnCarpet(c, 15)}>+15°</button>
+					<button type="button" onclick={() => turnCarpet(c, 90)}>↻ 90°</button>
+				</div>
+				<div class="row">
+					<button type="button" class="danger" onclick={() => removeCarpet(c)}>Remove from room</button>
+				</div>
+				{#if carpetError}<p class="error">{carpetError}</p>{/if}
+			</div>
+
+			<p class="model-status">
+				{#if c.textureJob?.state === 'queued' || c.textureJob?.state === 'running'}
+					<span class="status busy"
+						>Codex is drawing the rug from the listing photos (2–5 min). Shown as a plain rug until then.</span
+					>
+				{:else}
+					{#if c.textureJob?.state === 'failed'}<span class="error">Drawing the rug failed: {c.textureJob.error}</span>
+					{:else if c.texture}<span class="muted">{c.texture.note}</span>
+					{:else}<span class="muted">No image of the rug yet.</span>{/if}
+					<button type="button" onclick={() => carpetBuild.mutate(c.id)}>
+						{c.texture ? 'Redraw' : 'Draw'} the rug
+					</button>
+				{/if}
+			</p>
+
+			<p>{c.summary}</p>
+			<a href={c.url} target="_blank" rel="noreferrer">View on {host(c.url)} ↗</a>
 		</aside>
 	{/if}
 </div>

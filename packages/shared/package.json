@@ -7,6 +7,7 @@
 		"./env": "./src/env.ts",
 		"./items": "./src/items.ts",
 		"./fixtures": "./src/fixtures.ts",
+		"./carpets": "./src/carpets.ts",
 		"./floorplan": "./src/floorplan.ts",
 		"./plan": "./src/plan.ts",
 		"./obstacles": "./src/obstacles.ts",

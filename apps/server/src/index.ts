@@ -14,6 +14,8 @@ import { usdzPath } from './usdz';
 import { config } from './config';
 import { ideaFile, ideasHtml } from './ideas';
 import { textureJobs, textures } from './textures';
+import type { CarpetEntry } from '@repo/shared/carpets';
+import { CarpetError, carpetJobs, carpets, importCarpet, startCarpetJob, updateCarpet } from './carpets';
 import {
 	buildOption,
 	FixtureError,
@@ -32,10 +34,11 @@ const isVec3 = (v: unknown): v is [number, number, number] =>
 
 const productUrl = (url: unknown): url is string => typeof url === 'string' && /^https?:\/\//.test(url);
 const failure = (error: unknown) => {
-	if (!(error instanceof FixtureError)) console.error(error);
+	const fixable = error instanceof FixtureError || error instanceof CarpetError;
+	if (!fixable) console.error(error);
 	return Response.json(
 		{ error: error instanceof Error ? error.message : String(error) },
-		{ status: error instanceof FixtureError ? 400 : 502 },
+		{ status: fixable ? 400 : 502 },
 	);
 };
 const unknownFixture = (key: string) => Response.json({ error: `No fixture ${key}` }, { status: 404 });
@@ -88,6 +91,44 @@ const server = Bun.serve({
 				Response.json(
 					textures.all().map((t): WallTextureEntry => ({ ...t, textureJob: textureJobs.get(t.id) ?? null })),
 				),
+		},
+		'/api/carpets': {
+			GET: async () =>
+				Response.json(carpets.all().map((c): CarpetEntry => ({ ...c, textureJob: carpetJobs.get(c.id) ?? null }))),
+		},
+		'/api/carpets/import': {
+			POST: async request => {
+				const { url } = ((await request.json().catch(() => null)) ?? {}) as { url?: unknown };
+				if (!productUrl(url)) return Response.json({ error: 'Paste a rug product URL' }, { status: 400 });
+				try {
+					const carpet = await importCarpet(url, console.log);
+					if (!carpet.texture) startCarpetJob(carpet);
+					return Response.json({ ...carpet, textureJob: carpetJobs.get(carpet.id) ?? null });
+				} catch (error) {
+					return failure(error);
+				}
+			},
+		},
+		'/api/carpets/:id': {
+			PUT: async request => {
+				const { id } = request.params;
+				if (!carpets.get(id)) return Response.json({ error: `No carpet ${id}` }, { status: 404 });
+				const body = ((await request.json().catch(() => null)) ?? {}) as { size?: unknown; placement?: unknown };
+				try {
+					const carpet = updateCarpet(id, body);
+					return Response.json({ ...carpet, textureJob: carpetJobs.get(id) ?? null });
+				} catch (error) {
+					return failure(error);
+				}
+			},
+		},
+		'/api/carpets/:id/build': {
+			POST: async request => {
+				const carpet = carpets.get(request.params.id);
+				if (!carpet) return Response.json({ error: `No carpet ${request.params.id}` }, { status: 404 });
+				startCarpetJob(carpet);
+				return Response.json({ ...carpet, textureJob: carpetJobs.get(carpet.id) ?? null });
+			},
 		},
 		'/api/fixtures': { GET: async () => Response.json(await listFixtures()) },
 		'/api/fixtures/:key': {

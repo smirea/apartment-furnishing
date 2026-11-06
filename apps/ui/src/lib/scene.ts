@@ -7,6 +7,7 @@ import {
 	type WallTexture,
 } from '@repo/shared/items';
 import type { WallSpot } from '@repo/shared/fixtures';
+import { moveCarpet, type Carpet, type CarpetPose } from '@repo/shared/carpets';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {
@@ -56,11 +57,12 @@ import {
 	type Rect,
 	type Wall,
 } from '@repo/shared/floorplan';
-import { TV_DEPTH_IN, tvPose } from '@repo/shared/plan';
+import { planGeometry, TV_DEPTH_IN, tvPose } from '@repo/shared/plan';
 import { createMeasurer, type MeasureState, type MeasureTool } from './measure';
 import type { Box, Segment } from '@repo/shared/obstacles';
 
 export type Mode = 'orbit' | 'walk';
+export type Selection = { kind: 'item'; key: string } | { kind: 'carpet'; id: string };
 
 const EYE_FT = 5.5;
 const PLAYER_RADIUS_FT = 0.9;
@@ -72,6 +74,8 @@ const FRAME_IN = 2;
 const SNAP_FT = 0.6;
 const WALL_MOUNT_SNAP_FT = 2;
 const DEG = Math.PI / 180;
+// A rug's thickness: carpets lie this far above the floor, under the furniture standing on it.
+const CARPET_FT = 0.4 / 12;
 const round1 = (n: number) => Math.round(n * 10) / 10;
 
 const floorColors: Record<FloorKind, number> = { wood: 0xc9a672, tile: 0xe6e6e2, concrete: 0x9a9a98 };
@@ -79,8 +83,9 @@ const floorColors: Record<FloorKind, number> = { wood: 0xc9a672, tile: 0xe6e6e2,
 export function createViewer(
 	container: HTMLElement,
 	onMode: (mode: Mode) => void,
-	onSelect: (key: string | null) => void,
+	onSelect: (selection: Selection | null) => void,
 	onChange: (key: string, position: Placement['position'], rotation: Placement['rotation']) => void,
+	onCarpetChange: (id: string, pose: CarpetPose) => void,
 	onMeasure: (state: MeasureState) => void,
 ) {
 	const renderer = new WebGLRenderer({ antialias: true });
@@ -442,6 +447,101 @@ export function createViewer(
 
 	const itemGroup = new Group();
 	scene.add(itemGroup);
+
+	// Carpets lie on their own layer between the floor and everything else. Rugs that overlap stack in list order.
+	const carpetGroup = new Group();
+	scene.add(carpetGroup);
+	const carpetPlan = planGeometry();
+	type CarpetView = {
+		root: Group;
+		mesh: Mesh<PlaneGeometry, MeshStandardMaterial>;
+		carpet: Carpet;
+		// The last pose that cleared the walls, which a drag or a turn falls back to.
+		pose: CarpetPose;
+		map: string | null;
+	};
+	const carpetViews = new Map<string, CarpetView>();
+	const carpetGeometry = new PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+	const placeCarpet = (root: Group, pose: CarpetPose) => {
+		root.position.set(pose.x, 0, pose.z);
+		root.rotation.set(0, pose.yaw * DEG, 0);
+	};
+
+	function setCarpets(list: Carpet[]) {
+		const placed = list.filter(c => c.placement);
+		for (const [id, view] of carpetViews) {
+			if (placed.some(c => c.id === id)) continue;
+			view.root.removeFromParent();
+			view.mesh.material.map?.dispose();
+			view.mesh.material.dispose();
+			carpetViews.delete(id);
+			if (selected?.kind === 'carpet' && selected.id === id) select(null);
+		}
+		placed.forEach((carpet, layer) => {
+			let view = carpetViews.get(carpet.id);
+			if (!view) {
+				const mesh = new Mesh(
+					carpetGeometry,
+					new MeshStandardMaterial({ color: 0xb7aa96, roughness: 0.95, alphaTest: 0.5, polygonOffset: true }),
+				);
+				const root = new Group();
+				root.userData = { carpetId: carpet.id };
+				root.add(mesh);
+				carpetGroup.add(root);
+				view = { root, mesh, carpet, pose: carpet.placement!, map: null };
+				carpetViews.set(carpet.id, view);
+			}
+			view.carpet = carpet;
+			const { mesh } = view;
+			mesh.scale.set(carpet.size.widthIn / 12, 1, carpet.size.lengthIn / 12);
+			// The later of two overlapping rugs lies on top: a hair higher so clicks pick it, and pulled forward in depth
+			// because that hair alone z-fights from across the apartment.
+			mesh.position.y = CARPET_FT + layer * 0.001;
+			mesh.material.polygonOffsetFactor = -1 - layer;
+			mesh.material.polygonOffsetUnits = -4 * (layer + 1);
+			if (!isBeingMoved(view.root)) {
+				view.pose = carpet.placement!;
+				placeCarpet(view.root, view.pose);
+			}
+			const map = carpet.texture?.map ?? null;
+			if (map !== view.map) {
+				view.map = map;
+				const target = view;
+				const { material } = mesh;
+				if (!map) {
+					material.map?.dispose();
+					material.map = null;
+					material.color.set(0xb7aa96);
+					material.needsUpdate = true;
+				} else
+					void loadTexture(map).then(source => {
+						if (target.map !== map) return;
+						const texture = source.clone();
+						texture.colorSpace = SRGBColorSpace;
+						texture.needsUpdate = true;
+						material.map?.dispose();
+						material.map = texture;
+						material.color.set(0xffffff);
+						material.needsUpdate = true;
+					});
+			}
+		});
+		const root = selectedRoot();
+		if (root) selection.setFromObject(root);
+	}
+
+	const poseOf = (root: Group): CarpetPose => ({
+		x: root.position.x,
+		z: root.position.z,
+		yaw: Math.round((new Euler().setFromQuaternion(root.quaternion, 'YXZ').y / DEG) * 10) / 10,
+	});
+
+	// Called on every drag or gizmo step: the carpet goes as far toward the pointer as the walls allow.
+	function constrainCarpet(root: Group) {
+		const view = carpetViews.get(root.userData.carpetId)!;
+		view.pose = moveCarpet(view.pose, poseOf(root), view.carpet.size, carpetPlan);
+		placeCarpet(root, view.pose);
+	}
 	const gltf = new GLTFLoader();
 	const fallbackMat = new MeshStandardMaterial({ color: 0x8a8f98, roughness: 0.6 });
 	const roots = new Map<string, Group>();
@@ -582,6 +682,7 @@ export function createViewer(
 	}
 
 	const isBeingMoved = (root: Group) => dragging?.root === root || gizmos.some(g => g.dragging && g.object === root);
+	const isCarpet = (root: Object3D) => 'carpetId' in root.userData;
 
 	function setPlacements(placements: Placement[], catalog: Record<string, CatalogItem>) {
 		catalogById = catalog;
@@ -590,7 +691,7 @@ export function createViewer(
 			if (keys.has(key)) continue;
 			root.removeFromParent();
 			roots.delete(key);
-			if (selectedKey === key) select(null);
+			if (selected?.kind === 'item' && selected.key === key) select(null);
 		}
 		for (const p of placements) {
 			const item = catalog[p.itemId];
@@ -608,10 +709,10 @@ export function createViewer(
 				void buildItem(item).then(object => {
 					fresh.add(object);
 					if (snapOnLoad.delete(p.key)) commit(fresh);
-					if (selectedKey === p.key) selection.setFromObject(fresh);
+					if (selectedRoot() === fresh) selection.setFromObject(fresh);
 				});
 				root = fresh;
-				if (selectedKey === p.key) select(p.key);
+				if (selected?.kind === 'item' && selected.key === p.key) select(selected);
 			}
 			if (!isBeingMoved(root)) placeRoot(root, p);
 		}
@@ -684,6 +785,11 @@ export function createViewer(
 	}
 
 	function commit(root: Group) {
+		if (isCarpet(root)) {
+			constrainCarpet(root);
+			onCarpetChange(root.userData.carpetId, carpetViews.get(root.userData.carpetId)!.pose);
+			return;
+		}
 		snap(root);
 		// Items only turn about Y. Reading yaw in YXZ order avoids the gizmo's equivalent
 		// [180, y, 180] XYZ decomposition, which would make the card's turn buttons spin backwards.
@@ -713,29 +819,40 @@ export function createViewer(
 			if (!e.value && g.object) commit(g.object as Group);
 		});
 	}
+	const settle = (root: Group) => (isCarpet(root) ? constrainCarpet(root) : snap(root));
 	move.addEventListener('objectChange', () => {
-		if (move.object) snap(move.object as Group);
+		if (move.object) settle(move.object as Group);
+	});
+	turn.addEventListener('objectChange', () => {
+		if (turn.object && isCarpet(turn.object)) constrainCarpet(turn.object as Group);
 	});
 
-	let selectedKey: string | null = null;
+	let selected: Selection | null = null;
+	const rootOf = (s: Selection | null) =>
+		s?.kind === 'item' ? roots.get(s.key) : s?.kind === 'carpet' ? carpetViews.get(s.id)?.root : undefined;
+	const selectedRoot = () => rootOf(selected);
 	const selection = new BoxHelper(new Object3D(), 0x5eead4);
 	selection.visible = false;
 	scene.add(selection);
-	function select(key: string | null) {
-		selectedKey = key && roots.has(key) ? key : null;
-		selection.visible = !!selectedKey;
-		if (selectedKey) {
+	function select(next: Selection | null) {
+		const root = rootOf(next);
+		selected = root ? next : null;
+		selection.visible = !!root;
+		if (root) {
 			// Measuring and a selection share Backspace and Escape, so selecting furniture ends the measuring.
 			measurer.setTool(null);
-			const root = roots.get(selectedKey)!;
 			selection.setFromObject(root);
 			move.attach(root);
+			// Carpets only slide across the floor.
+			move.showY = !isCarpet(root);
 			// Wall-mounted items take their facing from the wall they snap to.
 			if (catalogById[root.userData.itemId]?.mount === 'wall') turn.detach();
 			else turn.attach(root);
 		} else for (const g of gizmos) g.detach();
-		onSelect(selectedKey);
+		onSelect(selected);
 	}
+	const selectionOf = (root: Group): Selection =>
+		isCarpet(root) ? { kind: 'carpet', id: root.userData.carpetId } : { kind: 'item', key: root.userData.key };
 
 	const raycaster = new Raycaster();
 	const pointer = new Vector2();
@@ -751,11 +868,12 @@ export function createViewer(
 		raycaster.setFromCamera(pointer, camera);
 	}
 
+	// The nearest thing under the pointer, so furniture standing on a carpet is picked before the carpet.
 	function pickItem(e: PointerEvent): Group | null {
 		setPointer(e);
-		const hit = raycaster.intersectObjects([...itemGroup.children, wallGroup], true)[0];
+		const hit = raycaster.intersectObjects([...itemGroup.children, wallGroup, carpetGroup], true)[0];
 		let node: Object3D | null = hit?.object ?? null;
-		while (node && node.parent !== itemGroup) node = node.parent;
+		while (node && node.parent !== itemGroup && node.parent !== carpetGroup) node = node.parent;
 		return node as Group | null;
 	}
 
@@ -789,7 +907,7 @@ export function createViewer(
 		if (!root) return;
 		floor.constant = -root.position.y;
 		if (!raycaster.ray.intersectPlane(floor, floorHit)) return;
-		select(root.userData.key);
+		select(selectionOf(root));
 		dragging = { root, offset: root.position.clone().sub(floorHit), moved: false };
 		orbit.enabled = false;
 		renderer.domElement.setPointerCapture(e.pointerId);
@@ -801,7 +919,7 @@ export function createViewer(
 		if (!raycaster.ray.intersectPlane(floor, floorHit)) return;
 		dragging.root.position.x = floorHit.x + dragging.offset.x;
 		dragging.root.position.z = floorHit.z + dragging.offset.z;
-		snap(dragging.root);
+		settle(dragging.root);
 		dragging.moved = true;
 	});
 	renderer.domElement.addEventListener('pointerup', e => {
@@ -815,7 +933,8 @@ export function createViewer(
 		if (onGizmo() || !downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 4) return;
 		if (measurer.active) return measurer.click(e);
 		if (mode === 'walk' && !look.isLocked) return;
-		select(pickItem(e)?.userData.key ?? null);
+		const picked = pickItem(e);
+		select(picked ? selectionOf(picked) : null);
 	});
 
 	const ceilingMat = new MeshStandardMaterial({ color: 0xffffff, roughness: 1 });
@@ -926,7 +1045,8 @@ export function createViewer(
 		last = now;
 		if (mode === 'walk') step(dt);
 		else orbit.update();
-		if (selectedKey) selection.setFromObject(roots.get(selectedKey)!);
+		const root = selectedRoot();
+		if (root) selection.setFromObject(root);
 		renderer.render(scene, camera);
 		labelRenderer.render(scene, camera);
 	});
@@ -936,6 +1056,7 @@ export function createViewer(
 		setCutaway,
 		setLabels,
 		setPlacements,
+		setCarpets,
 		setTv,
 		setWallItem: (key: string, spot: WallSpot, item: CatalogItem | null) =>
 			setWallItem(key, spot, item).catch(error => console.error(`${key} model failed to load`, error)),
