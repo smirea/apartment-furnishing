@@ -1,0 +1,21 @@
+
+== N1 · No balcony door · 98″ corner TV · 5-seat sofa on the west glass · 6-seat dining off the island  (score 94, 1471ms)
+  TV                   98″ on a stand
+  Seats                5 (3 prime, 2 good, 0 side)
+  Seat run             133″
+  Eye → screen         12′1″ – 15′5″
+  Screen fills         26–29°
+  Coffee table gap     16″
+  Dining               6 chairs, 72″ × 36″
+  Chair pull-out       48″ min
+  Island clearance     38″
+  Open floor           89″ × 79″
+  Odd pockets          19.7 sq ft
+  Office / guest door  43″
+  Bath 2 door          35″
+  seat 1 main   good  dist 185 fov 26° off 6° turn 39° w 25 access 17
+  seat 2 main   prime dist 170 fov 28° off 13° turn 32° w 25 access 17
+  seat 3 main   prime dist 159 fov 29° off 21° turn 24° w 25 access 15
+  seat 4 main   prime dist 150 fov 28° off 29° turn 16° w 25 access 15
+  seat 5 main   good  dist 145 fov 27° off 39° turn 6° w 25 access 17
+  [warn] 19.7 sq ft of odd empty pockets (6; largest 6.5 sq ft)

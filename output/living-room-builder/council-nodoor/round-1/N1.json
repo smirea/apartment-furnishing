@@ -1,0 +1,151 @@
+{
+	"id": "N1",
+	"title": "No balcony door · 98″ corner TV · 5-seat sofa on the west glass · 6-seat dining off the island",
+	"room": {
+		"balconyDoor": false
+	},
+	"notes": [
+		"With the balcony door gone, the west glass is a full wall: a 133″ five-seat sofa backs onto it, so no strip of floor is stranded behind the sofa.",
+		"A 98″ TV on a corner console across the south-east corner faces the sofa on the diagonal, so every seat is within 50° of the screen axis.",
+		"The 72″ × 36″ table stays off the island with three chairs a side and 48″ of pull-out room for each.",
+		"Plants, side tables, a lamp behind the TV corner and a swivel chair by the lake fill the leftover corners, leaving under 20 sq ft of odd pockets."
+	],
+	"components": [
+		{
+			"id": "sofa",
+			"label": "Sofa (5 seats)",
+			"type": "seating",
+			"x": 22,
+			"y": 100,
+			"rot": 90,
+			"length": 133,
+			"depth": 38,
+			"arm": 4,
+			"seats": 5
+		},
+		{
+			"id": "console",
+			"label": "Corner console",
+			"type": "console",
+			"x": 171.8,
+			"y": 28.2,
+			"rot": 315,
+			"w": 56,
+			"d": 18,
+			"h": 20
+		},
+		{
+			"id": "tv",
+			"label": "TV 98″",
+			"type": "tv",
+			"x": 165.4,
+			"y": 34.6,
+			"rot": 315,
+			"diag": 98,
+			"mount": "stand",
+			"center": 48
+		},
+		{
+			"id": "coffee",
+			"label": "Coffee table",
+			"type": "table",
+			"role": "coffee",
+			"x": 71,
+			"y": 91,
+			"rot": 90,
+			"w": 52,
+			"d": 28,
+			"h": 16,
+			"shape": "rect"
+		},
+		{
+			"id": "din",
+			"label": "Dining table",
+			"type": "dining",
+			"x": 114,
+			"y": 158,
+			"rot": 90,
+			"shape": "rect",
+			"w": 72,
+			"d": 36,
+			"sides": 3,
+			"ends": 0
+		},
+		{
+			"id": "chair",
+			"label": "Swivel lounge chair",
+			"type": "decor",
+			"kind": "chair",
+			"x": 104,
+			"y": 23,
+			"rot": 70,
+			"size": 32
+		},
+		{
+			"id": "side-s",
+			"label": "Side table",
+			"type": "table",
+			"role": "side",
+			"x": 34,
+			"y": 22,
+			"rot": 0,
+			"w": 18,
+			"d": 18,
+			"h": 22,
+			"shape": "round"
+		},
+		{
+			"id": "side-n",
+			"label": "Side table",
+			"type": "table",
+			"role": "side",
+			"x": 32,
+			"y": 178,
+			"rot": 0,
+			"w": 18,
+			"d": 18,
+			"h": 22,
+			"shape": "round"
+		},
+		{
+			"id": "plant-sw",
+			"label": "Plant",
+			"type": "decor",
+			"kind": "plant",
+			"x": 14,
+			"y": 15,
+			"rot": 0,
+			"size": 22
+		},
+		{
+			"id": "plant-nw",
+			"label": "Plant",
+			"type": "decor",
+			"kind": "plant",
+			"x": 13,
+			"y": 185,
+			"rot": 0,
+			"size": 20
+		},
+		{
+			"id": "plant-e",
+			"label": "Tall plant",
+			"type": "decor",
+			"kind": "plant",
+			"x": 186,
+			"y": 104,
+			"rot": 0,
+			"size": 24
+		},
+		{
+			"id": "lamp",
+			"label": "Uplight behind the TV",
+			"type": "decor",
+			"kind": "lamp",
+			"x": 189,
+			"y": 10,
+			"rot": 0,
+			"size": 14
+		}
+	]
+}

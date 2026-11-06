@@ -1,0 +1,259 @@
+[
+	{
+		"round": 1,
+		"date": "2026-11-05",
+		"layout": {
+			"id": "N1",
+			"title": "No balcony door · 98″ corner TV · 5-seat sofa on the west glass · 6-seat dining off the island",
+			"room": {
+				"balconyDoor": false
+			},
+			"notes": [
+				"With the balcony door gone, the west glass is a full wall: a 133″ five-seat sofa backs onto it, so no strip of floor is stranded behind the sofa.",
+				"A 98″ TV on a corner console across the south-east corner faces the sofa on the diagonal, so every seat is within 50° of the screen axis.",
+				"The 72″ × 36″ table stays off the island with three chairs a side and 48″ of pull-out room for each.",
+				"Plants, side tables, a lamp behind the TV corner and a swivel chair by the lake fill the leftover corners, leaving under 20 sq ft of odd pockets."
+			],
+			"components": [
+				{
+					"id": "sofa",
+					"label": "Sofa (5 seats)",
+					"type": "seating",
+					"x": 22,
+					"y": 100,
+					"rot": 90,
+					"length": 133,
+					"depth": 38,
+					"arm": 4,
+					"seats": 5
+				},
+				{
+					"id": "console",
+					"label": "Corner console",
+					"type": "console",
+					"x": 171.8,
+					"y": 28.2,
+					"rot": 315,
+					"w": 56,
+					"d": 18,
+					"h": 20
+				},
+				{
+					"id": "tv",
+					"label": "TV 98″",
+					"type": "tv",
+					"x": 165.4,
+					"y": 34.6,
+					"rot": 315,
+					"diag": 98,
+					"mount": "stand",
+					"center": 48
+				},
+				{
+					"id": "coffee",
+					"label": "Coffee table",
+					"type": "table",
+					"role": "coffee",
+					"x": 71,
+					"y": 91,
+					"rot": 90,
+					"w": 52,
+					"d": 28,
+					"h": 16,
+					"shape": "rect"
+				},
+				{
+					"id": "din",
+					"label": "Dining table",
+					"type": "dining",
+					"x": 114,
+					"y": 158,
+					"rot": 90,
+					"shape": "rect",
+					"w": 72,
+					"d": 36,
+					"sides": 3,
+					"ends": 0
+				},
+				{
+					"id": "chair",
+					"label": "Swivel lounge chair",
+					"type": "decor",
+					"kind": "chair",
+					"x": 104,
+					"y": 23,
+					"rot": 70,
+					"size": 32
+				},
+				{
+					"id": "side-s",
+					"label": "Side table",
+					"type": "table",
+					"role": "side",
+					"x": 34,
+					"y": 22,
+					"rot": 0,
+					"w": 18,
+					"d": 18,
+					"h": 22,
+					"shape": "round"
+				},
+				{
+					"id": "side-n",
+					"label": "Side table",
+					"type": "table",
+					"role": "side",
+					"x": 32,
+					"y": 178,
+					"rot": 0,
+					"w": 18,
+					"d": 18,
+					"h": 22,
+					"shape": "round"
+				},
+				{
+					"id": "plant-sw",
+					"label": "Plant",
+					"type": "decor",
+					"kind": "plant",
+					"x": 14,
+					"y": 15,
+					"rot": 0,
+					"size": 22
+				},
+				{
+					"id": "plant-nw",
+					"label": "Plant",
+					"type": "decor",
+					"kind": "plant",
+					"x": 13,
+					"y": 185,
+					"rot": 0,
+					"size": 20
+				},
+				{
+					"id": "plant-e",
+					"label": "Tall plant",
+					"type": "decor",
+					"kind": "plant",
+					"x": 186,
+					"y": 104,
+					"rot": 0,
+					"size": 24
+				},
+				{
+					"id": "lamp",
+					"label": "Uplight behind the TV",
+					"type": "decor",
+					"kind": "lamp",
+					"x": 189,
+					"y": 10,
+					"rot": 0,
+					"size": 14
+				}
+			]
+		},
+		"verdicts": [
+			{
+				"councillor": "Claude",
+				"model": "claude-sonnet-5-5 · medium",
+				"scores": {
+					"overall": 9,
+					"couch": 9,
+					"tv": 8,
+					"dining": 9,
+					"space": 9,
+					"plan": 10
+				},
+				"summary": "Cuts pockets from 75–91 sq ft to 19.7 while keeping five seats, six at the table and the 98″; the 26–29° fill is the only real shortfall, and nothing in the room fixes it for less than it costs.",
+				"feedback": [
+					"TV: 26–29° is under the 30° cinema floor, but mostly forced; sliding the sofa 4.5″ off the glass (a gap under 8″ creates no pocket) gains only ~0.5°.",
+					"Pockets: a low plant or basket at about (181, 78) and the swivel chair at (100, 25) would trim the total to roughly 12–14 sq ft.",
+					"The west chairs' pull-out reaches the sofa's legroom zone; shared use, a squeeze only when both are occupied.",
+					"The table sits 1.4″ off the island, so the two north chairs are reached by walking around.",
+					"The TV's west edge stands in front of about 11″ of the lake glass (x 135–146)."
+				]
+			},
+			{
+				"councillor": "Grok",
+				"model": "grok-4.7 · medium",
+				"scores": {
+					"overall": 9,
+					"couch": 9,
+					"tv": 9,
+					"dining": 10,
+					"space": 9,
+					"plan": 10
+				},
+				"summary": "The plan to build: five seats on the glass, a 98″ in the corner, a six-top with 48″ pull-out and 19.7 sq ft of leftovers; every closer screen hits the column, the office route or a much larger empty floor.",
+				"feedback": [
+					"No deductions. Measured alternatives: sofa 14″ east hits the column and pinches the office route to 31″; 98″ on the east wall gives 21–28°; a 4-seat sofa at 8 ft 4 in with the table behind it gives 35–46° but 38.5 sq ft of pockets (scored 7).",
+					"Corner TV slid 12″ toward the sofa: 27–30°, 28.1 sq ft of pockets (scored 8). H2 with the door ignored: 78 sq ft, one 73 sq ft piece (scored 6).",
+					"Brief error: the largest pocket (6.5 sq ft) is the south-glass strip, not the triangle behind the console (3.7 sq ft).",
+					"Brief error: the 14″-console variant's sofa (x 17–55) intersects the column; the lake bay behind a floated sofa is 66.7 sq ft, not about 60.",
+					"Seat 5's legroom clears the column by 2.1″ against a traced (not taped) column position: the one tight spot."
+				]
+			},
+			{
+				"councillor": "Antigravity",
+				"model": "gemini-4-argon · medium",
+				"scores": {
+					"overall": 9,
+					"couch": 9,
+					"tv": 9,
+					"dining": 10,
+					"space": 9,
+					"plan": 10
+				},
+				"summary": "The best no-door geometry for this room: a modest loss of viewing angle buys back 60+ sq ft of dead floor, with five unobstructed seats, six roomy dining seats and under 20 sq ft of perimeter pockets.",
+				"feedback": [
+					"Seat 1 misses prime by 0.1° of fill and is 34″ from the coffee table; a 60″ × 28″ coffee table at (71, 95) brings it to 26.5″ and trims pockets to 18.8 sq ft.",
+					"Moving the tall plant to (186, 86) with that table absorbs the east-wall pocket: 16.5 sq ft in 5 pieces.",
+					"Brief error: the largest pocket is the south-glass strip (6.55 sq ft); the console triangle is 3.67 sq ft.",
+					"Brief error: H2 with the door removed now measures 78.3 sq ft (the 91.1 predates counting the reading chair's front as used)."
+				]
+			},
+			{
+				"councillor": "Cursor",
+				"model": "composer-2.5",
+				"scores": {
+					"overall": 8.5,
+					"couch": 9,
+					"tv": 7.5,
+					"dining": 10,
+					"space": 9.5,
+					"plan": 10
+				},
+				"summary": "Maxes the 98″ and six-seat dining while crushing odd pockets, but the long diagonal throw (26–29°) is the main cost, and the in-room moves that widen the picture trade pockets or the office path for it.",
+				"feedback": [
+					"TV: 9–16° below H2's fill; seat 1 sits at the 26° floor with a 39° head turn.",
+					"The sofa-console alternative (27–32°, 35.5 sq ft, office 31″) would score about 7.5: not a net win.",
+					"No other deductions; eval output matches N1-eval.txt."
+				]
+			},
+			{
+				"councillor": "Codex",
+				"model": "gpt-6.1-terra · medium",
+				"scores": {
+					"overall": 9,
+					"couch": 9,
+					"tv": 9,
+					"dining": 9,
+					"space": 9,
+					"plan": 9
+				},
+				"summary": "Fits five sofa seats and generous six-person dining with little stranded floor, accepting a relatively distant TV view.",
+				"feedback": [
+					"No net improvement found; the sofa-console alternative would be about 8.",
+					"The prime label on 28–29° seats is the builder's classification, not evidence the distance matches H2's 38–42°.",
+					"Match the actual 98″ set's stand feet to the 56″ console before buying."
+				]
+			}
+		],
+		"changes": [
+			"Goal met in round 1: 4 of 5 councillors at 9 or above, so N1 stands as submitted.",
+			"Brief corrections: the largest pocket is the 6.5 sq ft strip along the south glass (the console triangle is 3.7 sq ft); H2 without the door measures 78.3 sq ft once the reading chair's front counts as used; the 14″ sofa-console variant hits the column.",
+			"Suggested refinements not applied, because each would be a new submission: a 60″ × 28″ coffee table at (71, 95); the tall plant at (186, 86); a low plant at (181, 78); confirm the column position by tape, since seat 5's legroom clears it by 2.1″."
+		]
+	}
+]

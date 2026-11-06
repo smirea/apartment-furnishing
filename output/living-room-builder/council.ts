@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 // Writes council/round-N.html for every round in council/rounds.json: the layout as it was submitted, then each
-// councillor's scores and feedback as a table. `./council.ts` rebuilds them all.
+// councillor's scores and feedback as a table. `./council.ts [series-dir]` rebuilds them all (default `council`).
 import { join } from 'node:path';
 import { card, PAGE_CSS } from './build.ts';
 import type { Layout } from './model.ts';
@@ -9,7 +9,8 @@ type Scores = { overall: number; couch: number; tv: number; dining: number; spac
 type Verdict = { councillor: string; model: string; scores: Scores | null; summary: string; feedback: string[] };
 type Round = { round: number; date: string; layout: Layout; verdicts: Verdict[]; changes?: string[] };
 
-const dir = join(import.meta.dir, 'council');
+const series = process.argv[2] ?? 'council';
+const dir = join(import.meta.dir, series);
 const rounds: Round[] = await Bun.file(join(dir, 'rounds.json')).json();
 const esc = (s: string) => s.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]!);
 const cell = (n: number | undefined) =>
@@ -48,11 +49,19 @@ table.council td.n{text-align:center;font-weight:700;white-space:nowrap}
 .m{font-weight:400;color:var(--muted-foreground);font-size:12px}
 table.council ul{margin:6px 0 0;padding-left:16px}
 .scroll{overflow-x:auto}
+@media (max-width:640px){
+table.council thead th:last-child{display:none}
+table.council tr{display:grid;grid-template-columns:minmax(0,1fr) repeat(6,3.1em);border-bottom:1px solid var(--border)}
+table.council th,table.council td{border-bottom:0}
+table.council td:last-child{grid-column:1/-1;padding-top:0}
+table.council td.n,table.council thead th{padding:8px 0;text-align:center;font-size:11px}table.council td.n{font-size:13px}
+table.council thead th:first-child{font-size:0}
+}
 </style></head><body><div class="lr wrap"><h1>Council round ${r.round} · ${esc(r.layout.id)} · ${esc(r.layout.title)}</h1>
 <div class="verdict">${passing} of ${r.verdicts.length} councillors at 9 or above (goal: at least ${r.verdicts.length - 1}) · ${esc(r.date)}</div>
 <div class="scroll"><table class="council"><thead><tr><th>Councillor</th><th>Overall</th><th>Couch</th><th>TV</th><th>Dining</th><th>Space</th><th>Plan</th><th>Verdict and feedback</th></tr></thead><tbody>${rows}</tbody></table></div>
 ${changes}
 <h3>The layout as submitted</h3>${card(r.layout)}</div></body></html>`;
 	await Bun.write(join(dir, `round-${r.round}.html`), html);
-	console.log(`wrote council/round-${r.round}.html (${passing}/${r.verdicts.length} at 9+)`);
+	console.log(`wrote ${series}/round-${r.round}.html (${passing}/${r.verdicts.length} at 9+)`);
 }

@@ -48,6 +48,7 @@ export const PLAN_CSS = `
 .lr-plan .tv{fill:var(--foreground,#111)}
 .lr-plan .chair{fill:color-mix(in srgb,var(--lr-wood) 45%,transparent);stroke:var(--lr-wood);stroke-width:.5}
 .lr-plan .pull{fill:none;stroke:color-mix(in srgb,var(--lr-wood) 55%,transparent);stroke-width:.4;stroke-dasharray:1.5 1.5}
+.lr-plan .pocket{fill:color-mix(in srgb,var(--destructive,#b3261e) 35%,transparent)}
 .lr-plan .decor{fill:color-mix(in srgb,var(--lr-plant) 55%,transparent)}
 .lr-plan .sight{stroke-width:.45;opacity:.7}
 .lr-plan .prime{stroke:var(--success,#2f7d4a);fill:var(--success,#2f7d4a)}
@@ -149,17 +150,19 @@ function roomUnder() {
 	return o.join('');
 }
 
-function roomOver() {
+function roomOver(door = true) {
 	const o: string[] = [];
 	o.push(`<circle class="column" cx="${ROOM.column.x}" cy="${sy(ROOM.column.y)}" r="${ROOM.column.r}"/>`);
 	o.push(text({ x: ROOM.column.x, y: ROOM.column.y }, 'column', 'mut'));
 	const W = (a: Vec, b: Vec, cls: string) => line(a, b, cls);
 	o.push(W({ x: 0, y: 0 }, { x: ROOM.southGlassEnd, y: 0 }, 'glass'));
 	o.push(W({ x: ROOM.southGlassEnd, y: 0 }, { x: ROOM.w, y: 0 }, 'wall'));
-	o.push(W({ x: 0, y: 0 }, { x: 0, y: ROOM.balconyDoor[0] }, 'glass'));
-	o.push(W({ x: 0, y: ROOM.balconyDoor[1] }, { x: 0, y: ROOM.d }, 'glass'));
-	o.push(line({ x: 0, y: ROOM.balconyDoor[0] }, { x: -30, y: ROOM.balconyDoor[0] + 12 }, 'open'));
-	o.push(text({ x: -9, y: (ROOM.balconyDoor[0] + ROOM.balconyDoor[1]) / 2 }, 'door', 'mut', -90));
+	if (door) {
+		o.push(W({ x: 0, y: 0 }, { x: 0, y: ROOM.balconyDoor[0] }, 'glass'));
+		o.push(W({ x: 0, y: ROOM.balconyDoor[1] }, { x: 0, y: ROOM.d }, 'glass'));
+		o.push(line({ x: 0, y: ROOM.balconyDoor[0] }, { x: -30, y: ROOM.balconyDoor[0] + 12 }, 'open'));
+		o.push(text({ x: -9, y: (ROOM.balconyDoor[0] + ROOM.balconyDoor[1]) / 2 }, 'door', 'mut', -90));
+	} else o.push(W({ x: 0, y: 0 }, { x: 0, y: ROOM.d }, 'glass'));
 	o.push(W({ x: ROOM.w, y: 0 }, { x: ROOM.w, y: ROOM.tvWall.y2 }, 'wall'));
 	o.push(W({ x: ROOM.w, y: ROOM.landing[3] }, { x: ROOM.w, y: ROOM.bathDoor[0] }, 'wall'));
 	o.push(W({ x: ROOM.w, y: ROOM.bathDoor[1] }, { x: ROOM.w, y: VB.y1 }, 'wall'));
@@ -191,12 +194,19 @@ const inlineStyles = (svg: string) => {
 };
 
 export const roomDefs = () =>
-	`<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><g id="lr-under" style="--lr-glass:#4f9bd0;font-family:var(--font-sans,system-ui,sans-serif)">${inlineStyles(roomUnder())}</g><g id="lr-over" style="--lr-glass:#4f9bd0;font-family:var(--font-sans,system-ui,sans-serif)">${inlineStyles(roomOver())}</g></defs></svg>`;
+	`<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><g id="lr-under" style="--lr-glass:#4f9bd0;font-family:var(--font-sans,system-ui,sans-serif)">${inlineStyles(roomUnder())}</g><g id="lr-over" style="--lr-glass:#4f9bd0;font-family:var(--font-sans,system-ui,sans-serif)">${inlineStyles(roomOver())}</g><g id="lr-over-nodoor" style="--lr-glass:#4f9bd0;font-family:var(--font-sans,system-ui,sans-serif)">${inlineStyles(roomOver(false))}</g></defs></svg>`;
 
 export function renderPlan(
 	layout: Layout,
 	ev: Evaluation,
-	opts: { selected?: string; routes?: boolean; sight?: boolean; openRect?: boolean; shared?: boolean } = {},
+	opts: {
+		selected?: string;
+		routes?: boolean;
+		sight?: boolean;
+		openRect?: boolean;
+		shared?: boolean;
+		pockets?: boolean;
+	} = {},
 ) {
 	const { routes = true, sight = true } = opts;
 	const o: string[] = [];
@@ -205,6 +215,18 @@ export function renderPlan(
 	);
 	o.push(opts.shared ? '<use href="#lr-under"/>' : roomUnder());
 	for (const c of layout.components.filter(c => c.type === 'rug')) o.push(drawComponent(c, opts.selected === c.id));
+	if (opts.pockets !== false && ev.pockets) {
+		const { cells, grid } = ev.pockets;
+		const w = grid.x1 - grid.x0;
+		for (let y = 0; y < grid.y1 - grid.y0; y++)
+			for (let x = 0; x < w; x++) {
+				if (!cells[y * w + x]) continue;
+				let e = x;
+				while (e + 1 < w && cells[y * w + e + 1]) e++;
+				o.push(`<rect class="pocket" x="${x + grid.x0}" y="${sy(y + grid.y0 + 1)}" width="${e - x + 1}" height="1"/>`);
+				x = e;
+			}
+	}
 	if (opts.openRect) {
 		const r = ev.openRect.rect;
 		o.push(`<polygon class="open-rect" points="${P(rectPts(r))}"/>`);
@@ -233,7 +255,8 @@ export function renderPlan(
 	}
 	for (const c of layout.components.filter(c => c.type === 'tv')) o.push(drawComponent(c, opts.selected === c.id));
 
-	o.push(opts.shared ? '<use href="#lr-over"/>' : roomOver());
+	const door = layout.room?.balconyDoor !== false;
+	o.push(opts.shared ? `<use href="#lr-over${door ? '' : '-nodoor'}"/>` : roomOver(door));
 	if (ev.tv) {
 		const t = ev.tv;
 		const lp = { x: t.center.x + t.normal.x * 8, y: t.center.y + t.normal.y * 8 };

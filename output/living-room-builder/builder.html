@@ -121,6 +121,9 @@
 				stroke-width: 0.4;
 				stroke-dasharray: 1.5 1.5;
 			}
+			.lr-plan .pocket {
+				fill: color-mix(in srgb, var(--destructive, #b3261e) 35%, transparent);
+			}
 			.lr-plan .decor {
 				fill: color-mix(in srgb, var(--lr-plant) 55%, transparent);
 			}
@@ -824,17 +827,21 @@
 			var G = { x0: -61, y0: 0, x1: 300, y1: 300 };
 			var GW = G.x1 - G.x0;
 			var GH = G.y1 - G.y0;
-			var DOMAIN = [
+			var domain = door => [
 				[0, 0, ROOM.w, ROOM.d],
 				[35, ROOM.d, ROOM.w, G.y1],
-				[-61, 2, 0, 204],
+				...(door ? [[-61, 2, 0, 204]] : []),
 				ROOM.landing,
 				[199, ROOM.bathDoor[0], 300, ROOM.bathDoor[1]],
 			];
-			var FIXED_BLOCKS = [
+			var fixedBlocks = door => [
 				ROOM.island,
-				[-0.5, 0, 0.5, ROOM.balconyDoor[0]],
-				[-0.5, ROOM.balconyDoor[1], 0.5, 204],
+				...(door
+					? [
+							[-0.5, 0, 0.5, ROOM.balconyDoor[0]],
+							[-0.5, ROOM.balconyDoor[1], 0.5, 204],
+						]
+					: [[-0.5, 0, 0.5, 204]]),
 				[199, 175, 300, ROOM.bathDoor[0]],
 			];
 			var TARGETS = [
@@ -864,7 +871,7 @@
 					d[q] = (q - v[k]) * (q - v[k]) + f[v[k]];
 				}
 			}
-			function clearanceGrid(solids) {
+			function clearanceGrid(solids, door = true) {
 				const blocked = new Uint8Array(GW * GH).fill(1);
 				const mark = (r, val) => {
 					for (let y = Math.max(0, Math.floor(r[1] - G.y0)); y < Math.min(GH, Math.ceil(r[3] - G.y0)); y++)
@@ -874,8 +881,8 @@
 							if (cx >= r[0] && cx <= r[2] && cy >= r[1] && cy <= r[3]) blocked[y * GW + x] = val;
 						}
 				};
-				for (const r of DOMAIN) mark(r, 0);
-				for (const r of FIXED_BLOCKS) mark(r, 1);
+				for (const r of domain(door)) mark(r, 0);
+				for (const r of fixedBlocks(door)) mark(r, 1);
 				const col = ROOM.column;
 				const all = [...solids];
 				for (const poly of all) {
@@ -1051,7 +1058,7 @@
 					taut.push(cells[b]);
 					a = b;
 				}
-				return { pts: taut.map(cellPt), pinch: cellPt(pinch) };
+				return { pts: taut.map(cellPt), pinch: cellPt(pinch), cells };
 			}
 			var rateSeat = (fov, off, turn) =>
 				fov >= 26 && fov <= 46 && off <= 30 && turn <= 35
@@ -1081,7 +1088,125 @@
 				}
 				return best.rect;
 			}
-			function evaluate(layout) {
+			function hull(pts) {
+				const p = pts.toSorted((a, b) => a.x - b.x || a.y - b.y);
+				const cross = (o, a, b) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+				const lower = [],
+					upper = [];
+				for (const q of p) {
+					while (lower.length >= 2 && cross(lower.at(-2), lower.at(-1), q) <= 0) lower.pop();
+					lower.push(q);
+				}
+				for (const q of p.toReversed()) {
+					while (upper.length >= 2 && cross(upper.at(-2), upper.at(-1), q) <= 0) upper.pop();
+					upper.push(q);
+				}
+				return [...lower.slice(0, -1), ...upper.slice(0, -1)];
+			}
+			function findPockets(ctx) {
+				const { r, val } = ctx;
+				const used = new Uint8Array(GW * GH);
+				const fill = poly => {
+					const xs = poly.map(p => p.x),
+						ys = poly.map(p => p.y);
+					for (
+						let y = Math.max(0, Math.floor(Math.min(...ys) - G.y0));
+						y < Math.min(GH, Math.ceil(Math.max(...ys) - G.y0));
+						y++
+					)
+						for (
+							let x = Math.max(0, Math.floor(Math.min(...xs) - G.x0));
+							x < Math.min(GW, Math.ceil(Math.max(...xs) - G.x0));
+							x++
+						)
+							if (inside({ x: x + G.x0 + 0.5, y: y + G.y0 + 0.5 }, poly)) used[y * GW + x] = 1;
+				};
+				const disk = (i, rad) => {
+					const cx = i % GW,
+						cy = Math.floor(i / GW);
+					for (let dy = -rad; dy <= rad; dy++)
+						for (let dx = -rad; dx <= rad; dx++)
+							if (dx * dx + dy * dy <= rad * rad) {
+								const x = cx + dx,
+									y = cy + dy;
+								if (x >= 0 && y >= 0 && x < GW && y < GH) used[y * GW + x] = 1;
+							}
+				};
+				for (const s of ctx.seats) if (s.legroom) fill(s.legroom);
+				const targets = ctx.seats.map(s => s.front);
+				for (const d of ctx.dinings)
+					for (const ch of diningChairs(d)) {
+						const at = (a, k) => ({
+							x: ch.edge.x + ch.side.x * a + ch.out.x * k,
+							y: ch.edge.y + ch.side.y * a + ch.out.y * k,
+						});
+						fill([
+							at(-CHAIR.w / 2, 0),
+							at(CHAIR.w / 2, 0),
+							at(CHAIR.w / 2, CHAIR.comfy),
+							at(-CHAIR.w / 2, CHAIR.comfy),
+						]);
+						targets.push(at(0, 30));
+					}
+				for (const c of ctx.chairs) {
+					const F = frame(c);
+					fill(F.rect(-c.size / 2, c.size / 2, c.size / 2, c.size / 2 + 18));
+					targets.push(F.pt(0, c.size / 2 + 12));
+				}
+				for (const t of ctx.coffees) {
+					const F = frame(t);
+					fill(F.rect(-t.w / 2 - 18, -t.d / 2 - 18, t.w / 2 + 18, t.d / 2 + 18));
+				}
+				if (ctx.tvInfo && ctx.seats.length) {
+					fill(hull([...ctx.seats.map(s => s.eye), ctx.tvInfo.left, ctx.tvInfo.right]));
+					targets.push({
+						x: ctx.tvInfo.center.x + ctx.tvInfo.normal.x * 24,
+						y: ctx.tvInfo.center.y + ctx.tvInfo.normal.y * 24,
+					});
+				}
+				for (const rt of ctx.routes) targets.push(rt.path[0]);
+				for (const t of targets) {
+					const ti = cellOf(t);
+					if (ti < 0 || ti >= val.length || val[ti] <= 0.5) continue;
+					const { cells } = corridorPath(r, ti, Math.min(val[ti], 15));
+					for (const c of cells) disk(c, 15);
+				}
+				const pocket = new Uint8Array(GW * GH);
+				const inLiving = i => {
+					const p = cellPt(i);
+					return p.x > 0 && p.x < ROOM.w && p.y > 0 && p.y < ROOM.island[1];
+				};
+				for (let i = 0; i < GW * GH; i++) if (inLiving(i) && r[i] > 0.5 && !used[i]) pocket[i] = 1;
+				const seen = new Uint8Array(GW * GH);
+				let area = 0,
+					count = 0,
+					largest = 0;
+				const keep = new Uint8Array(GW * GH);
+				for (let i = 0; i < GW * GH; i++) {
+					if (!pocket[i] || seen[i]) continue;
+					const comp = [i];
+					seen[i] = 1;
+					let maxR = 0;
+					for (let k = 0; k < comp.length; k++) {
+						const c = comp[k];
+						maxR = Math.max(maxR, r[c]);
+						for (const o of [-1, 1, -GW, GW]) {
+							const j = c + o;
+							if (j >= 0 && j < GW * GH && pocket[j] && !seen[j]) {
+								seen[j] = 1;
+								comp.push(j);
+							}
+						}
+					}
+					if (comp.length < 144 || maxR < 4) continue;
+					for (const c of comp) keep[c] = 1;
+					area += comp.length / 144;
+					count++;
+					largest = Math.max(largest, comp.length / 144);
+				}
+				return { area, count, largest, cells: keep, grid: G };
+			}
+			function evaluate(layout, opts = {}) {
 				const issues = [];
 				const comps = layout.components;
 				const all = comps.flatMap(c => pieces(c));
@@ -1204,7 +1329,11 @@
 				}
 				const seatComps = comps.filter(c => c.type === 'seating');
 				const rawSeats = seatComps.flatMap(seatsOf);
-				const { r } = clearanceGrid(solids.map(s => s.poly));
+				const door = layout.room?.balconyDoor !== false;
+				const { r } = clearanceGrid(
+					solids.map(s => s.poly),
+					door,
+				);
 				const { val, parent } = widestPaths(r);
 				const seats = rawSeats.map(s => {
 					let dist = 0,
@@ -1342,7 +1471,7 @@
 					const maxVert = Math.max(...seats.map(s => s.vert));
 					if (maxVert > 15) issues.push({ level: 'warn', msg: `screen center ${maxVert.toFixed(0)}° above eye level` });
 				}
-				const routes = TARGETS.map(t => {
+				const routes = TARGETS.filter(t => door || t.key !== 'balcony').map(t => {
 					const ti = cellOf(t.at);
 					const width = Math.max(0, val[ti]) * 2;
 					const { pts, pinch } = corridorPath(r, ti, Math.min(width, t.good) / 2);
@@ -1380,6 +1509,25 @@
 					if (seats.length && reachable < Math.ceil(seats.length * 0.6))
 						issues.push({ level: 'warn', msg: `only ${reachable} of ${seats.length} seats can reach a table surface` });
 				}
+				const pockets =
+					(opts.pockets ?? !door)
+						? findPockets({
+								r,
+								val,
+								seats,
+								dinings,
+								coffees,
+								chairs: comps.filter(c => c.type === 'decor' && c.kind === 'chair'),
+								tvInfo,
+								routes,
+								solids,
+							})
+						: undefined;
+				if (pockets && pockets.area >= 1)
+					issues.push({
+						level: 'warn',
+						msg: `${pockets.area.toFixed(1)} sq ft of odd empty pockets (${pockets.count}; largest ${pockets.largest.toFixed(1)} sq ft)`,
+					});
 				const islandGap = Math.min(
 					Infinity,
 					...solids.filter(s => s.type !== 'dining').map(s => polyDist(s.poly, rectPoly(ROOM.island))),
@@ -1451,6 +1599,7 @@
 						: {}),
 					'Island clearance': `${islandGap.toFixed(0)}″`,
 					'Open floor': `${openRect[2] - openRect[0]}″ × ${openRect[3] - openRect[1]}″`,
+					...(pockets ? { 'Odd pockets': `${pockets.area.toFixed(1)} sq ft` } : {}),
 				};
 				for (const rt of routes) summary[rt.name] = `${rt.width.toFixed(0)}″`;
 				if (!issues.some(i => i.level !== 'ok')) issues.push({ level: 'ok', msg: 'No collisions; every route clear' });
@@ -1467,6 +1616,7 @@
 					seatingArea,
 					openRect: { w: openRect[2] - openRect[0], d: openRect[3] - openRect[1], rect: openRect },
 					diningSeats,
+					pockets,
 					score,
 					summary,
 				};
@@ -1481,6 +1631,128 @@
 				return { ...c, x: Math.round((minX - x1) * 10) / 10, y: Math.round((minY - y1) * 10) / 10 };
 			}
 			var LAYOUTS = [
+				{
+					id: 'N1',
+					title: 'No balcony door · 98″ corner TV · 5-seat sofa on the west glass · 6-seat dining off the island',
+					room: { balconyDoor: false },
+					notes: [
+						'With the balcony door gone, the west glass is a full wall: a 133″ five-seat sofa backs onto it, so no strip of floor is stranded behind the sofa.',
+						'A 98″ TV on a corner console across the south-east corner faces the sofa on the diagonal, so every seat is within 50° of the screen axis.',
+						'The 72″ × 36″ table stays off the island with three chairs a side and 48″ of pull-out room for each.',
+						'Plants, side tables, a lamp behind the TV corner and a swivel chair by the lake fill the leftover corners, leaving under 20 sq ft of odd pockets.',
+					],
+					components: [
+						{
+							id: 'sofa',
+							label: 'Sofa (5 seats)',
+							type: 'seating',
+							x: 22,
+							y: 100,
+							rot: 90,
+							length: 133,
+							depth: 38,
+							arm: 4,
+							seats: 5,
+						},
+						{
+							id: 'console',
+							label: 'Corner console',
+							type: 'console',
+							x: 171.8,
+							y: 28.2,
+							rot: 315,
+							w: 56,
+							d: 18,
+							h: 20,
+						},
+						{
+							id: 'tv',
+							label: 'TV 98″',
+							type: 'tv',
+							x: 165.4,
+							y: 34.6,
+							rot: 315,
+							diag: 98,
+							mount: 'stand',
+							center: 48,
+						},
+						{
+							id: 'coffee',
+							label: 'Coffee table',
+							type: 'table',
+							role: 'coffee',
+							x: 71,
+							y: 91,
+							rot: 90,
+							w: 52,
+							d: 28,
+							h: 16,
+							shape: 'rect',
+						},
+						{
+							id: 'din',
+							label: 'Dining table',
+							type: 'dining',
+							x: 114,
+							y: 158,
+							rot: 90,
+							shape: 'rect',
+							w: 72,
+							d: 36,
+							sides: 3,
+							ends: 0,
+						},
+						{
+							id: 'chair',
+							label: 'Swivel lounge chair',
+							type: 'decor',
+							kind: 'chair',
+							x: 104,
+							y: 23,
+							rot: 70,
+							size: 32,
+						},
+						{
+							id: 'side-s',
+							label: 'Side table',
+							type: 'table',
+							role: 'side',
+							x: 34,
+							y: 22,
+							rot: 0,
+							w: 18,
+							d: 18,
+							h: 22,
+							shape: 'round',
+						},
+						{
+							id: 'side-n',
+							label: 'Side table',
+							type: 'table',
+							role: 'side',
+							x: 32,
+							y: 178,
+							rot: 0,
+							w: 18,
+							d: 18,
+							h: 22,
+							shape: 'round',
+						},
+						{ id: 'plant-sw', label: 'Plant', type: 'decor', kind: 'plant', x: 14, y: 15, rot: 0, size: 22 },
+						{ id: 'plant-nw', label: 'Plant', type: 'decor', kind: 'plant', x: 13, y: 185, rot: 0, size: 20 },
+						{ id: 'plant-e', label: 'Tall plant', type: 'decor', kind: 'plant', x: 186, y: 104, rot: 0, size: 24 },
+						{
+							id: 'lamp',
+							label: 'Uplight behind the TV',
+							type: 'decor',
+							kind: 'lamp',
+							x: 189,
+							y: 10,
+							rot: 0,
+							size: 14,
+						},
+					],
+				},
 				{
 					id: 'H2',
 					title: '85″ wall TV at 8 ft · 4-seat sofa east of the column · 6-seat dining off the island',
@@ -2502,17 +2774,19 @@
 				o.push(text({ x: 175, y: 240 }, 'kitchen / entry ↑', 'mut'));
 				return o.join('');
 			}
-			function roomOver() {
+			function roomOver(door = true) {
 				const o = [];
 				o.push(`<circle class="column" cx="${ROOM.column.x}" cy="${sy(ROOM.column.y)}" r="${ROOM.column.r}"/>`);
 				o.push(text({ x: ROOM.column.x, y: ROOM.column.y }, 'column', 'mut'));
 				const W = (a, b, cls) => line(a, b, cls);
 				o.push(W({ x: 0, y: 0 }, { x: ROOM.southGlassEnd, y: 0 }, 'glass'));
 				o.push(W({ x: ROOM.southGlassEnd, y: 0 }, { x: ROOM.w, y: 0 }, 'wall'));
-				o.push(W({ x: 0, y: 0 }, { x: 0, y: ROOM.balconyDoor[0] }, 'glass'));
-				o.push(W({ x: 0, y: ROOM.balconyDoor[1] }, { x: 0, y: ROOM.d }, 'glass'));
-				o.push(line({ x: 0, y: ROOM.balconyDoor[0] }, { x: -30, y: ROOM.balconyDoor[0] + 12 }, 'open'));
-				o.push(text({ x: -9, y: (ROOM.balconyDoor[0] + ROOM.balconyDoor[1]) / 2 }, 'door', 'mut', -90));
+				if (door) {
+					o.push(W({ x: 0, y: 0 }, { x: 0, y: ROOM.balconyDoor[0] }, 'glass'));
+					o.push(W({ x: 0, y: ROOM.balconyDoor[1] }, { x: 0, y: ROOM.d }, 'glass'));
+					o.push(line({ x: 0, y: ROOM.balconyDoor[0] }, { x: -30, y: ROOM.balconyDoor[0] + 12 }, 'open'));
+					o.push(text({ x: -9, y: (ROOM.balconyDoor[0] + ROOM.balconyDoor[1]) / 2 }, 'door', 'mut', -90));
+				} else o.push(W({ x: 0, y: 0 }, { x: 0, y: ROOM.d }, 'glass'));
 				o.push(W({ x: ROOM.w, y: 0 }, { x: ROOM.w, y: ROOM.tvWall.y2 }, 'wall'));
 				o.push(W({ x: ROOM.w, y: ROOM.landing[3] }, { x: ROOM.w, y: ROOM.bathDoor[0] }, 'wall'));
 				o.push(W({ x: ROOM.w, y: ROOM.bathDoor[1] }, { x: ROOM.w, y: VB.y1 }, 'wall'));
@@ -2540,6 +2814,20 @@
 				o.push(opts.shared ? '<use href="#lr-under"/>' : roomUnder());
 				for (const c of layout.components.filter(c => c.type === 'rug'))
 					o.push(drawComponent(c, opts.selected === c.id));
+				if (opts.pockets !== false && ev.pockets) {
+					const { cells, grid } = ev.pockets;
+					const w = grid.x1 - grid.x0;
+					for (let y = 0; y < grid.y1 - grid.y0; y++)
+						for (let x = 0; x < w; x++) {
+							if (!cells[y * w + x]) continue;
+							let e = x;
+							while (e + 1 < w && cells[y * w + e + 1]) e++;
+							o.push(
+								`<rect class="pocket" x="${x + grid.x0}" y="${sy(y + grid.y0 + 1)}" width="${e - x + 1}" height="1"/>`,
+							);
+							x = e;
+						}
+				}
 				if (opts.openRect) {
 					const r = ev.openRect.rect;
 					o.push(`<polygon class="open-rect" points="${P(rectPts(r))}"/>`);
@@ -2568,7 +2856,8 @@
 				}
 				for (const c of layout.components.filter(c => c.type === 'tv'))
 					o.push(drawComponent(c, opts.selected === c.id));
-				o.push(opts.shared ? '<use href="#lr-over"/>' : roomOver());
+				const door = layout.room?.balconyDoor !== false;
+				o.push(opts.shared ? `<use href="#lr-over${door ? '' : '-nodoor'}"/>` : roomOver(door));
 				if (ev.tv) {
 					const t = ev.tv;
 					const lp = { x: t.center.x + t.normal.x * 8, y: t.center.y + t.normal.y * 8 };

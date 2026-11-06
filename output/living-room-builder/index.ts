@@ -22,7 +22,7 @@ if (built.exitCode !== 0) throw new Error('build.ts failed');
 const THEME = `<style>${THEME_CSS}body{padding:12px}</style>`;
 await Bun.write(
 	join(dir, 'picks.html'),
-	compactGallery([byId('H2'), byId('G2')]).replace('</head>', `${THEME}</head>`),
+	compactGallery([byId('N1'), byId('H2'), byId('G2')]).replace('</head>', `${THEME}</head>`),
 );
 
 type PanelScores = {
@@ -91,18 +91,22 @@ const tabs = (name: string, frames: Frame[]) =>
 		)
 		.join('')}${frames.map((f, i) => `<div class="tab" data-for="${name}-${i}">${frame(f)}</div>`).join('')}</div>`;
 
-const councilRounds: { round: number; layout: Layout; verdicts: { scores: { overall: number } | null }[] }[] =
-	await Bun.file(join(dir, 'council/rounds.json')).json();
-const councilFrames = councilRounds.map(r => {
-	const pass = r.verdicts.filter(v => v.scores && v.scores.overall >= 9).length;
-	return {
+async function councilFrames(series: string): Promise<Frame[]> {
+	const rounds: { round: number; layout: Layout; verdicts: { scores: { overall: number } | null }[] }[] =
+		await Bun.file(join(dir, series, 'rounds.json')).json();
+	return rounds.map(r => ({
 		title: `Round ${r.round} · ${r.layout.id}`,
-		src: `living-room-builder/council/round-${r.round}.html`,
-		note: `${pass}/${r.verdicts.length} councillors at 9+`,
+		src: `living-room-builder/${series}/round-${r.round}.html`,
+		note: `${r.verdicts.filter(v => v.scores && v.scores.overall >= 9).length}/${r.verdicts.length} councillors at 9+`,
 		height: 1500,
-	};
-});
-const tabCss = councilFrames.map((_, i) => `#council-${i}:checked~.tab[data-for="council-${i}"]`).join(',');
+	}));
+}
+const council = await councilFrames('council');
+const councilNoDoor = await councilFrames('council-nodoor');
+const tabCss = [
+	...council.map((_, i) => `#council-${i}:checked~.tab[data-for="council-${i}"]`),
+	...councilNoDoor.map((_, i) => `#nodoor-${i}:checked~.tab[data-for="nodoor-${i}"]`),
+].join(',');
 const earlier: Frame[] = [
 	{
 		title: 'Layout permutations',
@@ -156,17 +160,18 @@ main{max-width:1240px;margin:0 auto;padding:8px 16px 64px}section{padding:28px 0
 details.study{margin:0 0 10px;background:var(--card);border:1px solid var(--line);border-radius:12px}details.study summary{cursor:pointer;padding:12px 14px;font-weight:600}details.study summary span{font-weight:400;color:var(--muted)}details.study .frame{margin:0;border:0;border-top:1px solid var(--line);border-radius:0}
 </style></head><body>
 <header><h1>Living room plans</h1><p>Everything worked out for the B4 living room: the measured layout builder, every layout tried, and the review rounds that picked a winner. Each panel below is the live page; use <b>Open ↗</b> for full screen.</p></header>
-<nav><div><a href="#picks">Picks</a><a href="#builder">Builder</a><a href="#layouts">All layouts</a><a href="#council">Council rounds (with dining)</a><a href="#panel">Panel rounds (couch + TV)</a><a href="#earlier">Earlier studies</a></div></nav>
+<nav><div><a href="#picks">Picks</a><a href="#builder">Builder</a><a href="#layouts">All layouts</a><a href="#council-nodoor">Council rounds (no balcony door)</a><a href="#council">Council rounds (with dining)</a><a href="#panel">Panel rounds (couch + TV)</a><a href="#earlier">Earlier studies</a></div></nav>
 <main>
 ${section(
 	'picks',
 	'The picks',
-	'Two winners, depending on whether the room needs a dining table.',
-	`<div class="cards"><div class="card"><span class="badge">Council 4/5 at 9+</span><h3>H2 · with dining</h3><p>85″ wall TV at 8 ft, a 4-seat sofa east of the column, and a 72″ six-seat table off the island.</p></div><div class="card"><span class="badge">Panel 3/3 at 9+</span><h3>G2 · without dining</h3><p>98″ TV across the south-east corner, a 6-seat L sectional facing it, and an Aries ottoman with a walnut tray.</p></div></div>${frame({ title: 'H2 and G2', src: 'living-room-builder/picks.html', note: 'plans and headline numbers', height: 660 }, false)}`,
+	'Three winners: with the balcony door gone (fewest odd pockets), with a dining table, and without one.',
+	`<div class="cards"><div class="card"><span class="badge">Council 4/5 at 9+</span><h3>N1 · no balcony door</h3><p>98″ TV across the south-east corner, a 5-seat sofa against the west glass, a 72″ six-seat table off the island, and 19.7 sq ft of odd pockets.</p></div><div class="card"><span class="badge">Council 4/5 at 9+</span><h3>H2 · with dining</h3><p>85″ wall TV at 8 ft, a 4-seat sofa east of the column, and a 72″ six-seat table off the island.</p></div><div class="card"><span class="badge">Panel 3/3 at 9+</span><h3>G2 · without dining</h3><p>98″ TV across the south-east corner, a 6-seat L sectional facing it, and an Aries ottoman with a walnut tray.</p></div></div>${frame({ title: 'N1, H2 and G2', src: 'living-room-builder/picks.html', note: 'plans and headline numbers', height: 660 }, false)}`,
 )}
-${section('builder', 'Layout builder', 'Drag, rotate and resize every piece; every layout is re-scored live for sightlines, legroom, routes and dining pull-out room.', frame({ title: 'Builder', src: 'living-room-builder/builder.html#H2', note: 'opens on H2; pick any layout from the menu', height: 1150 }))}
+${section('builder', 'Layout builder', 'Drag, rotate and resize every piece; every layout is re-scored live for sightlines, legroom, routes and dining pull-out room.', frame({ title: 'Builder', src: 'living-room-builder/builder.html#N1', note: 'opens on N1; pick any layout from the menu', height: 1150 }))}
 ${section('layouts', 'Every layout tried', 'Each layout with its plan, metrics, TV-wall elevation and seat table.', frame({ title: 'Gallery', src: 'living-room-builder/gallery.html', note: `${LAYOUTS.length} layouts`, height: 1400 }))}
-${section('council', 'Council rounds · couch + TV + dining', 'Five harnesses (claude-sonnet-5-5, grok-4.7, gemini-4-argon, composer-2.5, gpt-6.1-terra) scored each submission; the goal was 9+ from at least four.', tabs('council', councilFrames))}
+${section('council-nodoor', 'Council rounds · no balcony door, fewest odd pockets', 'The same five harnesses scored couch, TV and six-seat dining with the balcony door treated as glass, plus how little floor is left as odd empty pockets; the goal was 9+ from at least four.', tabs('nodoor', councilNoDoor))}
+${section('council', 'Council rounds · couch + TV + dining', 'Five harnesses (claude-sonnet-5-5, grok-4.7, gemini-4-argon, composer-2.5, gpt-6.1-terra) scored each submission; the goal was 9+ from at least four.', tabs('council', council))}
 ${section('panel', 'Panel rounds · couch + TV', 'The earlier three-reviewer panel, from the first 115″ L sectional to the 98″ corner-TV pick.', frame({ title: 'Panel rounds', src: 'living-room-builder/panel-rounds.html', note: `${panel.length} rounds`, height: 1300 }))}
 ${section('earlier', 'Earlier studies', 'Work in output/ from before the builder. Each loads when opened.', earlier.map(f => `<details class="study"><summary>${esc(f.title)} <span>· ${esc(f.note)}</span></summary>${frame(f)}</details>`).join(''))}
 </main></body></html>`;

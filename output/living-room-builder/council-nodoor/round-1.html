@@ -1,0 +1,1036 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Council round 1</title>
+		<style>
+			:root {
+				--background: #f6f4ef;
+				--foreground: #1d1d1b;
+				--muted-foreground: #6d6a62;
+				--border: #d9d5cb;
+				--card: #fff;
+				--success: #2f7d4a;
+				--warning: #b5651d;
+				--destructive: #b3261e;
+			}
+			@media (prefers-color-scheme: dark) {
+				:root {
+					--background: #161614;
+					--foreground: #ecebe6;
+					--muted-foreground: #a29f96;
+					--border: #37352f;
+					--card: #1f1f1c;
+					--success: #5cb27a;
+					--warning: #e09a50;
+					--destructive: #ef6b62;
+				}
+			}
+			body {
+				margin: 0;
+				background: var(--background);
+			}
+
+			.lr-plan {
+				--lr-sofa: #9c7b5c;
+				--lr-wood: #b8925f;
+				--lr-plant: #6e9a5c;
+				--lr-glass: #4f9bd0;
+				width: 100%;
+				height: auto;
+				display: block;
+				font-family: var(--font-sans, system-ui, sans-serif);
+			}
+			.lr-plan .floor {
+				fill: color-mix(in srgb, var(--foreground, #222) 5%, transparent);
+			}
+			.lr-plan .floor2 {
+				fill: color-mix(in srgb, var(--foreground, #222) 2.5%, transparent);
+			}
+			.lr-plan .wall {
+				stroke: var(--foreground, #222);
+				stroke-width: 3;
+				stroke-linecap: square;
+			}
+			.lr-plan .glass {
+				stroke: var(--lr-glass);
+				stroke-width: 2.2;
+			}
+			.lr-plan .open {
+				stroke: var(--muted-foreground, #888);
+				stroke-width: 0.6;
+				stroke-dasharray: 3 2;
+			}
+			.lr-plan .fixed {
+				fill: color-mix(in srgb, var(--foreground, #222) 14%, transparent);
+				stroke: var(--muted-foreground, #888);
+				stroke-width: 0.5;
+			}
+			.lr-plan .column {
+				fill: color-mix(in srgb, var(--foreground, #222) 45%, transparent);
+			}
+			.lr-plan .rug {
+				fill: color-mix(in srgb, var(--lr-wood) 16%, transparent);
+				stroke: color-mix(in srgb, var(--lr-wood) 60%, transparent);
+				stroke-width: 0.6;
+				stroke-dasharray: 2 1.5;
+			}
+			.lr-plan .sofa {
+				fill: color-mix(in srgb, var(--lr-sofa) 55%, transparent);
+				stroke: var(--lr-sofa);
+				stroke-width: 0.8;
+			}
+			.lr-plan .sofaback {
+				fill: color-mix(in srgb, var(--lr-sofa) 85%, black 10%);
+			}
+			.lr-plan .cushion {
+				fill: color-mix(in srgb, var(--lr-sofa) 30%, transparent);
+				stroke: color-mix(in srgb, var(--lr-sofa) 70%, transparent);
+				stroke-width: 0.4;
+			}
+			.lr-plan .table {
+				fill: color-mix(in srgb, var(--lr-wood) 70%, transparent);
+				stroke: var(--lr-wood);
+				stroke-width: 0.6;
+			}
+			.lr-plan .console {
+				fill: color-mix(in srgb, var(--foreground, #222) 30%, transparent);
+				stroke: var(--foreground, #222);
+				stroke-width: 0.4;
+			}
+			.lr-plan .tv {
+				fill: var(--foreground, #111);
+			}
+			.lr-plan .chair {
+				fill: color-mix(in srgb, var(--lr-wood) 45%, transparent);
+				stroke: var(--lr-wood);
+				stroke-width: 0.5;
+			}
+			.lr-plan .pull {
+				fill: none;
+				stroke: color-mix(in srgb, var(--lr-wood) 55%, transparent);
+				stroke-width: 0.4;
+				stroke-dasharray: 1.5 1.5;
+			}
+			.lr-plan .pocket {
+				fill: color-mix(in srgb, var(--destructive, #b3261e) 35%, transparent);
+			}
+			.lr-plan .decor {
+				fill: color-mix(in srgb, var(--lr-plant) 55%, transparent);
+			}
+			.lr-plan .sight {
+				stroke-width: 0.45;
+				opacity: 0.7;
+			}
+			.lr-plan .prime {
+				stroke: var(--success, #2f7d4a);
+				fill: var(--success, #2f7d4a);
+			}
+			.lr-plan .good {
+				stroke: var(--warning, #b5651d);
+				fill: var(--warning, #b5651d);
+			}
+			.lr-plan .side {
+				stroke: var(--destructive, #b3261e);
+				fill: var(--destructive, #b3261e);
+			}
+			.lr-plan .wedge {
+				fill: color-mix(in srgb, var(--lr-glass) 12%, transparent);
+			}
+			.lr-plan .route {
+				fill: none;
+				stroke-linecap: round;
+				stroke-linejoin: round;
+				opacity: 0.16;
+			}
+			.lr-plan .routec {
+				fill: none;
+				stroke-width: 0.6;
+				stroke-dasharray: 2 2;
+				opacity: 0.8;
+			}
+			.lr-plan .rok {
+				stroke: var(--success, #2f7d4a);
+			}
+			.lr-plan .rwarn {
+				stroke: var(--warning, #b5651d);
+			}
+			.lr-plan .rbad {
+				stroke: var(--destructive, #b3261e);
+			}
+			.lr-plan .lbl {
+				font-size: 5.5px;
+				fill: var(--foreground, #222);
+				text-anchor: middle;
+				dominant-baseline: middle;
+			}
+			.lr-plan .mut {
+				font-size: 5px;
+				fill: var(--muted-foreground, #777);
+				text-anchor: middle;
+				dominant-baseline: middle;
+			}
+			.lr-plan .big {
+				font-size: 7px;
+				font-weight: 700;
+				fill: var(--foreground, #222);
+				text-anchor: middle;
+				dominant-baseline: middle;
+			}
+			.lr-plan .seatn {
+				font-size: 5px;
+				font-weight: 700;
+				text-anchor: middle;
+				dominant-baseline: middle;
+				stroke: none;
+			}
+			.lr-plan .dim {
+				stroke: var(--foreground, #222);
+				stroke-width: 0.4;
+			}
+			.lr-plan .open-rect {
+				fill: none;
+				stroke: var(--lr-plant);
+				stroke-width: 0.5;
+				stroke-dasharray: 1 1.5;
+			}
+			.lr-plan .sel {
+				stroke: var(--ring, #3b82f6) !important;
+				stroke-width: 1.6 !important;
+			}
+			.lr-plan [data-id] {
+				cursor: grab;
+			}
+
+			.lr {
+				font-family: var(--font-sans, system-ui, sans-serif);
+				color: var(--foreground, #1d1d1b);
+				font-size: 13px;
+				line-height: 1.45;
+			}
+			.lr h2 {
+				font-size: 15px;
+				margin: 0 0 2px;
+			}
+			.lr .card {
+				border: 1px solid var(--border, #d9d5cb);
+				border-radius: var(--radius, 10px);
+				padding: 14px;
+				margin: 0 0 16px;
+				background: var(--card, transparent);
+			}
+			.lr .cols {
+				display: grid;
+				grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+				gap: 14px;
+				align-items: start;
+			}
+			.lr .kv {
+				display: flex;
+				justify-content: space-between;
+				gap: 8px;
+				border-bottom: 1px solid var(--border, #e5e2da);
+				padding: 2px 0;
+			}
+			.lr .kv span {
+				color: var(--muted-foreground, #6d6a62);
+			}
+			.lr .score {
+				font-weight: 700;
+				margin-bottom: 4px;
+			}
+			.lr ul.issues {
+				margin: 6px 0 0;
+				padding-left: 16px;
+			}
+			.lr li.bad {
+				color: var(--destructive, #b3261e);
+			}
+			.lr li.warn {
+				color: var(--warning, #b5651d);
+			}
+			.lr li.ok {
+				color: var(--success, #2f7d4a);
+			}
+			.lr table.seats {
+				width: 100%;
+				border-collapse: collapse;
+				font-size: 12px;
+				margin-top: 8px;
+			}
+			.lr table.seats th,
+			.lr table.seats td {
+				text-align: left;
+				padding: 2px 4px;
+				border-bottom: 1px solid var(--border, #e5e2da);
+			}
+			.lr table.seats th {
+				color: var(--muted-foreground, #6d6a62);
+				font-weight: 600;
+			}
+			.lr .dot {
+				display: inline-block;
+				width: 8px;
+				height: 8px;
+				border-radius: 50%;
+				margin-right: 4px;
+			}
+			.lr .dot.prime {
+				background: var(--success, #2f7d4a);
+			}
+			.lr .dot.good {
+				background: var(--warning, #b5651d);
+			}
+			.lr .dot.side {
+				background: var(--destructive, #b3261e);
+			}
+			.lr .notes {
+				margin: 4px 0 8px;
+				padding-left: 16px;
+				color: var(--muted-foreground, #6d6a62);
+			}
+			.lr .legend {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 10px;
+				font-size: 12px;
+				color: var(--muted-foreground, #6d6a62);
+				margin: 0 0 12px;
+			}
+			.lr .elev {
+				max-width: 340px;
+				margin-top: 8px;
+			}
+			@media (max-width: 640px) {
+				.lr .cols {
+					grid-template-columns: 1fr;
+				}
+			}
+
+			.wrap {
+				max-width: 1200px;
+				margin: 0 auto;
+				padding: 16px;
+			}
+			.lr h1 {
+				font-size: 20px;
+				margin: 0 0 4px;
+			}
+			.verdict {
+				font-weight: 700;
+				margin: 4px 0 14px;
+			}
+			table.council {
+				width: 100%;
+				border-collapse: collapse;
+				margin: 0 0 20px;
+				font-size: 13px;
+			}
+			table.council th,
+			table.council td {
+				border-bottom: 1px solid var(--border);
+				padding: 8px;
+				vertical-align: top;
+				text-align: left;
+			}
+			table.council thead th {
+				color: var(--muted-foreground);
+				font-weight: 600;
+			}
+			table.council td.n {
+				text-align: center;
+				font-weight: 700;
+				white-space: nowrap;
+			}
+			.pass {
+				color: var(--success);
+			}
+			.near {
+				color: var(--warning);
+			}
+			.low {
+				color: var(--destructive);
+			}
+			.m {
+				font-weight: 400;
+				color: var(--muted-foreground);
+				font-size: 12px;
+			}
+			table.council ul {
+				margin: 6px 0 0;
+				padding-left: 16px;
+			}
+			.scroll {
+				overflow-x: auto;
+			}
+			@media (max-width: 640px) {
+				table.council thead th:last-child {
+					display: none;
+				}
+				table.council tr {
+					display: grid;
+					grid-template-columns: minmax(0, 1fr) repeat(6, 3.1em);
+					border-bottom: 1px solid var(--border);
+				}
+				table.council th,
+				table.council td {
+					border-bottom: 0;
+				}
+				table.council td:last-child {
+					grid-column: 1/-1;
+					padding-top: 0;
+				}
+				table.council td.n,
+				table.council thead th {
+					padding: 8px 0;
+					text-align: center;
+					font-size: 11px;
+				}
+				table.council td.n {
+					font-size: 13px;
+				}
+				table.council thead th:first-child {
+					font-size: 0;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<div class="lr wrap">
+			<h1>
+				Council round 1 · N1 · No balcony door · 98″ corner TV · 5-seat sofa on the west glass · 6-seat dining off the
+				island
+			</h1>
+			<div class="verdict">4 of 5 councillors at 9 or above (goal: at least 4) · 2026-11-05</div>
+			<div class="scroll">
+				<table class="council">
+					<thead>
+						<tr>
+							<th>Councillor</th>
+							<th>Overall</th>
+							<th>Couch</th>
+							<th>TV</th>
+							<th>Dining</th>
+							<th>Space</th>
+							<th>Plan</th>
+							<th>Verdict and feedback</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<th>
+								Claude
+								<div class="m">claude-sonnet-5-5 · medium</div>
+							</th>
+							<td class="n pass">9</td>
+							<td class="n pass">9</td>
+							<td class="n near">8</td>
+							<td class="n pass">9</td>
+							<td class="n pass">9</td>
+							<td class="n pass">10</td>
+							<td>
+								Cuts pockets from 75–91 sq ft to 19.7 while keeping five seats, six at the table and the 98″; the 26–29°
+								fill is the only real shortfall, and nothing in the room fixes it for less than it costs.
+								<ul>
+									<li>
+										TV: 26–29° is under the 30° cinema floor, but mostly forced; sliding the sofa 4.5″ off the glass (a
+										gap under 8″ creates no pocket) gains only ~0.5°.
+									</li>
+									<li>
+										Pockets: a low plant or basket at about (181, 78) and the swivel chair at (100, 25) would trim the
+										total to roughly 12–14 sq ft.
+									</li>
+									<li>
+										The west chairs' pull-out reaches the sofa's legroom zone; shared use, a squeeze only when both are
+										occupied.
+									</li>
+									<li>The table sits 1.4″ off the island, so the two north chairs are reached by walking around.</li>
+									<li>The TV's west edge stands in front of about 11″ of the lake glass (x 135–146).</li>
+								</ul>
+							</td>
+						</tr>
+						<tr>
+							<th>
+								Grok
+								<div class="m">grok-4.7 · medium</div>
+							</th>
+							<td class="n pass">9</td>
+							<td class="n pass">9</td>
+							<td class="n pass">9</td>
+							<td class="n pass">10</td>
+							<td class="n pass">9</td>
+							<td class="n pass">10</td>
+							<td>
+								The plan to build: five seats on the glass, a 98″ in the corner, a six-top with 48″ pull-out and 19.7 sq
+								ft of leftovers; every closer screen hits the column, the office route or a much larger empty floor.
+								<ul>
+									<li>
+										No deductions. Measured alternatives: sofa 14″ east hits the column and pinches the office route to
+										31″; 98″ on the east wall gives 21–28°; a 4-seat sofa at 8 ft 4 in with the table behind it gives
+										35–46° but 38.5 sq ft of pockets (scored 7).
+									</li>
+									<li>
+										Corner TV slid 12″ toward the sofa: 27–30°, 28.1 sq ft of pockets (scored 8). H2 with the door
+										ignored: 78 sq ft, one 73 sq ft piece (scored 6).
+									</li>
+									<li>
+										Brief error: the largest pocket (6.5 sq ft) is the south-glass strip, not the triangle behind the
+										console (3.7 sq ft).
+									</li>
+									<li>
+										Brief error: the 14″-console variant's sofa (x 17–55) intersects the column; the lake bay behind a
+										floated sofa is 66.7 sq ft, not about 60.
+									</li>
+									<li>
+										Seat 5's legroom clears the column by 2.1″ against a traced (not taped) column position: the one
+										tight spot.
+									</li>
+								</ul>
+							</td>
+						</tr>
+						<tr>
+							<th>
+								Antigravity
+								<div class="m">gemini-4-argon · medium</div>
+							</th>
+							<td class="n pass">9</td>
+							<td class="n pass">9</td>
+							<td class="n pass">9</td>
+							<td class="n pass">10</td>
+							<td class="n pass">9</td>
+							<td class="n pass">10</td>
+							<td>
+								The best no-door geometry for this room: a modest loss of viewing angle buys back 60+ sq ft of dead
+								floor, with five unobstructed seats, six roomy dining seats and under 20 sq ft of perimeter pockets.
+								<ul>
+									<li>
+										Seat 1 misses prime by 0.1° of fill and is 34″ from the coffee table; a 60″ × 28″ coffee table at
+										(71, 95) brings it to 26.5″ and trims pockets to 18.8 sq ft.
+									</li>
+									<li>
+										Moving the tall plant to (186, 86) with that table absorbs the east-wall pocket: 16.5 sq ft in 5
+										pieces.
+									</li>
+									<li>
+										Brief error: the largest pocket is the south-glass strip (6.55 sq ft); the console triangle is 3.67
+										sq ft.
+									</li>
+									<li>
+										Brief error: H2 with the door removed now measures 78.3 sq ft (the 91.1 predates counting the
+										reading chair's front as used).
+									</li>
+								</ul>
+							</td>
+						</tr>
+						<tr>
+							<th>
+								Cursor
+								<div class="m">composer-2.5</div>
+							</th>
+							<td class="n near">8.5</td>
+							<td class="n pass">9</td>
+							<td class="n low">7.5</td>
+							<td class="n pass">10</td>
+							<td class="n pass">9.5</td>
+							<td class="n pass">10</td>
+							<td>
+								Maxes the 98″ and six-seat dining while crushing odd pockets, but the long diagonal throw (26–29°) is
+								the main cost, and the in-room moves that widen the picture trade pockets or the office path for it.
+								<ul>
+									<li>TV: 9–16° below H2's fill; seat 1 sits at the 26° floor with a 39° head turn.</li>
+									<li>
+										The sofa-console alternative (27–32°, 35.5 sq ft, office 31″) would score about 7.5: not a net win.
+									</li>
+									<li>No other deductions; eval output matches N1-eval.txt.</li>
+								</ul>
+							</td>
+						</tr>
+						<tr>
+							<th>
+								Codex
+								<div class="m">gpt-6.1-terra · medium</div>
+							</th>
+							<td class="n pass">9</td>
+							<td class="n pass">9</td>
+							<td class="n pass">9</td>
+							<td class="n pass">9</td>
+							<td class="n pass">9</td>
+							<td class="n pass">9</td>
+							<td>
+								Fits five sofa seats and generous six-person dining with little stranded floor, accepting a relatively
+								distant TV view.
+								<ul>
+									<li>No net improvement found; the sofa-console alternative would be about 8.</li>
+									<li>
+										The prime label on 28–29° seats is the builder's classification, not evidence the distance matches
+										H2's 38–42°.
+									</li>
+									<li>Match the actual 98″ set's stand feet to the 56″ console before buying.</li>
+								</ul>
+							</td>
+						</tr>
+					</tbody>
+				</table>
+			</div>
+			<h3>After this round</h3>
+			<ul>
+				<li>Goal met in round 1: 4 of 5 councillors at 9 or above, so N1 stands as submitted.</li>
+				<li>
+					Brief corrections: the largest pocket is the 6.5 sq ft strip along the south glass (the console triangle is
+					3.7 sq ft); H2 without the door measures 78.3 sq ft once the reading chair's front counts as used; the 14″
+					sofa-console variant hits the column.
+				</li>
+				<li>
+					Suggested refinements not applied, because each would be a new submission: a 60″ × 28″ coffee table at (71,
+					95); the tall plant at (186, 86); a low plant at (181, 78); confirm the column position by tape, since seat
+					5's legroom clears it by 2.1″.
+				</li>
+			</ul>
+			<h3>The layout as submitted</h3>
+			<section class="card">
+				<h2>N1 · No balcony door · 98″ corner TV · 5-seat sofa on the west glass · 6-seat dining off the island</h2>
+				<ul class="notes">
+					<li>
+						With the balcony door gone, the west glass is a full wall: a 133″ five-seat sofa backs onto it, so no strip
+						of floor is stranded behind the sofa.
+					</li>
+					<li>
+						A 98″ TV on a corner console across the south-east corner faces the sofa on the diagonal, so every seat is
+						within 50° of the screen axis.
+					</li>
+					<li>The 72″ × 36″ table stays off the island with three chairs a side and 48″ of pull-out room for each.</li>
+					<li>
+						Plants, side tables, a lamp behind the TV corner and a swivel chair by the lake fill the leftover corners,
+						leaving under 20 sq ft of odd pockets.
+					</li>
+				</ul>
+				<div class="cols">
+					<div>
+						<svg
+							class="lr-plan"
+							viewBox="-40 -22 302 272"
+							xmlns="http://www.w3.org/2000/svg"
+							role="img"
+							aria-label="No balcony door · 98″ corner TV · 5-seat sofa on the west glass · 6-seat dining off the island floor plan"
+						>
+							<polygon class="floor" points="0,228 199,228 199,24 0,24" />
+							<polygon class="floor2" points="35,24 199,24 199,-22 35,-22" />
+							<polygon class="floor2" points="199,106 262,106 262,53 199,53" />
+							<polygon class="floor2" points="-38,226 -1,226 -1,24 -38,24" />
+							<text class="mut" x="-20" y="128" transform="rotate(-90 -20 128)">balcony</text>
+							<text class="mut" x="232" y="80">office</text>
+							<text class="mut" x="232" y="87">landing</text>
+							<text class="mut" x="218" y="31">bath 2</text>
+							<polygon class="fixed" points="78,32.5 149,32.5 149,-8.5 78,-8.5" />
+							<text class="mut" x="113.5" y="12">island 71×41</text>
+							<polygon class="fixed" points="7,24 35,24 35,-22 7,-22" />
+							<text class="mut" x="21" y="0" transform="rotate(-90 21 0)">counter</text>
+							<text class="mut" x="175" y="-12">kitchen / entry ↑</text>
+							<rect class="pocket" x="2" y="226" width="134" height="1" />
+							<rect class="pocket" x="159" y="226" width="39" height="1" />
+							<rect class="pocket" x="2" y="225" width="92" height="1" />
+							<rect class="pocket" x="97" y="225" width="38" height="1" />
+							<rect class="pocket" x="160" y="225" width="22" height="1" />
+							<rect class="pocket" x="196" y="225" width="2" height="1" />
+							<rect class="pocket" x="2" y="224" width="1" height="1" />
+							<rect class="pocket" x="25" y="224" width="32" height="1" />
+							<rect class="pocket" x="66" y="224" width="27" height="1" />
+							<rect class="pocket" x="100" y="224" width="34" height="1" />
+							<rect class="pocket" x="161" y="224" width="20" height="1" />
+							<rect class="pocket" x="197" y="224" width="1" height="1" />
+							<rect class="pocket" x="26" y="223" width="29" height="1" />
+							<rect class="pocket" x="68" y="223" width="25" height="1" />
+							<rect class="pocket" x="103" y="223" width="31" height="1" />
+							<rect class="pocket" x="162" y="223" width="19" height="1" />
+							<rect class="pocket" x="197" y="223" width="1" height="1" />
+							<rect class="pocket" x="26" y="222" width="27" height="1" />
+							<rect class="pocket" x="70" y="222" width="22" height="1" />
+							<rect class="pocket" x="105" y="222" width="27" height="1" />
+							<rect class="pocket" x="163" y="222" width="18" height="1" />
+							<rect class="pocket" x="197" y="222" width="1" height="1" />
+							<rect class="pocket" x="26" y="221" width="25" height="1" />
+							<rect class="pocket" x="72" y="221" width="20" height="1" />
+							<rect class="pocket" x="108" y="221" width="22" height="1" />
+							<rect class="pocket" x="164" y="221" width="17" height="1" />
+							<rect class="pocket" x="197" y="221" width="1" height="1" />
+							<rect class="pocket" x="26" y="220" width="24" height="1" />
+							<rect class="pocket" x="73" y="220" width="19" height="1" />
+							<rect class="pocket" x="111" y="220" width="16" height="1" />
+							<rect class="pocket" x="165" y="220" width="16" height="1" />
+							<rect class="pocket" x="197" y="220" width="1" height="1" />
+							<rect class="pocket" x="26" y="219" width="23" height="1" />
+							<rect class="pocket" x="74" y="219" width="17" height="1" />
+							<rect class="pocket" x="114" y="219" width="11" height="1" />
+							<rect class="pocket" x="166" y="219" width="15" height="1" />
+							<rect class="pocket" x="197" y="219" width="1" height="1" />
+							<rect class="pocket" x="26" y="218" width="22" height="1" />
+							<rect class="pocket" x="75" y="218" width="16" height="1" />
+							<rect class="pocket" x="116" y="218" width="6" height="1" />
+							<rect class="pocket" x="167" y="218" width="14" height="1" />
+							<rect class="pocket" x="197" y="218" width="1" height="1" />
+							<rect class="pocket" x="26" y="217" width="21" height="1" />
+							<rect class="pocket" x="76" y="217" width="15" height="1" />
+							<rect class="pocket" x="119" y="217" width="1" height="1" />
+							<rect class="pocket" x="168" y="217" width="13" height="1" />
+							<rect class="pocket" x="197" y="217" width="1" height="1" />
+							<rect class="pocket" x="26" y="216" width="21" height="1" />
+							<rect class="pocket" x="76" y="216" width="14" height="1" />
+							<rect class="pocket" x="169" y="216" width="12" height="1" />
+							<rect class="pocket" x="197" y="216" width="1" height="1" />
+							<rect class="pocket" x="43" y="215" width="3" height="1" />
+							<rect class="pocket" x="77" y="215" width="13" height="1" />
+							<rect class="pocket" x="170" y="215" width="11" height="1" />
+							<rect class="pocket" x="197" y="215" width="1" height="1" />
+							<rect class="pocket" x="44" y="214" width="2" height="1" />
+							<rect class="pocket" x="77" y="214" width="12" height="1" />
+							<rect class="pocket" x="171" y="214" width="10" height="1" />
+							<rect class="pocket" x="197" y="214" width="1" height="1" />
+							<rect class="pocket" x="44" y="213" width="1" height="1" />
+							<rect class="pocket" x="78" y="213" width="11" height="1" />
+							<rect class="pocket" x="172" y="213" width="9" height="1" />
+							<rect class="pocket" x="197" y="213" width="1" height="1" />
+							<rect class="pocket" x="44" y="212" width="1" height="1" />
+							<rect class="pocket" x="78" y="212" width="11" height="1" />
+							<rect class="pocket" x="173" y="212" width="8" height="1" />
+							<rect class="pocket" x="197" y="212" width="1" height="1" />
+							<rect class="pocket" x="79" y="211" width="9" height="1" />
+							<rect class="pocket" x="174" y="211" width="7" height="1" />
+							<rect class="pocket" x="197" y="211" width="1" height="1" />
+							<rect class="pocket" x="79" y="210" width="9" height="1" />
+							<rect class="pocket" x="175" y="210" width="7" height="1" />
+							<rect class="pocket" x="196" y="210" width="2" height="1" />
+							<rect class="pocket" x="79" y="209" width="9" height="1" />
+							<rect class="pocket" x="176" y="209" width="22" height="1" />
+							<rect class="pocket" x="79" y="208" width="8" height="1" />
+							<rect class="pocket" x="177" y="208" width="21" height="1" />
+							<rect class="pocket" x="79" y="207" width="8" height="1" />
+							<rect class="pocket" x="178" y="207" width="20" height="1" />
+							<rect class="pocket" x="79" y="206" width="8" height="1" />
+							<rect class="pocket" x="179" y="206" width="19" height="1" />
+							<rect class="pocket" x="79" y="205" width="7" height="1" />
+							<rect class="pocket" x="180" y="205" width="18" height="1" />
+							<rect class="pocket" x="79" y="204" width="7" height="1" />
+							<rect class="pocket" x="181" y="204" width="17" height="1" />
+							<rect class="pocket" x="79" y="203" width="6" height="1" />
+							<rect class="pocket" x="182" y="203" width="16" height="1" />
+							<rect class="pocket" x="78" y="202" width="4" height="1" />
+							<rect class="pocket" x="183" y="202" width="15" height="1" />
+							<rect class="pocket" x="78" y="201" width="2" height="1" />
+							<rect class="pocket" x="184" y="201" width="14" height="1" />
+							<rect class="pocket" x="185" y="200" width="13" height="1" />
+							<rect class="pocket" x="186" y="199" width="12" height="1" />
+							<rect class="pocket" x="187" y="198" width="11" height="1" />
+							<rect class="pocket" x="188" y="197" width="10" height="1" />
+							<rect class="pocket" x="189" y="196" width="9" height="1" />
+							<rect class="pocket" x="190" y="195" width="8" height="1" />
+							<rect class="pocket" x="191" y="194" width="7" height="1" />
+							<rect class="pocket" x="192" y="193" width="6" height="1" />
+							<rect class="pocket" x="193" y="192" width="5" height="1" />
+							<rect class="pocket" x="194" y="191" width="4" height="1" />
+							<rect class="pocket" x="195" y="190" width="3" height="1" />
+							<rect class="pocket" x="196" y="189" width="2" height="1" />
+							<rect class="pocket" x="197" y="188" width="1" height="1" />
+							<rect class="pocket" x="194" y="162" width="1" height="1" />
+							<rect class="pocket" x="197" y="162" width="1" height="1" />
+							<rect class="pocket" x="192" y="161" width="6" height="1" />
+							<rect class="pocket" x="190" y="160" width="8" height="1" />
+							<rect class="pocket" x="188" y="159" width="10" height="1" />
+							<rect class="pocket" x="186" y="158" width="12" height="1" />
+							<rect class="pocket" x="184" y="157" width="14" height="1" />
+							<rect class="pocket" x="182" y="156" width="16" height="1" />
+							<rect class="pocket" x="180" y="155" width="18" height="1" />
+							<rect class="pocket" x="179" y="154" width="19" height="1" />
+							<rect class="pocket" x="179" y="153" width="19" height="1" />
+							<rect class="pocket" x="179" y="152" width="19" height="1" />
+							<rect class="pocket" x="179" y="151" width="19" height="1" />
+							<rect class="pocket" x="179" y="150" width="19" height="1" />
+							<rect class="pocket" x="179" y="149" width="19" height="1" />
+							<rect class="pocket" x="179" y="148" width="19" height="1" />
+							<rect class="pocket" x="179" y="147" width="19" height="1" />
+							<rect class="pocket" x="179" y="146" width="19" height="1" />
+							<rect class="pocket" x="179" y="145" width="19" height="1" />
+							<rect class="pocket" x="179" y="144" width="19" height="1" />
+							<rect class="pocket" x="179" y="143" width="19" height="1" />
+							<rect class="pocket" x="179" y="142" width="19" height="1" />
+							<rect class="pocket" x="179" y="141" width="19" height="1" />
+							<rect class="pocket" x="179" y="140" width="19" height="1" />
+							<rect class="pocket" x="179" y="139" width="19" height="1" />
+							<rect class="pocket" x="179" y="138" width="19" height="1" />
+							<rect class="pocket" x="179" y="137" width="19" height="1" />
+							<rect class="pocket" x="114" y="123" width="1" height="1" />
+							<rect class="pocket" x="112" y="122" width="4" height="1" />
+							<rect class="pocket" x="110" y="121" width="7" height="1" />
+							<rect class="pocket" x="108" y="120" width="10" height="1" />
+							<rect class="pocket" x="106" y="119" width="13" height="1" />
+							<rect class="pocket" x="104" y="118" width="16" height="1" />
+							<rect class="pocket" x="103" y="117" width="18" height="1" />
+							<rect class="pocket" x="103" y="116" width="19" height="1" />
+							<rect class="pocket" x="103" y="115" width="20" height="1" />
+							<rect class="pocket" x="103" y="114" width="21" height="1" />
+							<rect class="pocket" x="103" y="113" width="22" height="1" />
+							<rect class="pocket" x="103" y="112" width="23" height="1" />
+							<rect class="pocket" x="103" y="111" width="24" height="1" />
+							<rect class="pocket" x="103" y="110" width="25" height="1" />
+							<rect class="pocket" x="183" y="110" width="15" height="1" />
+							<rect class="pocket" x="103" y="109" width="26" height="1" />
+							<rect class="pocket" x="184" y="109" width="14" height="1" />
+							<rect class="pocket" x="103" y="108" width="27" height="1" />
+							<rect class="pocket" x="184" y="108" width="14" height="1" />
+							<rect class="pocket" x="103" y="107" width="28" height="1" />
+							<rect class="pocket" x="185" y="107" width="13" height="1" />
+							<rect class="pocket" x="185" y="106" width="13" height="1" />
+							<rect class="pocket" x="186" y="105" width="13" height="1" />
+							<rect class="pocket" x="186" y="104" width="13" height="1" />
+							<rect class="pocket" x="186" y="103" width="13" height="1" />
+							<rect class="pocket" x="186" y="102" width="13" height="1" />
+							<rect class="pocket" x="186" y="101" width="13" height="1" />
+							<rect class="pocket" x="187" y="100" width="12" height="1" />
+							<rect class="pocket" x="187" y="99" width="12" height="1" />
+							<rect class="pocket" x="187" y="98" width="12" height="1" />
+							<rect class="pocket" x="187" y="97" width="12" height="1" />
+							<rect class="pocket" x="187" y="96" width="12" height="1" />
+							<rect class="pocket" x="187" y="95" width="12" height="1" />
+							<rect class="pocket" x="187" y="94" width="12" height="1" />
+							<rect class="pocket" x="187" y="93" width="12" height="1" />
+							<rect class="pocket" x="187" y="92" width="12" height="1" />
+							<rect class="pocket" x="188" y="91" width="11" height="1" />
+							<rect class="pocket" x="188" y="90" width="11" height="1" />
+							<rect class="pocket" x="188" y="89" width="11" height="1" />
+							<rect class="pocket" x="188" y="88" width="11" height="1" />
+							<rect class="pocket" x="188" y="87" width="11" height="1" />
+							<rect class="pocket" x="188" y="86" width="11" height="1" />
+							<rect class="pocket" x="188" y="85" width="11" height="1" />
+							<rect class="pocket" x="188" y="84" width="11" height="1" />
+							<rect class="pocket" x="188" y="83" width="8" height="1" />
+							<rect class="pocket" x="188" y="82" width="3" height="1" />
+							<rect class="pocket" x="42" y="62" width="1" height="1" />
+							<rect class="pocket" x="42" y="61" width="2" height="1" />
+							<rect class="pocket" x="41" y="60" width="4" height="1" />
+							<rect class="pocket" x="41" y="59" width="5" height="1" />
+							<rect class="pocket" x="42" y="58" width="5" height="1" />
+							<rect class="pocket" x="42" y="57" width="6" height="1" />
+							<rect class="pocket" x="42" y="56" width="6" height="1" />
+							<rect class="pocket" x="42" y="55" width="6" height="1" />
+							<rect class="pocket" x="42" y="54" width="6" height="1" />
+							<rect class="pocket" x="42" y="53" width="6" height="1" />
+							<rect class="pocket" x="42" y="52" width="6" height="1" />
+							<rect class="pocket" x="42" y="51" width="6" height="1" />
+							<rect class="pocket" x="42" y="50" width="6" height="1" />
+							<rect class="pocket" x="42" y="49" width="6" height="1" />
+							<rect class="pocket" x="42" y="48" width="6" height="1" />
+							<rect class="pocket" x="42" y="47" width="6" height="1" />
+							<rect class="pocket" x="42" y="46" width="6" height="1" />
+							<rect class="pocket" x="42" y="45" width="6" height="1" />
+							<rect class="pocket" x="42" y="44" width="6" height="1" />
+							<rect class="pocket" x="42" y="43" width="6" height="1" />
+							<rect class="pocket" x="42" y="42" width="6" height="1" />
+							<rect class="pocket" x="42" y="41" width="6" height="1" />
+							<rect class="pocket" x="41" y="40" width="7" height="1" />
+							<rect class="pocket" x="24" y="39" width="24" height="1" />
+							<rect class="pocket" x="24" y="38" width="24" height="1" />
+							<rect class="pocket" x="24" y="37" width="24" height="1" />
+							<rect class="pocket" x="24" y="36" width="24" height="1" />
+							<rect class="pocket" x="24" y="35" width="24" height="1" />
+							<rect class="pocket" x="24" y="34" width="24" height="1" />
+							<rect class="pocket" x="24" y="33" width="24" height="1" />
+							<polyline
+								class="route rok"
+								stroke-width="43"
+								points="262.5,77.5 195.5,71.5 190.5,69.5 185.5,65.5 178.5,55.5 175.5,-34.5"
+							/>
+							<polyline
+								class="routec rok"
+								points="262.5,77.5 195.5,71.5 190.5,69.5 185.5,65.5 178.5,55.5 175.5,-34.5"
+							/>
+							<text class="mut" x="188.5" y="63.5">43″</text>
+							<polyline
+								class="route rok"
+								stroke-width="35"
+								points="262.5,30.5 195.5,29.5 189.5,26.5 183.5,20.5 175.5,-34.5"
+							/>
+							<polyline class="routec rok" points="262.5,30.5 195.5,29.5 189.5,26.5 183.5,20.5 175.5,-34.5" />
+							<text class="mut" x="192.5" y="23.5">35″</text>
+							<polygon class="wedge" points="21,78 135,223.5 195.5,163" />
+							<line class="sight good" x1="21" y1="78" x2="165.5" y2="193.5" />
+							<line class="sight prime" x1="21" y1="103" x2="165.5" y2="193.5" />
+							<line class="sight prime" x1="21" y1="128" x2="165.5" y2="193.5" />
+							<line class="sight prime" x1="21" y1="153" x2="165.5" y2="193.5" />
+							<line class="sight good" x1="21" y1="178" x2="165.5" y2="193.5" />
+							<g data-id="sofa">
+								<polygon class="sofa" points="3,61.5 3,194.5 41,194.5 41,61.5" />
+								<polygon class="sofaback" points="3,61.5 3,194.5 12,194.5 12,61.5" />
+								<polygon class="sofaback" points="3,61.5 3,65.5 41,65.5 41,61.5" />
+								<polygon class="sofaback" points="3,190.5 3,194.5 41,194.5 41,190.5" />
+							</g>
+							<g data-id="console"><polygon class="console" points="158.5,226 198,186.5 185,173.5 145.5,213" /></g>
+							<g data-id="coffee"><polygon class="table" points="57,111 57,163 85,163 85,111" /></g>
+							<g data-id="din">
+								<polygon class="table" points="96,34 96,106 132,106 132,34" />
+								<polygon class="chair" points="136,54 136,38 152,38 152,54" />
+								<polygon class="pull" points="156,56 156,36 168,36 168,56" />
+								<polygon class="chair" points="136,78 136,62 152,62 152,78" />
+								<polygon class="pull" points="156,80 156,60 168,60 168,80" />
+								<polygon class="chair" points="136,102 136,86 152,86 152,102" />
+								<polygon class="pull" points="156,104 156,84 168,84 168,104" />
+								<polygon class="chair" points="92,38 92,54 76,54 76,38" />
+								<polygon class="pull" points="72,36 72,56 60,56 60,36" />
+								<polygon class="chair" points="92,62 92,78 76,78 76,62" />
+								<polygon class="pull" points="72,60 72,80 60,80 60,60" />
+								<polygon class="chair" points="92,86 92,102 76,102 76,86" />
+								<polygon class="pull" points="72,84 72,104 60,104 60,84" />
+							</g>
+							<g data-id="chair"><polygon class="sofa" points="83.5,195.5 94.5,225.5 124.5,214.5 113.5,184.5" /></g>
+							<g data-id="side-s">
+								<ellipse class="table" cx="34" cy="206" rx="9" ry="9" transform="rotate(0 34 206)" />
+							</g>
+							<g data-id="side-n">
+								<ellipse class="table" cx="32" cy="50" rx="9" ry="9" transform="rotate(0 32 50)" />
+							</g>
+							<g data-id="plant-sw"><circle class="decor" cx="14" cy="213" r="11" /></g>
+							<g data-id="plant-nw"><circle class="decor" cx="13" cy="43" r="10" /></g>
+							<g data-id="plant-e"><circle class="decor" cx="186" cy="124" r="12" /></g>
+							<g data-id="lamp"><circle class="decor" cx="189" cy="218" r="7" /></g>
+							<polygon class="cushion" points="12,65.5 12,90.5 41,90.5 41,65.5" />
+							<circle class="good" cx="21" cy="78" r="2.6" stroke="white" stroke-width=".5" />
+							<text class="seatn" fill="white" x="21" y="78.2">1</text>
+							<polygon class="cushion" points="12,90.5 12,115.5 41,115.5 41,90.5" />
+							<circle class="prime" cx="21" cy="103" r="2.6" stroke="white" stroke-width=".5" />
+							<text class="seatn" fill="white" x="21" y="103.2">2</text>
+							<polygon class="cushion" points="12,115.5 12,140.5 41,140.5 41,115.5" />
+							<circle class="prime" cx="21" cy="128" r="2.6" stroke="white" stroke-width=".5" />
+							<text class="seatn" fill="white" x="21" y="128.2">3</text>
+							<polygon class="cushion" points="12,140.5 12,165.5 41,165.5 41,140.5" />
+							<circle class="prime" cx="21" cy="153" r="2.6" stroke="white" stroke-width=".5" />
+							<text class="seatn" fill="white" x="21" y="153.2">4</text>
+							<polygon class="cushion" points="12,165.5 12,190.5 41,190.5 41,165.5" />
+							<circle class="good" cx="21" cy="178" r="2.6" stroke="white" stroke-width=".5" />
+							<text class="seatn" fill="white" x="21" y="178.2">5</text>
+							<g data-id="tv"><polygon class="tv" points="136.5,225.5 197.5,164.5 196,163 135,224" /></g>
+							<circle class="column" cx="61.5" cy="207.5" r="16.5" />
+							<text class="mut" x="61.5" y="207.5">column</text>
+							<line class="glass" x1="0" y1="228" x2="146" y2="228" />
+							<line class="wall" x1="146" y1="228" x2="199" y2="228" />
+							<line class="glass" x1="0" y1="228" x2="0" y2="24" />
+							<line class="wall" x1="199" y1="228" x2="199" y2="106" />
+							<line class="wall" x1="199" y1="53" x2="199" y2="48" />
+							<line class="wall" x1="199" y1="13" x2="199" y2="-22" />
+							<line class="wall" x1="199" y1="106" x2="300" y2="106" />
+							<line class="wall" x1="213" y1="53" x2="300" y2="53" />
+							<line class="wall" x1="0" y1="24" x2="35" y2="24" />
+							<line class="open" x1="35" y1="32.5" x2="199" y2="32.5" />
+							<text class="mut" x="70" y="236">south glass (lake)</text>
+							<text class="mut" x="172" y="236">solid</text>
+							<text class="mut" x="-9" y="158" transform="rotate(-90 -9 158)">west glass</text>
+							<text class="mut" x="208" y="167" transform="rotate(90 208 167)">TV wall 122″</text>
+							<line class="dim" x1="150" y1="244" x2="198" y2="244" />
+							<line class="dim" x1="150" y1="242" x2="150" y2="246" />
+							<line class="dim" x1="198" y1="242" x2="198" y2="246" />
+							<text class="mut" x="210" y="244">4 ft</text>
+							<text class="lbl" x="245" y="218">N ↑</text>
+							<text class="big" x="159.5" y="187.5" transform="rotate(-45 159.5 187.5)">98″ TV</text>
+							<text class="lbl" x="93" y="131.5">15′5″ · 26°</text>
+						</svg>
+					</div>
+					<div>
+						<div class="kv"><span>TV</span><b>98″ on a stand</b></div>
+						<div class="kv"><span>Seats</span><b>5 (3 prime, 2 good, 0 side)</b></div>
+						<div class="kv"><span>Seat run</span><b>133″</b></div>
+						<div class="kv"><span>Eye → screen</span><b>12′1″ – 15′5″</b></div>
+						<div class="kv"><span>Screen fills</span><b>26–29°</b></div>
+						<div class="kv"><span>Coffee table gap</span><b>16″</b></div>
+						<div class="kv"><span>Dining</span><b>6 chairs, 72″ × 36″</b></div>
+						<div class="kv"><span>Chair pull-out</span><b>48″ min</b></div>
+						<div class="kv"><span>Island clearance</span><b>38″</b></div>
+						<div class="kv"><span>Open floor</span><b>89″ × 79″</b></div>
+						<div class="kv"><span>Odd pockets</span><b>19.7 sq ft</b></div>
+						<div class="kv"><span>Office / guest door</span><b>43″</b></div>
+						<div class="kv"><span>Bath 2 door</span><b>35″</b></div>
+						<ul class="issues">
+							<li class="warn">19.7 sq ft of odd empty pockets (6; largest 6.5 sq ft)</li>
+						</ul>
+						<div class="elev">
+							<svg
+								class="lr-plan"
+								viewBox="0 0 150 135"
+								xmlns="http://www.w3.org/2000/svg"
+								role="img"
+								aria-label="TV elevation"
+							>
+								<rect class="floor" x="10" y="7" width="130" height="120" />
+								<line class="wall" x1="10" y1="127" x2="140" y2="127" />
+								<line class="open" x1="10" y1="7" x2="140" y2="7" />
+								<rect class="console" x="53.5" y="107" width="56" height="20" />
+								<rect class="tv" x="44.5" y="54.5" width="61.5" height="49" rx="1" />
+								<text class="lbl" style="fill: var(--background, #fff)" x="75" y="79">98″ · 86.5″ × 49″</text>
+								<line class="dim" x1="10" y1="87" x2="140" y2="87" stroke-dasharray="2 2" />
+								<text class="mut" x="126" y="84">eye 40″</text>
+								<text class="mut" x="75" y="13">TV, seen from the sofa</text>
+							</svg>
+						</div>
+					</div>
+				</div>
+				<table class="seats">
+					<thead>
+						<tr>
+							<th>Seat</th>
+							<th>Type</th>
+							<th>To screen</th>
+							<th>Fills</th>
+							<th>Off-axis</th>
+							<th>Head turn</th>
+							<th>Width</th>
+						</tr>
+					</thead>
+					<tbody>
+						<tr>
+							<td><span class="dot good"></span>1</td>
+							<td>main</td>
+							<td>15′5″</td>
+							<td>26°</td>
+							<td>6°</td>
+							<td>39°</td>
+							<td>25″</td>
+						</tr>
+						<tr>
+							<td><span class="dot prime"></span>2</td>
+							<td>main</td>
+							<td>14′2″</td>
+							<td>28°</td>
+							<td>13°</td>
+							<td>32°</td>
+							<td>25″</td>
+						</tr>
+						<tr>
+							<td><span class="dot prime"></span>3</td>
+							<td>main</td>
+							<td>13′3″</td>
+							<td>29°</td>
+							<td>21°</td>
+							<td>24°</td>
+							<td>25″</td>
+						</tr>
+						<tr>
+							<td><span class="dot prime"></span>4</td>
+							<td>main</td>
+							<td>12′6″</td>
+							<td>28°</td>
+							<td>29°</td>
+							<td>16°</td>
+							<td>25″</td>
+						</tr>
+						<tr>
+							<td><span class="dot good"></span>5</td>
+							<td>main</td>
+							<td>12′1″</td>
+							<td>27°</td>
+							<td>39°</td>
+							<td>6°</td>
+							<td>25″</td>
+						</tr>
+					</tbody>
+				</table>
+			</section>
+		</div>
+	</body>
+</html>

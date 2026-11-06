@@ -113,6 +113,9 @@
 				stroke-width: 0.4;
 				stroke-dasharray: 1.5 1.5;
 			}
+			.lr-plan .pocket {
+				fill: color-mix(in srgb, var(--destructive, #b3261e) 35%, transparent);
+			}
 			.lr-plan .decor {
 				fill: color-mix(in srgb, var(--lr-plant) 55%, transparent);
 			}
@@ -360,6 +363,36 @@
 			}
 			.scroll {
 				overflow-x: auto;
+			}
+			@media (max-width: 640px) {
+				table.council thead th:last-child {
+					display: none;
+				}
+				table.council tr {
+					display: grid;
+					grid-template-columns: minmax(0, 1fr) repeat(6, 3.1em);
+					border-bottom: 1px solid var(--border);
+				}
+				table.council th,
+				table.council td {
+					border-bottom: 0;
+				}
+				table.council td:last-child {
+					grid-column: 1/-1;
+					padding-top: 0;
+				}
+				table.council td.n,
+				table.council thead th {
+					padding: 8px 0;
+					text-align: center;
+					font-size: 11px;
+				}
+				table.council td.n {
+					font-size: 13px;
+				}
+				table.council thead th:first-child {
+					font-size: 0;
+				}
 			}
 		</style>
 	</head>

@@ -74,7 +74,14 @@ export type Dining = Base & {
 	bare?: ('front' | 'back')[];
 };
 export type Component = Seating | Tv | Console | Table | Rug | Decor | Dining;
-export type Layout = { id: string; title: string; notes?: string[]; components: Component[] };
+// `room.balconyDoor: false` treats the balcony door as glass: no route to it, and furniture may stand in front of it.
+export type Layout = {
+	id: string;
+	title: string;
+	notes?: string[];
+	room?: { balconyDoor?: boolean };
+	components: Component[];
+};
 
 export const tvSize = (diag: number) => ({
 	w: (diag * 16) / Math.hypot(16, 9) + 1,
@@ -415,17 +422,21 @@ const G = { x0: -61, y0: 0, x1: 300, y1: 300 }; // 1" cells
 const GW = G.x1 - G.x0,
 	GH = G.y1 - G.y0;
 
-const DOMAIN: Rect[] = [
+const domain = (door: boolean): Rect[] => [
 	[0, 0, ROOM.w, ROOM.d],
 	[35, ROOM.d, ROOM.w, G.y1],
-	[-61, 2, 0, 204], // balcony, reached only through the door gap
+	...(door ? ([[-61, 2, 0, 204]] as Rect[]) : []), // balcony, reached only through the door gap
 	ROOM.landing,
 	[199, ROOM.bathDoor[0], 300, ROOM.bathDoor[1]],
 ];
-const FIXED_BLOCKS: Rect[] = [
+const fixedBlocks = (door: boolean): Rect[] => [
 	ROOM.island,
-	[-0.5, 0, 0.5, ROOM.balconyDoor[0]],
-	[-0.5, ROOM.balconyDoor[1], 0.5, 204],
+	...(door
+		? ([
+				[-0.5, 0, 0.5, ROOM.balconyDoor[0]],
+				[-0.5, ROOM.balconyDoor[1], 0.5, 204],
+			] as Rect[])
+		: ([[-0.5, 0, 0.5, 204]] as Rect[])),
 	[199, 175, 300, ROOM.bathDoor[0]],
 ];
 
@@ -458,7 +469,7 @@ function edt1d(f: Float64Array, n: number, d: Float64Array, v: Int32Array, z: Fl
 	}
 }
 
-function clearanceGrid(solids: Poly[]) {
+function clearanceGrid(solids: Poly[], door = true) {
 	const blocked = new Uint8Array(GW * GH).fill(1);
 	const mark = (r: Rect, val: 0 | 1) => {
 		for (let y = Math.max(0, Math.floor(r[1] - G.y0)); y < Math.min(GH, Math.ceil(r[3] - G.y0)); y++)
@@ -468,8 +479,8 @@ function clearanceGrid(solids: Poly[]) {
 				if (cx >= r[0] && cx <= r[2] && cy >= r[1] && cy <= r[3]) blocked[y * GW + x] = val;
 			}
 	};
-	for (const r of DOMAIN) mark(r, 0);
-	for (const r of FIXED_BLOCKS) mark(r, 1);
+	for (const r of domain(door)) mark(r, 0);
+	for (const r of fixedBlocks(door)) mark(r, 1);
 	const col = ROOM.column;
 	const all = [...solids];
 	for (const poly of all) {
@@ -652,7 +663,7 @@ function corridorPath(r: Float32Array, t: number, radius: number) {
 		taut.push(cells[b]!);
 		a = b;
 	}
-	return { pts: taut.map(cellPt), pinch: cellPt(pinch) };
+	return { pts: taut.map(cellPt), pinch: cellPt(pinch), cells };
 }
 
 // ---------- evaluation ----------
@@ -689,6 +700,7 @@ export type Evaluation = {
 	seatingArea: number;
 	openRect: { w: number; d: number; rect: Rect };
 	diningSeats: { comp: string; n: number; pull: number }[];
+	pockets?: { area: number; count: number; largest: number; cells: Uint8Array; grid: typeof G };
 	score: number;
 	summary: Record<string, string | number>;
 };
@@ -724,7 +736,136 @@ function largestOpenRect(blockedLiving: (x: number, y: number) => boolean, w: nu
 	return best.rect;
 }
 
-export function evaluate(layout: Layout): Evaluation {
+function hull(pts: Vec[]): Poly {
+	const p = pts.toSorted((a, b) => a.x - b.x || a.y - b.y);
+	const cross = (o: Vec, a: Vec, b: Vec) => (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x);
+	const lower: Vec[] = [],
+		upper: Vec[] = [];
+	for (const q of p) {
+		while (lower.length >= 2 && cross(lower.at(-2)!, lower.at(-1)!, q) <= 0) lower.pop();
+		lower.push(q);
+	}
+	for (const q of p.toReversed()) {
+		while (upper.length >= 2 && cross(upper.at(-2)!, upper.at(-1)!, q) <= 0) upper.pop();
+		upper.push(q);
+	}
+	return [...lower.slice(0, -1), ...upper.slice(0, -1)];
+}
+
+// Odd pockets: free floor in the living room that nothing uses. Floor counts as used when it is legroom, a dining
+// chair's seat or pull-out zone, within reach of the coffee table, inside the viewing wedge between the seats and the
+// screen, in front of a reading chair, or on a 30" access corridor from the kitchen to a door, a seat, a chair or the TV. Strips under 8"
+// (wall and glass clearance) and specks under 1 sq ft are ignored.
+function findPockets(ctx: {
+	r: Float32Array;
+	val: Float32Array;
+	seats: Seat[];
+	dinings: Dining[];
+	coffees: Table[];
+	chairs: Decor[];
+	tvInfo: Evaluation['tv'];
+	routes: Route[];
+	solids: Piece[];
+}) {
+	const { r, val } = ctx;
+	const used = new Uint8Array(GW * GH);
+	const fill = (poly: Poly) => {
+		const xs = poly.map(p => p.x),
+			ys = poly.map(p => p.y);
+		for (
+			let y = Math.max(0, Math.floor(Math.min(...ys) - G.y0));
+			y < Math.min(GH, Math.ceil(Math.max(...ys) - G.y0));
+			y++
+		)
+			for (
+				let x = Math.max(0, Math.floor(Math.min(...xs) - G.x0));
+				x < Math.min(GW, Math.ceil(Math.max(...xs) - G.x0));
+				x++
+			)
+				if (inside({ x: x + G.x0 + 0.5, y: y + G.y0 + 0.5 }, poly)) used[y * GW + x] = 1;
+	};
+	const disk = (i: number, rad: number) => {
+		const cx = i % GW,
+			cy = Math.floor(i / GW);
+		for (let dy = -rad; dy <= rad; dy++)
+			for (let dx = -rad; dx <= rad; dx++)
+				if (dx * dx + dy * dy <= rad * rad) {
+					const x = cx + dx,
+						y = cy + dy;
+					if (x >= 0 && y >= 0 && x < GW && y < GH) used[y * GW + x] = 1;
+				}
+	};
+	for (const s of ctx.seats) if (s.legroom) fill(s.legroom);
+	const targets: Vec[] = ctx.seats.map(s => s.front);
+	for (const d of ctx.dinings)
+		for (const ch of diningChairs(d)) {
+			const at = (a: number, k: number): Vec => ({
+				x: ch.edge.x + ch.side.x * a + ch.out.x * k,
+				y: ch.edge.y + ch.side.y * a + ch.out.y * k,
+			});
+			fill([at(-CHAIR.w / 2, 0), at(CHAIR.w / 2, 0), at(CHAIR.w / 2, CHAIR.comfy), at(-CHAIR.w / 2, CHAIR.comfy)]);
+			targets.push(at(0, 30));
+		}
+	for (const c of ctx.chairs) {
+		const F = frame(c);
+		fill(F.rect(-c.size / 2, c.size / 2, c.size / 2, c.size / 2 + 18));
+		targets.push(F.pt(0, c.size / 2 + 12));
+	}
+	for (const t of ctx.coffees) {
+		const F = frame(t);
+		fill(F.rect(-t.w / 2 - 18, -t.d / 2 - 18, t.w / 2 + 18, t.d / 2 + 18));
+	}
+	if (ctx.tvInfo && ctx.seats.length) {
+		fill(hull([...ctx.seats.map(s => s.eye), ctx.tvInfo.left, ctx.tvInfo.right]));
+		targets.push({
+			x: ctx.tvInfo.center.x + ctx.tvInfo.normal.x * 24,
+			y: ctx.tvInfo.center.y + ctx.tvInfo.normal.y * 24,
+		});
+	}
+	for (const rt of ctx.routes) targets.push(rt.path[0]!);
+	for (const t of targets) {
+		const ti = cellOf(t);
+		if (ti < 0 || ti >= val.length || val[ti]! <= 0.5) continue;
+		const { cells } = corridorPath(r, ti, Math.min(val[ti]!, 15));
+		for (const c of cells) disk(c, 15);
+	}
+	const pocket = new Uint8Array(GW * GH);
+	const inLiving = (i: number) => {
+		const p = cellPt(i);
+		return p.x > 0 && p.x < ROOM.w && p.y > 0 && p.y < ROOM.island[1];
+	};
+	for (let i = 0; i < GW * GH; i++) if (inLiving(i) && r[i]! > 0.5 && !used[i]) pocket[i] = 1;
+	const seen = new Uint8Array(GW * GH);
+	let area = 0,
+		count = 0,
+		largest = 0;
+	const keep = new Uint8Array(GW * GH);
+	for (let i = 0; i < GW * GH; i++) {
+		if (!pocket[i] || seen[i]) continue;
+		const comp: number[] = [i];
+		seen[i] = 1;
+		let maxR = 0;
+		for (let k = 0; k < comp.length; k++) {
+			const c = comp[k]!;
+			maxR = Math.max(maxR, r[c]!);
+			for (const o of [-1, 1, -GW, GW]) {
+				const j = c + o;
+				if (j >= 0 && j < GW * GH && pocket[j] && !seen[j]) {
+					seen[j] = 1;
+					comp.push(j);
+				}
+			}
+		}
+		if (comp.length < 144 || maxR < 4) continue;
+		for (const c of comp) keep[c] = 1;
+		area += comp.length / 144;
+		count++;
+		largest = Math.max(largest, comp.length / 144);
+	}
+	return { area, count, largest, cells: keep, grid: G };
+}
+
+export function evaluate(layout: Layout, opts: { pockets?: boolean } = {}): Evaluation {
 	const issues: Issue[] = [];
 	const comps = layout.components;
 	const all = comps.flatMap(c => pieces(c));
@@ -845,7 +986,11 @@ export function evaluate(layout: Layout): Evaluation {
 	// Seats
 	const seatComps = comps.filter((c): c is Seating => c.type === 'seating');
 	const rawSeats = seatComps.flatMap(seatsOf);
-	const { r } = clearanceGrid(solids.map(s => s.poly));
+	const door = layout.room?.balconyDoor !== false;
+	const { r } = clearanceGrid(
+		solids.map(s => s.poly),
+		door,
+	);
 	const { val, parent } = widestPaths(r);
 	const seats: SeatView[] = rawSeats.map(s => {
 		let dist = 0,
@@ -979,7 +1124,7 @@ export function evaluate(layout: Layout): Evaluation {
 	}
 
 	// Routes
-	const routes: Route[] = TARGETS.map(t => {
+	const routes: Route[] = TARGETS.filter(t => door || t.key !== 'balcony').map(t => {
 		const ti = cellOf(t.at);
 		const width = Math.max(0, val[ti]!) * 2;
 		const { pts, pinch } = corridorPath(r, ti, Math.min(width, t.good) / 2);
@@ -1015,6 +1160,26 @@ export function evaluate(layout: Layout): Evaluation {
 		if (seats.length && reachable < Math.ceil(seats.length * 0.6))
 			issues.push({ level: 'warn', msg: `only ${reachable} of ${seats.length} seats can reach a table surface` });
 	}
+
+	const pockets =
+		(opts.pockets ?? !door)
+			? findPockets({
+					r,
+					val,
+					seats,
+					dinings,
+					coffees,
+					chairs: comps.filter((c): c is Decor => c.type === 'decor' && c.kind === 'chair'),
+					tvInfo,
+					routes,
+					solids,
+				})
+			: undefined;
+	if (pockets && pockets.area >= 1)
+		issues.push({
+			level: 'warn',
+			msg: `${pockets.area.toFixed(1)} sq ft of odd empty pockets (${pockets.count}; largest ${pockets.largest.toFixed(1)} sq ft)`,
+		});
 
 	// A dining table set against the island replaces the stools, so only other furniture counts here.
 	const islandGap = Math.min(
@@ -1083,6 +1248,7 @@ export function evaluate(layout: Layout): Evaluation {
 			: {}),
 		'Island clearance': `${islandGap.toFixed(0)}″`,
 		'Open floor': `${openRect[2] - openRect[0]}″ × ${openRect[3] - openRect[1]}″`,
+		...(pockets ? { 'Odd pockets': `${pockets.area.toFixed(1)} sq ft` } : {}),
 	};
 	for (const rt of routes) summary[rt.name] = `${rt.width.toFixed(0)}″`;
 	if (!issues.some(i => i.level !== 'ok')) issues.push({ level: 'ok', msg: 'No collisions; every route clear' });
@@ -1099,6 +1265,7 @@ export function evaluate(layout: Layout): Evaluation {
 		seatingArea,
 		openRect: { w: openRect[2] - openRect[0], d: openRect[3] - openRect[1], rect: openRect },
 		diningSeats,
+		pockets,
 		score,
 		summary,
 	};

@@ -186,7 +186,8 @@
 				margin-top: 8px;
 			}
 			#council-0:checked ~ .tab[data-for='council-0'],
-			#council-1:checked ~ .tab[data-for='council-1'] {
+			#council-1:checked ~ .tab[data-for='council-1'],
+			#nodoor-0:checked ~ .tab[data-for='nodoor-0'] {
 				display: block;
 			}
 			details.study {
@@ -223,6 +224,7 @@
 		<nav>
 			<div>
 				<a href="#picks">Picks</a><a href="#builder">Builder</a><a href="#layouts">All layouts</a
+				><a href="#council-nodoor">Council rounds (no balcony door)</a
 				><a href="#council">Council rounds (with dining)</a><a href="#panel">Panel rounds (couch + TV)</a
 				><a href="#earlier">Earlier studies</a>
 			</div>
@@ -231,9 +233,17 @@
 			<section id="picks">
 				<div class="head">
 					<h2>The picks</h2>
-					<p>Two winners, depending on whether the room needs a dining table.</p>
+					<p>Three winners: with the balcony door gone (fewest odd pockets), with a dining table, and without one.</p>
 				</div>
 				<div class="cards">
+					<div class="card">
+						<span class="badge">Council 4/5 at 9+</span>
+						<h3>N1 · no balcony door</h3>
+						<p>
+							98″ TV across the south-east corner, a 5-seat sofa against the west glass, a 72″ six-seat table off the
+							island, and 19.7 sq ft of odd pockets.
+						</p>
+					</div>
 					<div class="card">
 						<span class="badge">Council 4/5 at 9+</span>
 						<h3>H2 · with dining</h3>
@@ -250,10 +260,10 @@
 				</div>
 				<figure class="frame">
 					<figcaption>
-						<span><b>H2 and G2</b> · plans and headline numbers</span
+						<span><b>N1, H2 and G2</b> · plans and headline numbers</span
 						><a href="living-room-builder/picks.html" target="_blank" rel="noopener">Open ↗</a>
 					</figcaption>
-					<iframe src="living-room-builder/picks.html" title="H2 and G2" style="height: 660px"></iframe>
+					<iframe src="living-room-builder/picks.html" title="N1, H2 and G2" style="height: 660px"></iframe>
 				</figure>
 			</section>
 			<section id="builder">
@@ -266,11 +276,11 @@
 				</div>
 				<figure class="frame">
 					<figcaption>
-						<span><b>Builder</b> · opens on H2; pick any layout from the menu</span
-						><a href="living-room-builder/builder.html#H2" target="_blank" rel="noopener">Open ↗</a>
+						<span><b>Builder</b> · opens on N1; pick any layout from the menu</span
+						><a href="living-room-builder/builder.html#N1" target="_blank" rel="noopener">Open ↗</a>
 					</figcaption>
 					<iframe
-						src="living-room-builder/builder.html#H2"
+						src="living-room-builder/builder.html#N1"
 						title="Builder"
 						style="height: 1150px"
 						loading="lazy"
@@ -284,11 +294,37 @@
 				</div>
 				<figure class="frame">
 					<figcaption>
-						<span><b>Gallery</b> · 16 layouts</span
+						<span><b>Gallery</b> · 17 layouts</span
 						><a href="living-room-builder/gallery.html" target="_blank" rel="noopener">Open ↗</a>
 					</figcaption>
 					<iframe src="living-room-builder/gallery.html" title="Gallery" style="height: 1400px" loading="lazy"></iframe>
 				</figure>
+			</section>
+			<section id="council-nodoor">
+				<div class="head">
+					<h2>Council rounds · no balcony door, fewest odd pockets</h2>
+					<p>
+						The same five harnesses scored couch, TV and six-seat dining with the balcony door treated as glass, plus
+						how little floor is left as odd empty pockets; the goal was 9+ from at least four.
+					</p>
+				</div>
+				<div class="tabs">
+					<input type="radio" name="nodoor" id="nodoor-0" checked /><label for="nodoor-0">Round 1 · N1</label>
+					<div class="tab" data-for="nodoor-0">
+						<figure class="frame">
+							<figcaption>
+								<span><b>Round 1 · N1</b> · 4/5 councillors at 9+</span
+								><a href="living-room-builder/council-nodoor/round-1.html" target="_blank" rel="noopener">Open ↗</a>
+							</figcaption>
+							<iframe
+								src="living-room-builder/council-nodoor/round-1.html"
+								title="Round 1 · N1"
+								style="height: 1500px"
+								loading="lazy"
+							></iframe>
+						</figure>
+					</div>
+				</div>
 			</section>
 			<section id="council">
 				<div class="head">
