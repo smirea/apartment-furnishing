@@ -1,4 +1,5 @@
 import {
+	diningChairs,
 	ROOM,
 	frame,
 	pieces,
@@ -45,6 +46,8 @@ export const PLAN_CSS = `
 .lr-plan .table{fill:color-mix(in srgb,var(--lr-wood) 70%,transparent);stroke:var(--lr-wood);stroke-width:.6}
 .lr-plan .console{fill:color-mix(in srgb,var(--foreground,#222) 30%,transparent);stroke:var(--foreground,#222);stroke-width:.4}
 .lr-plan .tv{fill:var(--foreground,#111)}
+.lr-plan .chair{fill:color-mix(in srgb,var(--lr-wood) 45%,transparent);stroke:var(--lr-wood);stroke-width:.5}
+.lr-plan .pull{fill:none;stroke:color-mix(in srgb,var(--lr-wood) 55%,transparent);stroke-width:.4;stroke-dasharray:1.5 1.5}
 .lr-plan .decor{fill:color-mix(in srgb,var(--lr-plant) 55%,transparent)}
 .lr-plan .sight{stroke-width:.45;opacity:.7}
 .lr-plan .prime{stroke:var(--success,#2f7d4a);fill:var(--success,#2f7d4a)}
@@ -100,9 +103,25 @@ function drawComponent(c: Component, selected: boolean) {
 		case 'rug':
 			g.push(`<polygon class="rug${sel}" points="${P(pieces(c)[0]!.poly)}"/>`);
 			break;
+		case 'dining': {
+			const ctr = F.pt(0, 0);
+			if (c.shape === 'round')
+				g.push(`<circle class="table${sel}" cx="${f1(ctr.x)}" cy="${f1(sy(ctr.y))}" r="${c.w / 2}"/>`);
+			else g.push(`<polygon class="table${sel}" points="${P(F.rect(-c.w / 2, -c.d / 2, c.w / 2, c.d / 2))}"/>`);
+			for (const ch of diningChairs(c)) {
+				const at = (a: number, d: number) => ({
+					x: ch.edge.x + ch.side.x * a + ch.out.x * d,
+					y: ch.edge.y + ch.side.y * a + ch.out.y * d,
+				});
+				g.push(`<polygon class="chair" points="${P([at(-8, 4), at(8, 4), at(8, 20), at(-8, 20)])}"/>`);
+				g.push(`<polygon class="pull" points="${P([at(-10, 24), at(10, 24), at(10, 36), at(-10, 36)])}"/>`);
+			}
+			break;
+		}
 		case 'decor': {
 			const ctr = F.pt(0, 0);
-			g.push(`<circle class="decor${sel}" cx="${f1(ctr.x)}" cy="${f1(sy(ctr.y))}" r="${c.size / 2}"/>`);
+			if (c.kind === 'chair') g.push(`<polygon class="sofa${sel}" points="${P(pieces(c)[0]!.poly)}"/>`);
+			else g.push(`<circle class="decor${sel}" cx="${f1(ctr.x)}" cy="${f1(sy(ctr.y))}" r="${c.size / 2}"/>`);
 			break;
 		}
 	}

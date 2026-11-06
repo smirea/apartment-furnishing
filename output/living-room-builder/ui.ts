@@ -52,8 +52,16 @@ const FIELDS: Record<Component['type'], Field[]> = {
 		{ path: 'w', label: 'width', kind: 'num' },
 		{ path: 'd', label: 'depth', kind: 'num' },
 	],
+	dining: [
+		{ path: 'shape', label: 'shape', kind: 'select', options: ['rect', 'round'] },
+		{ path: 'w', label: 'length / diameter', kind: 'num' },
+		{ path: 'd', label: 'width', kind: 'num' },
+		{ path: 'sides', label: 'chairs per long side', kind: 'num' },
+		{ path: 'ends', label: 'end chairs (0–2)', kind: 'num' },
+		{ path: 'n', label: 'chairs (round)', kind: 'num' },
+	],
 	decor: [
-		{ path: 'kind', label: 'kind', kind: 'select', options: ['plant', 'lamp'] },
+		{ path: 'kind', label: 'kind', kind: 'select', options: ['plant', 'lamp', 'chair'] },
 		{ path: 'size', label: 'size', kind: 'num' },
 	],
 };
@@ -101,6 +109,8 @@ const TEMPLATES: Record<string, Template> = {
 	Console: { type: 'console', label: 'Console', rot: 270, w: 90, d: 16, h: 20 },
 	Rug: { type: 'rug', label: 'Rug', rot: 0, w: 120, d: 96 },
 	Plant: { type: 'decor', label: 'Plant', kind: 'plant', rot: 0, size: 18 },
+	'Dining 6 (rect)': { type: 'dining', label: 'Dining table', rot: 0, shape: 'rect', w: 60, d: 36, sides: 2, ends: 2 },
+	'Dining 4 (round)': { type: 'dining', label: 'Dining table', rot: 45, shape: 'round', w: 42, d: 42, n: 4 },
 };
 
 function $<T extends HTMLElement>(id: string) {

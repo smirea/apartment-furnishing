@@ -52,4 +52,4 @@ Not taped yet: the column's distance from the south glass, the balcony door jamb
   - `search-l.ts`: an L sectional, facing a wall TV or a corner TV (`CORNER=1`).
   - `search-pair.ts` and `search-v.ts`: two-sofa arrangements.
 
-Layouts live in `layouts.ts`. Review rounds, with their scores, are in [`rounds/`](rounds/README.md).
+Layouts live in `layouts.ts`. Review rounds, with their scores, are in [`rounds/`](rounds/README.md) (couch + TV) and [`council/`](council/) (couch + TV + dining, five-harness council: `round-N.html` per round, each round's brief and files in `round-N/`, data in `rounds.json`, rebuilt by `./council.ts`). `search-d.ts` searches couch + TV + dining combinations.

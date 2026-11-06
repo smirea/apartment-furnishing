@@ -59,8 +59,21 @@ export type Table = Base & {
 	shape: 'rect' | 'oval' | 'round';
 };
 export type Rug = Base & { type: 'rug'; w: number; d: number };
-export type Decor = Base & { type: 'decor'; kind: 'plant' | 'lamp'; size: number };
-export type Component = Seating | Tv | Console | Table | Rug | Decor;
+// A reading chair is decor: it takes floor and blocks walking, but it is not a TV seat.
+export type Decor = Base & { type: 'decor'; kind: 'plant' | 'lamp' | 'chair'; size: number };
+// Chairs sit on the long sides (`sides` per side) and the short ends of a rect table, or evenly around a round one.
+// `bare` lists rect sides that get no chairs, such as one pushed against a bench or the island.
+export type Dining = Base & {
+	type: 'dining';
+	shape: 'rect' | 'round';
+	w: number;
+	d: number;
+	sides?: number;
+	ends?: 0 | 1 | 2;
+	n?: number;
+	bare?: ('front' | 'back')[];
+};
+export type Component = Seating | Tv | Console | Table | Rug | Decor | Dining;
 export type Layout = { id: string; title: string; notes?: string[]; components: Component[] };
 
 export const tvSize = (diag: number) => ({
@@ -240,6 +253,48 @@ export function seatsOf(c: Seating): Seat[] {
 	return [...leftSeats.reverse(), ...main, ...rightSeats].map((s, i) => ({ ...s, n: i + 1 }));
 }
 
+// A seated diner takes 24" behind the table edge; pushing the chair back to stand needs 32–36".
+export const CHAIR = { w: 20, seated: 24, tight: 32, comfy: 36 };
+
+export type Chair = { n: number; zone: Poly; edge: Vec; out: Vec; side: Vec };
+
+export function diningChairs(c: Dining): Chair[] {
+	const F = frame(c);
+	const out: Omit<Chair, 'n'>[] = [];
+	const add = (edgeL: [number, number], outL: [number, number]) => {
+		const o = F.dir(outL[0], outL[1]);
+		const side = { x: -o.y, y: o.x };
+		const e = F.pt(edgeL[0], edgeL[1]);
+		const hw = CHAIR.w / 2;
+		const at = (along: number, dist: number): Vec => ({
+			x: e.x + side.x * along + o.x * dist,
+			y: e.y + side.y * along + o.y * dist,
+		});
+		out.push({ zone: [at(-hw, 0), at(hw, 0), at(hw, CHAIR.seated), at(-hw, CHAIR.seated)], edge: e, out: o, side });
+	};
+	if (c.shape === 'round') {
+		const n = c.n ?? 4,
+			r = c.w / 2;
+		for (let i = 0; i < n; i++) {
+			const a = (2 * Math.PI * i) / n;
+			add([Math.sin(a) * r, Math.cos(a) * r], [Math.sin(a), Math.cos(a)]);
+		}
+	} else {
+		const k = c.sides ?? 2;
+		for (const [side, ly] of [
+			['front', c.d / 2],
+			['back', -c.d / 2],
+		] as const) {
+			if (c.bare?.includes(side)) continue;
+			for (let i = 0; i < k; i++) add([-c.w / 2 + (c.w * (i + 0.5)) / k, ly], [0, Math.sign(ly)]);
+		}
+		const ends = c.ends ?? 0;
+		if (ends >= 1) add([c.w / 2, 0], [1, 0]);
+		if (ends >= 2) add([-c.w / 2, 0], [-1, 0]);
+	}
+	return out.map((ch, i) => ({ ...ch, n: i + 1 }));
+}
+
 export type Piece = { comp: string; type: Component['type']; label: string; poly: Poly; solid: boolean };
 
 export function pieces(c: Component): Piece[] {
@@ -262,6 +317,14 @@ export function pieces(c: Component): Piece[] {
 			return [p(F.rect(-c.w / 2, -c.d / 2, c.w / 2, c.d / 2), false)];
 		case 'decor':
 			return [p(F.rect(-c.size / 2, -c.size / 2, c.size / 2, c.size / 2))];
+		case 'dining': {
+			const r = c.w / 2;
+			const table =
+				c.shape === 'round'
+					? Array.from({ length: 16 }, (_, i) => F.pt(Math.sin((i * Math.PI) / 8) * r, Math.cos((i * Math.PI) / 8) * r))
+					: F.rect(-c.w / 2, -c.d / 2, c.w / 2, c.d / 2);
+			return [p(table), ...diningChairs(c).map(ch => p(ch.zone))];
+		}
 	}
 }
 
@@ -625,6 +688,7 @@ export type Evaluation = {
 	seatingLength: number;
 	seatingArea: number;
 	openRect: { w: number; d: number; rect: Rect };
+	diningSeats: { comp: string; n: number; pull: number }[];
 	score: number;
 	summary: Record<string, string | number>;
 };
@@ -843,6 +907,69 @@ export function evaluate(layout: Layout): Evaluation {
 					msg: `${cName(s.comp)} seat ${s.n}: view of the screen blocked by ${[...blockers].join(', ')}`,
 				});
 		}
+	// Dining tables: chair pull-out room, and whether empty chairs or the table cut the bottom of the screen.
+	const dinings = comps.filter((c): c is Dining => c.type === 'dining');
+	const blockedAt = (p: Vec, own: string) =>
+		p.x < 0 ||
+		p.y < 0 ||
+		p.x > ROOM.w ||
+		(p.y > ROOM.d && p.x < ROOM.counter[2]) ||
+		inside(p, rectPoly(ROOM.island)) ||
+		Math.hypot(p.x - ROOM.column.x, p.y - ROOM.column.y) < ROOM.column.r ||
+		solids.some(q => q.comp !== own && inside(p, q.poly));
+	const diningSeats: { comp: string; n: number; pull: number }[] = [];
+	for (const d of dinings) {
+		for (const ch of diningChairs(d)) {
+			let pull = CHAIR.seated;
+			for (let k = CHAIR.seated; k <= 48; k++) {
+				const hit = [-CHAIR.w / 2, 0, CHAIR.w / 2].some(a =>
+					blockedAt({ x: ch.edge.x + ch.side.x * a + ch.out.x * k, y: ch.edge.y + ch.side.y * a + ch.out.y * k }, d.id),
+				);
+				if (hit) break;
+				pull = k;
+			}
+			diningSeats.push({ comp: d.id, n: ch.n, pull });
+			if (pull < CHAIR.tight - 4)
+				issues.push({
+					level: 'bad',
+					msg: `${cName(d.id)} chair ${ch.n} can't pull out: ${pull}″ behind the table edge`,
+				});
+			else if (pull < CHAIR.tight)
+				issues.push({
+					level: 'warn',
+					msg: `${cName(d.id)} chair ${ch.n}: ${pull}″ to pull out (32–36″ is comfortable)`,
+				});
+		}
+		if (tvInfo) {
+			const bottom = tvInfo.comp.center - tvInfo.h / 2;
+			const dp = pieces(d);
+			const cut = new Set<number>();
+			for (const s of seats)
+				for (let k = 0; k <= 4; k++) {
+					const target = {
+						x: tvInfo.left.x + ((tvInfo.right.x - tvInfo.left.x) * k) / 4,
+						y: tvInfo.left.y + ((tvInfo.right.y - tvInfo.left.y) * k) / 4,
+					};
+					dp.forEach((piece, i) => {
+						const top = i === 0 ? 30 : 34;
+						for (let j = 1; j < 40; j++) {
+							const t = j / 40;
+							const q = { x: s.eye.x + (target.x - s.eye.x) * t, y: s.eye.y + (target.y - s.eye.y) * t };
+							if (inside(q, piece.poly) && ROOM.eyeZ + (bottom - ROOM.eyeZ) * t < top) {
+								cut.add(s.n);
+								break;
+							}
+						}
+					});
+				}
+			if (cut.size)
+				issues.push({
+					level: 'warn',
+					msg: `${cName(d.id)} sits in the sightline of seat${cut.size > 1 ? 's' : ''} ${[...cut].join(', ')}: chair backs cut the bottom of the screen`,
+				});
+		}
+	}
+
 	if (tvInfo && seats.length) {
 		const best = Math.max(...seats.map(s => s.fov));
 		if (best > 50)
@@ -868,7 +995,7 @@ export function evaluate(layout: Layout): Evaluation {
 	const seatPolys = seatComps.flatMap(c => pieces(c).map(p => p.poly));
 	let coffeeGap: number | undefined;
 	let tvGap: number | undefined;
-	if (!coffees.length) issues.push({ level: 'bad', msg: 'no coffee table' });
+	if (!coffees.length) issues.push({ level: 'warn', msg: 'no coffee table' });
 	for (const t of coffees) {
 		const tp = pieces(t)[0]!.poly;
 		const g = Math.min(...seatPolys.map(sp => polyDist(sp, tp)));
@@ -889,7 +1016,11 @@ export function evaluate(layout: Layout): Evaluation {
 			issues.push({ level: 'warn', msg: `only ${reachable} of ${seats.length} seats can reach a table surface` });
 	}
 
-	const islandGap = Math.min(Infinity, ...solids.map(s => polyDist(s.poly, rectPoly(ROOM.island))));
+	// A dining table set against the island replaces the stools, so only other furniture counts here.
+	const islandGap = Math.min(
+		Infinity,
+		...solids.filter(s => s.type !== 'dining').map(s => polyDist(s.poly, rectPoly(ROOM.island))),
+	);
 	const columnGap = Math.min(Infinity, ...solids.map(s => polyCircleDist(s.poly, ROOM.column)));
 	if (islandGap < 36)
 		issues.push({
@@ -944,6 +1075,12 @@ export function evaluate(layout: Layout): Evaluation {
 			? `${Math.round(Math.min(...seats.map(s => s.fov)))}–${Math.round(Math.max(...seats.map(s => s.fov)))}°`
 			: '—',
 		'Coffee table gap': coffeeGap !== undefined ? `${coffeeGap.toFixed(0)}″` : '—',
+		...(dinings.length
+			? {
+					Dining: `${diningSeats.length} chairs, ${dinings.map(d => (d.shape === 'round' ? `${d.w}″ round` : `${d.w}″ × ${d.d}″`)).join(' + ')}`,
+					'Chair pull-out': `${Math.min(...diningSeats.map(x => x.pull))}″ min`,
+				}
+			: {}),
 		'Island clearance': `${islandGap.toFixed(0)}″`,
 		'Open floor': `${openRect[2] - openRect[0]}″ × ${openRect[3] - openRect[1]}″`,
 	};
@@ -961,6 +1098,7 @@ export function evaluate(layout: Layout): Evaluation {
 		seatingLength,
 		seatingArea,
 		openRect: { w: openRect[2] - openRect[0], d: openRect[3] - openRect[1], rect: openRect },
+		diningSeats,
 		score,
 		summary,
 	};

@@ -1,0 +1,20 @@
+
+== H2 · 85″ wall TV at 8 ft · 4-seat sofa east of the column · 6-seat dining off the island  (score 85, 53ms)
+  TV                   85″ wall-mounted
+  Seats                4 (4 prime, 0 good, 0 side)
+  Seat run             108″
+  Eye → screen         7′11″ – 8′5″
+  Screen fills         38–42°
+  Coffee table gap     15″
+  Dining               6 chairs, 72″ × 36″
+  Chair pull-out       48″ min
+  Island clearance     79″
+  Open floor           77″ × 96″
+  Office / guest door  37″
+  Bath 2 door          35″
+  Balcony door         41″
+  seat 1 main   prime dist 101 fov 38° off 22° turn 22° w 25 access 17
+  seat 2 main   prime dist 95 fov 42° off 8° turn 8° w 25 access 13
+  seat 3 main   prime dist 95 fov 42° off 8° turn 8° w 25 access 13
+  seat 4 main   prime dist 101 fov 38° off 22° turn 22° w 25 access 17
+  [ok] No collisions; every route clear

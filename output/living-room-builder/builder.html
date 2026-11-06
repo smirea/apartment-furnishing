@@ -110,6 +110,17 @@
 			.lr-plan .tv {
 				fill: var(--foreground, #111);
 			}
+			.lr-plan .chair {
+				fill: color-mix(in srgb, var(--lr-wood) 45%, transparent);
+				stroke: var(--lr-wood);
+				stroke-width: 0.5;
+			}
+			.lr-plan .pull {
+				fill: none;
+				stroke: color-mix(in srgb, var(--lr-wood) 55%, transparent);
+				stroke-width: 0.4;
+				stroke-dasharray: 1.5 1.5;
+			}
 			.lr-plan .decor {
 				fill: color-mix(in srgb, var(--lr-plant) 55%, transparent);
 			}
@@ -661,6 +672,48 @@
 				const rightSeats = out.splice(0);
 				return [...leftSeats.reverse(), ...main, ...rightSeats].map((s, i) => ({ ...s, n: i + 1 }));
 			}
+			var CHAIR = { w: 20, seated: 24, tight: 32, comfy: 36 };
+			function diningChairs(c) {
+				const F = frame(c);
+				const out = [];
+				const add = (edgeL, outL) => {
+					const o = F.dir(outL[0], outL[1]);
+					const side = { x: -o.y, y: o.x };
+					const e = F.pt(edgeL[0], edgeL[1]);
+					const hw = CHAIR.w / 2;
+					const at = (along, dist) => ({
+						x: e.x + side.x * along + o.x * dist,
+						y: e.y + side.y * along + o.y * dist,
+					});
+					out.push({
+						zone: [at(-hw, 0), at(hw, 0), at(hw, CHAIR.seated), at(-hw, CHAIR.seated)],
+						edge: e,
+						out: o,
+						side,
+					});
+				};
+				if (c.shape === 'round') {
+					const n = c.n ?? 4,
+						r = c.w / 2;
+					for (let i = 0; i < n; i++) {
+						const a = (2 * Math.PI * i) / n;
+						add([Math.sin(a) * r, Math.cos(a) * r], [Math.sin(a), Math.cos(a)]);
+					}
+				} else {
+					const k = c.sides ?? 2;
+					for (const [side, ly] of [
+						['front', c.d / 2],
+						['back', -c.d / 2],
+					]) {
+						if (c.bare?.includes(side)) continue;
+						for (let i = 0; i < k; i++) add([-c.w / 2 + (c.w * (i + 0.5)) / k, ly], [0, Math.sign(ly)]);
+					}
+					const ends = c.ends ?? 0;
+					if (ends >= 1) add([c.w / 2, 0], [1, 0]);
+					if (ends >= 2) add([-c.w / 2, 0], [-1, 0]);
+				}
+				return out.map((ch, i) => ({ ...ch, n: i + 1 }));
+			}
 			function pieces(c) {
 				const F = frame(c);
 				const label = c.label ?? c.id;
@@ -681,6 +734,16 @@
 						return [p(F.rect(-c.w / 2, -c.d / 2, c.w / 2, c.d / 2), false)];
 					case 'decor':
 						return [p(F.rect(-c.size / 2, -c.size / 2, c.size / 2, c.size / 2))];
+					case 'dining': {
+						const r = c.w / 2;
+						const table =
+							c.shape === 'round'
+								? Array.from({ length: 16 }, (_, i) =>
+										F.pt(Math.sin((i * Math.PI) / 8) * r, Math.cos((i * Math.PI) / 8) * r),
+									)
+								: F.rect(-c.w / 2, -c.d / 2, c.w / 2, c.d / 2);
+						return [p(table), ...diningChairs(c).map(ch => p(ch.zone))];
+					}
 				}
 			}
 			var rectPoly = ([x1, y1, x2, y2]) => [
@@ -1205,6 +1268,70 @@
 								msg: `${cName(s.comp)} seat ${s.n}: view of the screen blocked by ${[...blockers].join(', ')}`,
 							});
 					}
+				const dinings = comps.filter(c => c.type === 'dining');
+				const blockedAt = (p, own) =>
+					p.x < 0 ||
+					p.y < 0 ||
+					p.x > ROOM.w ||
+					(p.y > ROOM.d && p.x < ROOM.counter[2]) ||
+					inside(p, rectPoly(ROOM.island)) ||
+					Math.hypot(p.x - ROOM.column.x, p.y - ROOM.column.y) < ROOM.column.r ||
+					solids.some(q => q.comp !== own && inside(p, q.poly));
+				const diningSeats = [];
+				for (const d of dinings) {
+					for (const ch of diningChairs(d)) {
+						let pull = CHAIR.seated;
+						for (let k = CHAIR.seated; k <= 48; k++) {
+							const hit = [-CHAIR.w / 2, 0, CHAIR.w / 2].some(a =>
+								blockedAt(
+									{ x: ch.edge.x + ch.side.x * a + ch.out.x * k, y: ch.edge.y + ch.side.y * a + ch.out.y * k },
+									d.id,
+								),
+							);
+							if (hit) break;
+							pull = k;
+						}
+						diningSeats.push({ comp: d.id, n: ch.n, pull });
+						if (pull < CHAIR.tight - 4)
+							issues.push({
+								level: 'bad',
+								msg: `${cName(d.id)} chair ${ch.n} can't pull out: ${pull}″ behind the table edge`,
+							});
+						else if (pull < CHAIR.tight)
+							issues.push({
+								level: 'warn',
+								msg: `${cName(d.id)} chair ${ch.n}: ${pull}″ to pull out (32–36″ is comfortable)`,
+							});
+					}
+					if (tvInfo) {
+						const bottom = tvInfo.comp.center - tvInfo.h / 2;
+						const dp = pieces(d);
+						const cut = new Set();
+						for (const s of seats)
+							for (let k = 0; k <= 4; k++) {
+								const target = {
+									x: tvInfo.left.x + ((tvInfo.right.x - tvInfo.left.x) * k) / 4,
+									y: tvInfo.left.y + ((tvInfo.right.y - tvInfo.left.y) * k) / 4,
+								};
+								dp.forEach((piece, i) => {
+									const top = i === 0 ? 30 : 34;
+									for (let j = 1; j < 40; j++) {
+										const t = j / 40;
+										const q = { x: s.eye.x + (target.x - s.eye.x) * t, y: s.eye.y + (target.y - s.eye.y) * t };
+										if (inside(q, piece.poly) && ROOM.eyeZ + (bottom - ROOM.eyeZ) * t < top) {
+											cut.add(s.n);
+											break;
+										}
+									}
+								});
+							}
+						if (cut.size)
+							issues.push({
+								level: 'warn',
+								msg: `${cName(d.id)} sits in the sightline of seat${cut.size > 1 ? 's' : ''} ${[...cut].join(', ')}: chair backs cut the bottom of the screen`,
+							});
+					}
+				}
 				if (tvInfo && seats.length) {
 					const best = Math.max(...seats.map(s => s.fov));
 					if (best > 50)
@@ -1229,7 +1356,7 @@
 				const seatPolys = seatComps.flatMap(c => pieces(c).map(p => p.poly));
 				let coffeeGap;
 				let tvGap;
-				if (!coffees.length) issues.push({ level: 'bad', msg: 'no coffee table' });
+				if (!coffees.length) issues.push({ level: 'warn', msg: 'no coffee table' });
 				for (const t of coffees) {
 					const tp = pieces(t)[0].poly;
 					const g = Math.min(...seatPolys.map(sp => polyDist(sp, tp)));
@@ -1253,7 +1380,10 @@
 					if (seats.length && reachable < Math.ceil(seats.length * 0.6))
 						issues.push({ level: 'warn', msg: `only ${reachable} of ${seats.length} seats can reach a table surface` });
 				}
-				const islandGap = Math.min(Infinity, ...solids.map(s => polyDist(s.poly, rectPoly(ROOM.island))));
+				const islandGap = Math.min(
+					Infinity,
+					...solids.filter(s => s.type !== 'dining').map(s => polyDist(s.poly, rectPoly(ROOM.island))),
+				);
 				const columnGap = Math.min(Infinity, ...solids.map(s => polyCircleDist(s.poly, ROOM.column)));
 				if (islandGap < 36)
 					issues.push({
@@ -1313,6 +1443,12 @@
 						? `${Math.round(Math.min(...seats.map(s => s.fov)))}–${Math.round(Math.max(...seats.map(s => s.fov)))}°`
 						: '—',
 					'Coffee table gap': coffeeGap !== undefined ? `${coffeeGap.toFixed(0)}″` : '—',
+					...(dinings.length
+						? {
+								Dining: `${diningSeats.length} chairs, ${dinings.map(d => (d.shape === 'round' ? `${d.w}″ round` : `${d.w}″ × ${d.d}″`)).join(' + ')}`,
+								'Chair pull-out': `${Math.min(...diningSeats.map(x => x.pull))}″ min`,
+							}
+						: {}),
 					'Island clearance': `${islandGap.toFixed(0)}″`,
 					'Open floor': `${openRect[2] - openRect[0]}″ × ${openRect[3] - openRect[1]}″`,
 				};
@@ -1330,6 +1466,7 @@
 					seatingLength,
 					seatingArea,
 					openRect: { w: openRect[2] - openRect[0], d: openRect[3] - openRect[1], rect: openRect },
+					diningSeats,
 					score,
 					summary,
 				};
@@ -1344,6 +1481,68 @@
 				return { ...c, x: Math.round((minX - x1) * 10) / 10, y: Math.round((minY - y1) * 10) / 10 };
 			}
 			var LAYOUTS = [
+				{
+					id: 'H1',
+					title: '98″ wall TV · 4-seat sofa · 6-seat dining table off the island',
+					notes: [
+						'Dining by the kitchen: a 72″ × 36″ table runs south from the island with three chairs a side, every chair 36″+ of pull-out room.',
+						'Living by the lake: a 108″ four-seat sofa floats facing the TV wall, a 98″ TV on it, coffee table between.',
+					],
+					components: [
+						{ id: 'rug', label: 'Rug 10×7', type: 'rug', x: 108, y: 80, rot: 0, w: 120, d: 84 },
+						{
+							id: 'sofa',
+							label: '4-seat sofa',
+							type: 'seating',
+							x: 44,
+							y: 95,
+							rot: 90,
+							length: 108,
+							depth: 38,
+							arm: 4,
+							seats: 4,
+						},
+						{ id: 'tv', label: 'TV', type: 'tv', x: 194, y: 68, rot: 270, diag: 98, mount: 'wall', center: 52 },
+						{
+							id: 'console',
+							label: 'Floating console',
+							type: 'console',
+							x: 192,
+							y: 68,
+							rot: 270,
+							w: 90,
+							d: 14,
+							h: 16,
+							floating: true,
+						},
+						{
+							id: 'ottoman',
+							label: 'Coffee table',
+							type: 'table',
+							role: 'coffee',
+							x: 92,
+							y: 84,
+							rot: 90,
+							w: 56,
+							d: 26,
+							h: 17,
+							shape: 'rect',
+						},
+						{
+							id: 'din',
+							label: 'Dining table',
+							type: 'dining',
+							x: 120,
+							y: 158,
+							rot: 90,
+							shape: 'rect',
+							w: 72,
+							d: 36,
+							sides: 3,
+							ends: 0,
+						},
+					],
+				},
 				{
 					id: 'G2',
 					title: '98″ corner TV · 6-seat L facing it',
@@ -2178,6 +2377,21 @@
 					case 'rug':
 						g.push(`<polygon class="rug${sel}" points="${P(pieces(c)[0].poly)}"/>`);
 						break;
+					case 'dining': {
+						const ctr = F.pt(0, 0);
+						if (c.shape === 'round')
+							g.push(`<circle class="table${sel}" cx="${f1(ctr.x)}" cy="${f1(sy(ctr.y))}" r="${c.w / 2}"/>`);
+						else g.push(`<polygon class="table${sel}" points="${P(F.rect(-c.w / 2, -c.d / 2, c.w / 2, c.d / 2))}"/>`);
+						for (const ch of diningChairs(c)) {
+							const at = (a, d) => ({
+								x: ch.edge.x + ch.side.x * a + ch.out.x * d,
+								y: ch.edge.y + ch.side.y * a + ch.out.y * d,
+							});
+							g.push(`<polygon class="chair" points="${P([at(-8, 4), at(8, 4), at(8, 20), at(-8, 20)])}"/>`);
+							g.push(`<polygon class="pull" points="${P([at(-10, 24), at(10, 24), at(10, 36), at(-10, 36)])}"/>`);
+						}
+						break;
+					}
 					case 'decor': {
 						const ctr = F.pt(0, 0);
 						g.push(`<circle class="decor${sel}" cx="${f1(ctr.x)}" cy="${f1(sy(ctr.y))}" r="${c.size / 2}"/>`);
@@ -2399,6 +2613,14 @@
 					{ path: 'w', label: 'width', kind: 'num' },
 					{ path: 'd', label: 'depth', kind: 'num' },
 				],
+				dining: [
+					{ path: 'shape', label: 'shape', kind: 'select', options: ['rect', 'round'] },
+					{ path: 'w', label: 'length / diameter', kind: 'num' },
+					{ path: 'd', label: 'width', kind: 'num' },
+					{ path: 'sides', label: 'chairs per long side', kind: 'num' },
+					{ path: 'ends', label: 'end chairs (0–2)', kind: 'num' },
+					{ path: 'n', label: 'chairs (round)', kind: 'num' },
+				],
 				decor: [
 					{ path: 'kind', label: 'kind', kind: 'select', options: ['plant', 'lamp'] },
 					{ path: 'size', label: 'size', kind: 'num' },
@@ -2455,6 +2677,17 @@
 				Console: { type: 'console', label: 'Console', rot: 270, w: 90, d: 16, h: 20 },
 				Rug: { type: 'rug', label: 'Rug', rot: 0, w: 120, d: 96 },
 				Plant: { type: 'decor', label: 'Plant', kind: 'plant', rot: 0, size: 18 },
+				'Dining 6 (rect)': {
+					type: 'dining',
+					label: 'Dining table',
+					rot: 0,
+					shape: 'rect',
+					w: 60,
+					d: 36,
+					sides: 2,
+					ends: 2,
+				},
+				'Dining 4 (round)': { type: 'dining', label: 'Dining table', rot: 45, shape: 'round', w: 42, d: 42, n: 4 },
 			};
 			function $(id) {
 				const el = document.getElementById(id);

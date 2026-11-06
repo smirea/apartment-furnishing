@@ -1,0 +1,391 @@
+[
+	{
+		"round": 1,
+		"date": "2026-11-05",
+		"layout": {
+			"id": "H1",
+			"title": "98″ wall TV · 4-seat sofa · 6-seat dining table off the island",
+			"notes": [
+				"Dining by the kitchen: a 72″ × 36″ table runs south from the island with three chairs a side, every chair 36″+ of pull-out room.",
+				"Living by the lake: a 108″ four-seat sofa floats facing the TV wall, a 98″ TV on it, coffee table between."
+			],
+			"components": [
+				{
+					"id": "rug",
+					"label": "Rug 10×7",
+					"type": "rug",
+					"x": 108,
+					"y": 80,
+					"rot": 0,
+					"w": 120,
+					"d": 84
+				},
+				{
+					"id": "sofa",
+					"label": "4-seat sofa",
+					"type": "seating",
+					"x": 44,
+					"y": 95,
+					"rot": 90,
+					"length": 108,
+					"depth": 38,
+					"arm": 4,
+					"seats": 4
+				},
+				{
+					"id": "tv",
+					"label": "TV",
+					"type": "tv",
+					"x": 194,
+					"y": 68,
+					"rot": 270,
+					"diag": 98,
+					"mount": "wall",
+					"center": 52
+				},
+				{
+					"id": "console",
+					"label": "Floating console",
+					"type": "console",
+					"x": 192,
+					"y": 68,
+					"rot": 270,
+					"w": 90,
+					"d": 14,
+					"h": 16,
+					"floating": true
+				},
+				{
+					"id": "ottoman",
+					"label": "Coffee table",
+					"type": "table",
+					"role": "coffee",
+					"x": 92,
+					"y": 84,
+					"rot": 90,
+					"w": 56,
+					"d": 26,
+					"h": 17,
+					"shape": "rect"
+				},
+				{
+					"id": "din",
+					"label": "Dining table",
+					"type": "dining",
+					"x": 120,
+					"y": 158,
+					"rot": 90,
+					"shape": "rect",
+					"w": 72,
+					"d": 36,
+					"sides": 3,
+					"ends": 0
+				}
+			]
+		},
+		"verdicts": [
+			{
+				"councillor": "Claude",
+				"model": "claude-sonnet-5-5 · medium",
+				"scores": {
+					"overall": 8.5,
+					"couch": 9,
+					"tv": 8,
+					"dining": 8,
+					"space": 8.5,
+					"plan": 9.5
+				},
+				"summary": "Strong, balanced; loses a little on east chairs crowding the Bath 2 route and the 12½–13½ ft viewing distance.",
+				"feedback": [
+					"TV fills 27–31°; a 96″ sofa at x 40–78 would reach ~34° but crushes the west chairs’ pull-out (~24″).",
+					"East chairs at x 138–162 leave 35″ at Bath 2; a pulled-out chair blocks the office route. Use 2 east chairs at y 150–194 plus a south-end chair.",
+					"Dead strips: behind the sofa (x 0–25) and the south-east floor.",
+					"The 16″-high floating console hides the outlet at 16″; raise it ~4″."
+				]
+			},
+			{
+				"councillor": "Grok",
+				"model": "grok-4.7 · medium",
+				"scores": {
+					"overall": 9,
+					"couch": 9,
+					"tv": 9,
+					"dining": 9,
+					"space": 9,
+					"plan": 9
+				},
+				"summary": "The right balance for this room; the column and island keep the far seat at 27°.",
+				"feedback": [
+					"Every nudge it measured is worse: 7″ east costs chair pull-out, a 5-seat sofa pinches the balcony or drops a seat below prime.",
+					"The south-west chair sits 2″ from seat 1’s feet when both are occupied.",
+					"Rug 1″ from the column: move its center to (108, 84).",
+					"Console covers the outlet’s lower half: mount it at 18–28″ and raise the TV center to 56″.",
+					"Brief errors: column clearance is 4″, not 3″; the 49″ island figure is corner to corner."
+				]
+			},
+			{
+				"councillor": "Antigravity",
+				"model": "gemini-4-argon · medium",
+				"scores": {
+					"overall": 8.5,
+					"couch": 8.5,
+					"tv": 8.5,
+					"dining": 8.5,
+					"space": 8,
+					"plan": 9.5
+				},
+				"summary": "Right macro zoning, but seat 1 overlaps the south-west dining chair (15″ gap, 2″ past legroom), the rug stops short, and the TV is raised to 52″ just to clear a chair back.",
+				"feedback": [
+					"Alternative A (66″ table, 104″ sofa, 10×8 rug, console top at 20″): est. 9.2.",
+					"Alternative B: sofa east of the column (x 82–120), 85–92″ TV at 8 ft (38–46°), dining pull-out 48″, reading nook in the lake bay: est. 9.5.",
+					"Chair pull-out ignores the sofa sitter’s legroom; sightline check assumes 34″ chair backs.",
+					"Console bisects the outlet; brief says 3″ to the column, actually 4″."
+				]
+			},
+			{
+				"councillor": "Cursor",
+				"model": "composer-2.5",
+				"scores": {
+					"overall": 8,
+					"couch": 9,
+					"tv": 8,
+					"dining": 9,
+					"space": 9,
+					"plan": 10
+				},
+				"summary": "Nails 6-seat dining and plan compliance, but the island dining forces a long viewing throw (27–31° fill).",
+				"feedback": [
+					"The 98″ is at 27–31°; seat 1 at 27°.",
+					"Corner-TV L (G1) reaches 31–40° and 5 prime seats but has no dining.",
+					"4 couch seats meets the minimum, not the ideal 5."
+				]
+			},
+			{
+				"councillor": "Codex",
+				"model": "gpt-6.1-terra · medium",
+				"scores": {
+					"overall": 10,
+					"couch": 10,
+					"tv": 10,
+					"dining": 10,
+					"space": 10,
+					"plan": 10
+				},
+				"summary": "Meets the seating, TV and dining targets; no buildable improvement found without a material trade-off.",
+				"feedback": [
+					"A seated west diner leaves ~15″ to the sofa; routes are not passage behind occupied chairs.",
+					"Sightline check uses empty chair backs, not seated diners.",
+					"Tape the column and balcony jamb before ordering."
+				]
+			}
+		],
+		"changes": [
+			"Sofa moves east of the column (x 82–120, y 8–116), 8 ft from the TV wall, so it no longer overlaps the dining chairs in y.",
+			"TV becomes the 85″ Samsung M70HB already in the TV list: 38–42° of view, more than the 98″ gave at 13 ft.",
+			"All six dining chairs get 48″ of pull-out room even with the sofa full.",
+			"Console raised to 10–20″ so it frames the outlet instead of cutting it; rug clear of the column; reading nook in the freed lake bay."
+		]
+	},
+	{
+		"round": 2,
+		"date": "2026-11-05",
+		"layout": {
+			"id": "H2",
+			"title": "85″ wall TV at 8 ft · 4-seat sofa east of the column · 6-seat dining off the island",
+			"notes": [
+				"The sofa moves east of the column, 8 ft from the TV wall, so an 85″ screen fills 38–42° of view: more picture than a 98″ at 13 ft (28–31°).",
+				"Dining stays by the kitchen: the 72″ × 36″ table off the island with three chairs a side, now 48″ of pull-out room each.",
+				"The freed lake corner behind the sofa becomes a reading nook: a swivel lounge chair and lamp by the column, the balcony route behind."
+			],
+			"components": [
+				{
+					"id": "rug",
+					"label": "Rug 8×10",
+					"type": "rug",
+					"x": 142,
+					"y": 62,
+					"rot": 0,
+					"w": 96,
+					"d": 112
+				},
+				{
+					"id": "sofa",
+					"label": "4-seat sofa",
+					"type": "seating",
+					"x": 101,
+					"y": 62,
+					"rot": 90,
+					"length": 108,
+					"depth": 38,
+					"arm": 4,
+					"seats": 4
+				},
+				{
+					"id": "tv",
+					"label": "TV (Samsung 85″ M70HB)",
+					"type": "tv",
+					"x": 194,
+					"y": 62,
+					"rot": 270,
+					"diag": 85,
+					"mount": "wall",
+					"center": 46
+				},
+				{
+					"id": "console",
+					"label": "Floating console (10–20″ up, frames the outlet)",
+					"type": "console",
+					"x": 192,
+					"y": 62,
+					"rot": 270,
+					"w": 80,
+					"d": 14,
+					"h": 20,
+					"floating": true
+				},
+				{
+					"id": "ottoman",
+					"label": "Coffee table",
+					"type": "table",
+					"role": "coffee",
+					"x": 148,
+					"y": 62,
+					"rot": 90,
+					"w": 56,
+					"d": 26,
+					"h": 17,
+					"shape": "rect"
+				},
+				{
+					"id": "din",
+					"label": "Dining table",
+					"type": "dining",
+					"x": 120,
+					"y": 158,
+					"rot": 90,
+					"shape": "rect",
+					"w": 72,
+					"d": 36,
+					"sides": 3,
+					"ends": 0
+				},
+				{
+					"id": "chair",
+					"label": "Swivel lounge chair",
+					"type": "decor",
+					"kind": "chair",
+					"x": 32,
+					"y": 76,
+					"rot": 45,
+					"size": 33
+				},
+				{
+					"id": "lamp",
+					"label": "Floor lamp",
+					"type": "decor",
+					"kind": "lamp",
+					"x": 14,
+					"y": 50,
+					"rot": 0,
+					"size": 12
+				}
+			]
+		},
+		"verdicts": [
+			{
+				"councillor": "Claude",
+				"model": "claude-sonnet-5-5 · medium",
+				"scores": {
+					"overall": 8.5,
+					"couch": 8.5,
+					"tv": 8,
+					"dining": 9,
+					"space": 8.5,
+					"plan": 9
+				},
+				"summary": "Four prime seats, a 6-seat table and a clean plan; two small, cheap fixes remain.",
+				"feedback": [
+					"85″ is 13″ under the cap; a 98″ here fills ~48.6° from the middle seats, which is a taste call.",
+					"Turn the swivel chair east and it becomes a fifth (good, ~25°) TV seat.",
+					"The console at 10–20″ hides the 16″ outlet rather than framing it: use a shelf at 20–24″ or a back cutout.",
+					"“Island clearance 79″” cannot be walked: the table sits 1.4″ from the island by design."
+				]
+			},
+			{
+				"councillor": "Grok",
+				"model": "grok-4.7 · medium",
+				"scores": {
+					"overall": 9.5,
+					"couch": 10,
+					"tv": 10,
+					"dining": 10,
+					"space": 9,
+					"plan": 10
+				},
+				"summary": "Four prime 25″ seats at 8 ft, an 85″ picture at 38–42°, and a six-seat table whose chairs pull out more than 5 ft.",
+				"feedback": [
+					"Only change: turn the reading chair 180° (rot 225) toward the lake.",
+					"Any TV up to 92″ keeps all four seats prime; 98″ drops the middle two to good.",
+					"Real pull-out is 61″ east and 102″ west; the tool caps at 48″.",
+					"Rug label says 8×10; it is 8′ × 9′4″."
+				]
+			},
+			{
+				"councillor": "Antigravity",
+				"model": "gemini-4-argon · medium",
+				"scores": {
+					"overall": 9.5,
+					"couch": 9.5,
+					"tv": 9.5,
+					"dining": 9.5,
+					"space": 9.5,
+					"plan": 10
+				},
+				"summary": "Resolves every round-1 crowding, sightline and console issue, gives every chair 48″+ and turns the lake bay into a reading nook.",
+				"feedback": [
+					"A 56″ × 24″ coffee table at (149, 62) opens the sofa gap to 17″: est. 9.8.",
+					"A standard 8′ × 9′ rug at (137, 62) lines up with the sofa ends.",
+					"The console needs an open back bay to truly frame the outlet."
+				]
+			},
+			{
+				"councillor": "Cursor",
+				"model": "composer-2.5",
+				"scores": {
+					"overall": 9,
+					"couch": 9.5,
+					"tv": 8.5,
+					"dining": 10,
+					"space": 9,
+					"plan": 10
+				},
+				"summary": "Trades 13″ of diagonal for all-prime viewing at ~8 ft, fixes the sofa/dining clash and fully delivers six-seat dining.",
+				"feedback": [
+					"A 92″ panel at the same mount keeps all four seats prime (41–46°): est. 9.5.",
+					"The brief overstated 85″ as the prime ceiling here."
+				]
+			},
+			{
+				"councillor": "Codex",
+				"model": "gpt-6.1-terra · medium",
+				"scores": {
+					"overall": 9.5,
+					"couch": 10,
+					"tv": 10,
+					"dining": 10,
+					"space": 9,
+					"plan": 10
+				},
+				"summary": "Excellent use of the room; meets the seating, TV and dining goals.",
+				"feedback": [
+					"The rotated nook chair leaves ~27″ to the sofa back: move it to (25, 80) and the lamp to (14, 115) for ~34″.",
+					"A fully pulled-out east chair and the 37″ route share floor."
+				]
+			}
+		],
+		"changes": [
+			"Goal met: 4 of 5 councillors at 9 or above, so H2 stands as submitted.",
+			"Suggested refinements not applied, because each would be a new submission: turn the nook chair toward the lake or move it to (25, 80); a 56″ × 24″ coffee table; a standard 8′ × 9′ rug; an open-back console bay at the outlet; a 92″ TV if one is sold."
+		]
+	}
+]

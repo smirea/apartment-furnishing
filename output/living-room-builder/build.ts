@@ -9,7 +9,7 @@ import { PLAN_CSS, renderElevation, renderPlan, roomDefs, seatTable } from './re
 
 const dir = import.meta.dir;
 
-const PAGE_CSS = `
+export const PAGE_CSS = `
 ${PLAN_CSS}
 .lr{font-family:var(--font-sans,system-ui,sans-serif);color:var(--foreground,#1d1d1b);font-size:13px;line-height:1.45}
 .lr h2{font-size:15px;margin:0 0 2px}
@@ -119,13 +119,15 @@ const pick = (ids: string[]) =>
 			})
 		: LAYOUTS;
 
-const [mode, out, ...ids] = process.argv.slice(2);
-if (mode === '--gallery' || mode === '--compact') {
-	if (!out) throw new Error(`usage: ./build.ts ${mode} <out.html> [ids...]`);
-	await Bun.write(out, mode === '--gallery' ? gallery(pick(ids)) : compactGallery(pick(ids)));
-	console.log(`wrote ${out}`);
-} else {
-	await Bun.write(join(dir, 'builder.html'), await builder());
-	await Bun.write(join(dir, 'gallery.html'), gallery(LAYOUTS));
-	console.log('wrote builder.html, gallery.html');
+if (import.meta.main) {
+	const [mode, out, ...ids] = process.argv.slice(2);
+	if (mode === '--gallery' || mode === '--compact') {
+		if (!out) throw new Error(`usage: ./build.ts ${mode} <out.html> [ids...]`);
+		await Bun.write(out, mode === '--gallery' ? gallery(pick(ids)) : compactGallery(pick(ids)));
+		console.log(`wrote ${out}`);
+	} else {
+		await Bun.write(join(dir, 'builder.html'), await builder());
+		await Bun.write(join(dir, 'gallery.html'), gallery(LAYOUTS));
+		console.log('wrote builder.html, gallery.html');
+	}
 }
