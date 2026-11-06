@@ -1,0 +1,136 @@
+{
+	"round": 5,
+	"date": "2026-11-05",
+	"tvCap": 98,
+	"layout": {
+		"id": "G2",
+		"title": "98″ corner TV · 6-seat L facing it",
+		"notes": [
+			"The TV angles across the south-east corner on a 56″ corner console, so the main run and the return both face it: no seat looks away from the screen.",
+			"L sectional 44″ deep, 18″ off the west glass (room for shades). Main run 106″ (y 41–147) with two 28½″ seats plus the corner, 4″ clear of the column; return 136″ (x 18–154) with three 29″ seats.",
+			"Seats sit 8′3″–13′8″ from the screen, which fills 29–43° of view; four seats are prime, two are good.",
+			"Coffee table: Living Spaces Aries II cocktail ottoman, 66 × 27 × 18″, with the 30 × 24″ MAGIGO walnut tray (both from ideas/README.md), 16″ from both seat fronts."
+		],
+		"components": [
+			{
+				"id": "rug",
+				"label": "Rug 12′×8′4″",
+				"type": "rug",
+				"x": 106,
+				"y": 95,
+				"rot": 0,
+				"w": 144,
+				"d": 100
+			},
+			{
+				"id": "sofa",
+				"label": "L sectional",
+				"type": "seating",
+				"x": 86,
+				"y": 94,
+				"rot": 90,
+				"length": 106,
+				"depth": 44,
+				"arm": 5,
+				"seats": 2,
+				"left": {
+					"length": 136,
+					"kind": "seats",
+					"seats": 3,
+					"corner": true
+				}
+			},
+			{
+				"id": "console",
+				"label": "Corner console",
+				"type": "console",
+				"x": 171.8,
+				"y": 28.2,
+				"rot": 315,
+				"w": 56,
+				"d": 18,
+				"h": 20
+			},
+			{
+				"id": "tv",
+				"label": "TV",
+				"type": "tv",
+				"x": 165.4,
+				"y": 34.6,
+				"rot": 315,
+				"diag": 98,
+				"mount": "stand",
+				"center": 48
+			},
+			{
+				"id": "ottoman",
+				"label": "Aries ottoman + tray",
+				"type": "table",
+				"role": "coffee",
+				"x": 111,
+				"y": 73.5,
+				"rot": 0,
+				"w": 66,
+				"d": 27,
+				"h": 18,
+				"shape": "rect"
+			},
+			{
+				"id": "side",
+				"label": "Side table",
+				"type": "table",
+				"role": "side",
+				"x": 15,
+				"y": 20,
+				"rot": 0,
+				"w": 18,
+				"d": 18,
+				"h": 22,
+				"shape": "round"
+			},
+			{
+				"id": "lamp",
+				"label": "Floor lamp",
+				"type": "decor",
+				"kind": "lamp",
+				"x": 34,
+				"y": 10,
+				"rot": 0,
+				"size": 12
+			},
+			{
+				"id": "plant",
+				"label": "Plant",
+				"type": "decor",
+				"kind": "plant",
+				"x": 186,
+				"y": 96,
+				"rot": 0,
+				"size": 18
+			}
+		]
+	},
+	"scores": {
+		"gpt-6.1-terra": {
+			"overall": 10,
+			"seating": 10,
+			"tv": 10,
+			"coffeeTable": 10,
+			"space": 10,
+			"floorPlan": 10
+		},
+		"claude-sonnet-5-5": {
+			"overall": 9,
+			"seating": 9,
+			"tv": 9,
+			"coffeeTable": 10,
+			"space": 9,
+			"floorPlan": 10
+		},
+		"grok-4.7": "pending"
+	},
+	"findings": [
+		"terra: no measured shortfall with a buildable fix; tape the column north edge (modeled y 37) and check door hardware before ordering.",
+		"sonnet: nothing to fix; seats 3 and 6 stay good, not prime, and no alternative fixes that without losing a seat. The seat table rounded 28.5-inch seats to 29 (fixed)."
+	]
+}

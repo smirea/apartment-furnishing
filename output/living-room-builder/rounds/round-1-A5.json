@@ -1,0 +1,136 @@
+{
+	"round": 1,
+	"date": "2026-11-05",
+	"layout": {
+		"id": "A5",
+		"title": "115″ wall TV · 6-seat L sectional · long tufted ottoman",
+		"notes": [
+			"Main run against the west glass: two seats plus the corner face the TV square on at 14½ ft.",
+			"Three more seats on the north return; its east arm stops 32″ short of the console so the room stays open from the kitchen.",
+			"68″ × 36″ upholstered ottoman (the coffee-table footrest idea) reaches all six seats.",
+			"Side table and floor lamp tuck between the sofa’s south arm and the glass, beside the column."
+		],
+		"components": [
+			{
+				"id": "rug",
+				"label": "Rug 12×9",
+				"type": "rug",
+				"x": 88,
+				"y": 94,
+				"rot": 0,
+				"w": 144,
+				"d": 108
+			},
+			{
+				"id": "sofa",
+				"label": "L sectional",
+				"type": "seating",
+				"x": 78,
+				"y": 88,
+				"rot": 90,
+				"length": 116,
+				"depth": 42,
+				"arm": 6,
+				"seats": 2,
+				"left": {
+					"length": 150,
+					"kind": "seats",
+					"seats": 3,
+					"corner": true
+				}
+			},
+			{
+				"id": "tv",
+				"label": "TV",
+				"type": "tv",
+				"x": 194,
+				"y": 61,
+				"rot": 270,
+				"diag": 115,
+				"mount": "wall",
+				"center": 50
+			},
+			{
+				"id": "console",
+				"label": "Floating console",
+				"type": "console",
+				"x": 192,
+				"y": 61,
+				"rot": 270,
+				"w": 100,
+				"d": 14,
+				"h": 16,
+				"floating": true
+			},
+			{
+				"id": "ottoman",
+				"label": "Tufted ottoman",
+				"type": "table",
+				"role": "coffee",
+				"x": 95,
+				"y": 70,
+				"rot": 0,
+				"w": 68,
+				"d": 36,
+				"h": 17,
+				"shape": "rect"
+			},
+			{
+				"id": "side",
+				"label": "Side table",
+				"type": "table",
+				"role": "side",
+				"x": 14,
+				"y": 17,
+				"rot": 0,
+				"w": 18,
+				"d": 18,
+				"h": 22,
+				"shape": "round"
+			},
+			{
+				"id": "lamp",
+				"label": "Floor lamp",
+				"type": "decor",
+				"kind": "lamp",
+				"x": 33,
+				"y": 10,
+				"rot": 0,
+				"size": 12
+			}
+		]
+	},
+	"scores": {
+		"grok-4.7": {
+			"overall": 6,
+			"seating": 5,
+			"tv": 7,
+			"coffeeTable": 7,
+			"space": 7,
+			"floorPlan": 6
+		},
+		"gpt-6.1-terra": {
+			"overall": 7,
+			"seating": 7,
+			"tv": 7,
+			"coffeeTable": 8,
+			"space": 7,
+			"floorPlan": 8
+		},
+		"claude-sonnet-5-5": {
+			"overall": 7.5,
+			"seating": 7.5,
+			"tv": 8,
+			"coffeeTable": 6,
+			"space": 8,
+			"floorPlan": 9
+		}
+	},
+	"findings": [
+		"Three return seats face south and turn 44°, 56°, 63° to see the TV (all three reviewers).",
+		"Sofa 2″ into the balcony door opening and 2.5″ off the column (grok).",
+		"A soft ottoman is a footrest, not a coffee table (sonnet).",
+		"TV edge only 3.9″ from the light switch (codex, grok, sonnet).",
+		"Corner counted as a full seat (codex)."
+	]
+}

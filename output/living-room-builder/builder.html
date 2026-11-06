@@ -1,0 +1,2730 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>Living Room Builder</title>
+		<style>
+			:root {
+				--background: #f6f4ef;
+				--foreground: #1d1d1b;
+				--muted-foreground: #6d6a62;
+				--border: #d9d5cb;
+				--card: #fff;
+				--chart-1: #8c6f56;
+				--chart-2: #3f8fc4;
+				--chart-3: #4f8f4f;
+				--chart-4: #c09a68;
+				--success: #2f7d4a;
+				--warning: #b5651d;
+				--destructive: #b3261e;
+				--ring: #2563eb;
+				--radius: 10px;
+			}
+			@media (prefers-color-scheme: dark) {
+				:root:not([data-theme='light']) {
+					--background: #161614;
+					--foreground: #ecebe6;
+					--muted-foreground: #a29f96;
+					--border: #37352f;
+					--card: #1f1f1c;
+					--chart-1: #b08a68;
+					--chart-4: #c9a77c;
+					--success: #5cb27a;
+					--warning: #e09a50;
+					--destructive: #ef6b62;
+				}
+			}
+			body {
+				margin: 0;
+				background: var(--background);
+			}
+
+			.lr-plan {
+				--lr-sofa: #9c7b5c;
+				--lr-wood: #b8925f;
+				--lr-plant: #6e9a5c;
+				--lr-glass: #4f9bd0;
+				width: 100%;
+				height: auto;
+				display: block;
+				font-family: var(--font-sans, system-ui, sans-serif);
+			}
+			.lr-plan .floor {
+				fill: color-mix(in srgb, var(--foreground, #222) 5%, transparent);
+			}
+			.lr-plan .floor2 {
+				fill: color-mix(in srgb, var(--foreground, #222) 2.5%, transparent);
+			}
+			.lr-plan .wall {
+				stroke: var(--foreground, #222);
+				stroke-width: 3;
+				stroke-linecap: square;
+			}
+			.lr-plan .glass {
+				stroke: var(--lr-glass);
+				stroke-width: 2.2;
+			}
+			.lr-plan .open {
+				stroke: var(--muted-foreground, #888);
+				stroke-width: 0.6;
+				stroke-dasharray: 3 2;
+			}
+			.lr-plan .fixed {
+				fill: color-mix(in srgb, var(--foreground, #222) 14%, transparent);
+				stroke: var(--muted-foreground, #888);
+				stroke-width: 0.5;
+			}
+			.lr-plan .column {
+				fill: color-mix(in srgb, var(--foreground, #222) 45%, transparent);
+			}
+			.lr-plan .rug {
+				fill: color-mix(in srgb, var(--lr-wood) 16%, transparent);
+				stroke: color-mix(in srgb, var(--lr-wood) 60%, transparent);
+				stroke-width: 0.6;
+				stroke-dasharray: 2 1.5;
+			}
+			.lr-plan .sofa {
+				fill: color-mix(in srgb, var(--lr-sofa) 55%, transparent);
+				stroke: var(--lr-sofa);
+				stroke-width: 0.8;
+			}
+			.lr-plan .sofaback {
+				fill: color-mix(in srgb, var(--lr-sofa) 85%, black 10%);
+			}
+			.lr-plan .cushion {
+				fill: color-mix(in srgb, var(--lr-sofa) 30%, transparent);
+				stroke: color-mix(in srgb, var(--lr-sofa) 70%, transparent);
+				stroke-width: 0.4;
+			}
+			.lr-plan .table {
+				fill: color-mix(in srgb, var(--lr-wood) 70%, transparent);
+				stroke: var(--lr-wood);
+				stroke-width: 0.6;
+			}
+			.lr-plan .console {
+				fill: color-mix(in srgb, var(--foreground, #222) 30%, transparent);
+				stroke: var(--foreground, #222);
+				stroke-width: 0.4;
+			}
+			.lr-plan .tv {
+				fill: var(--foreground, #111);
+			}
+			.lr-plan .decor {
+				fill: color-mix(in srgb, var(--lr-plant) 55%, transparent);
+			}
+			.lr-plan .sight {
+				stroke-width: 0.45;
+				opacity: 0.7;
+			}
+			.lr-plan .prime {
+				stroke: var(--success, #2f7d4a);
+				fill: var(--success, #2f7d4a);
+			}
+			.lr-plan .good {
+				stroke: var(--warning, #b5651d);
+				fill: var(--warning, #b5651d);
+			}
+			.lr-plan .side {
+				stroke: var(--destructive, #b3261e);
+				fill: var(--destructive, #b3261e);
+			}
+			.lr-plan .wedge {
+				fill: color-mix(in srgb, var(--lr-glass) 12%, transparent);
+			}
+			.lr-plan .route {
+				fill: none;
+				stroke-linecap: round;
+				stroke-linejoin: round;
+				opacity: 0.16;
+			}
+			.lr-plan .routec {
+				fill: none;
+				stroke-width: 0.6;
+				stroke-dasharray: 2 2;
+				opacity: 0.8;
+			}
+			.lr-plan .rok {
+				stroke: var(--success, #2f7d4a);
+			}
+			.lr-plan .rwarn {
+				stroke: var(--warning, #b5651d);
+			}
+			.lr-plan .rbad {
+				stroke: var(--destructive, #b3261e);
+			}
+			.lr-plan .lbl {
+				font-size: 5.5px;
+				fill: var(--foreground, #222);
+				text-anchor: middle;
+				dominant-baseline: middle;
+			}
+			.lr-plan .mut {
+				font-size: 5px;
+				fill: var(--muted-foreground, #777);
+				text-anchor: middle;
+				dominant-baseline: middle;
+			}
+			.lr-plan .big {
+				font-size: 7px;
+				font-weight: 700;
+				fill: var(--foreground, #222);
+				text-anchor: middle;
+				dominant-baseline: middle;
+			}
+			.lr-plan .seatn {
+				font-size: 5px;
+				font-weight: 700;
+				text-anchor: middle;
+				dominant-baseline: middle;
+				stroke: none;
+			}
+			.lr-plan .dim {
+				stroke: var(--foreground, #222);
+				stroke-width: 0.4;
+			}
+			.lr-plan .open-rect {
+				fill: none;
+				stroke: var(--lr-plant);
+				stroke-width: 0.5;
+				stroke-dasharray: 1 1.5;
+			}
+			.lr-plan .sel {
+				stroke: var(--ring, #3b82f6) !important;
+				stroke-width: 1.6 !important;
+			}
+			.lr-plan [data-id] {
+				cursor: grab;
+			}
+
+			.lr {
+				font-family: var(--font-sans, system-ui, sans-serif);
+				color: var(--foreground, #1d1d1b);
+				font-size: 13px;
+				line-height: 1.45;
+			}
+			.lr h2 {
+				font-size: 15px;
+				margin: 0 0 2px;
+			}
+			.lr .card {
+				border: 1px solid var(--border, #d9d5cb);
+				border-radius: var(--radius, 10px);
+				padding: 14px;
+				margin: 0 0 16px;
+				background: var(--card, transparent);
+			}
+			.lr .cols {
+				display: grid;
+				grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+				gap: 14px;
+				align-items: start;
+			}
+			.lr .kv {
+				display: flex;
+				justify-content: space-between;
+				gap: 8px;
+				border-bottom: 1px solid var(--border, #e5e2da);
+				padding: 2px 0;
+			}
+			.lr .kv span {
+				color: var(--muted-foreground, #6d6a62);
+			}
+			.lr .score {
+				font-weight: 700;
+				margin-bottom: 4px;
+			}
+			.lr ul.issues {
+				margin: 6px 0 0;
+				padding-left: 16px;
+			}
+			.lr li.bad {
+				color: var(--destructive, #b3261e);
+			}
+			.lr li.warn {
+				color: var(--warning, #b5651d);
+			}
+			.lr li.ok {
+				color: var(--success, #2f7d4a);
+			}
+			.lr table.seats {
+				width: 100%;
+				border-collapse: collapse;
+				font-size: 12px;
+				margin-top: 8px;
+			}
+			.lr table.seats th,
+			.lr table.seats td {
+				text-align: left;
+				padding: 2px 4px;
+				border-bottom: 1px solid var(--border, #e5e2da);
+			}
+			.lr table.seats th {
+				color: var(--muted-foreground, #6d6a62);
+				font-weight: 600;
+			}
+			.lr .dot {
+				display: inline-block;
+				width: 8px;
+				height: 8px;
+				border-radius: 50%;
+				margin-right: 4px;
+			}
+			.lr .dot.prime {
+				background: var(--success, #2f7d4a);
+			}
+			.lr .dot.good {
+				background: var(--warning, #b5651d);
+			}
+			.lr .dot.side {
+				background: var(--destructive, #b3261e);
+			}
+			.lr .notes {
+				margin: 4px 0 8px;
+				padding-left: 16px;
+				color: var(--muted-foreground, #6d6a62);
+			}
+			.lr .legend {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 10px;
+				font-size: 12px;
+				color: var(--muted-foreground, #6d6a62);
+				margin: 0 0 12px;
+			}
+			.lr .elev {
+				max-width: 340px;
+				margin-top: 8px;
+			}
+			@media (max-width: 640px) {
+				.lr .cols {
+					grid-template-columns: 1fr;
+				}
+			}
+
+			.app {
+				display: grid;
+				grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr);
+				gap: 16px;
+				padding: 16px;
+				max-width: 1500px;
+				margin: 0 auto;
+			}
+			.bar {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 8px;
+				align-items: center;
+				padding: 12px 16px 0;
+				max-width: 1500px;
+				margin: 0 auto;
+			}
+			.bar h1 {
+				font-size: 16px;
+				margin: 0 12px 0 0;
+			}
+			button,
+			select,
+			input,
+			textarea {
+				font: inherit;
+				color: inherit;
+				background: var(--card);
+				border: 1px solid var(--border);
+				border-radius: 6px;
+				padding: 3px 7px;
+			}
+			button {
+				cursor: pointer;
+			}
+			button.danger {
+				color: var(--destructive);
+			}
+			.panel {
+				display: flex;
+				flex-direction: column;
+				gap: 12px;
+			}
+			.box {
+				border: 1px solid var(--border);
+				border-radius: var(--radius);
+				padding: 10px;
+				background: var(--card);
+			}
+			.box h3 {
+				font-size: 12px;
+				text-transform: uppercase;
+				letter-spacing: 0.04em;
+				color: var(--muted-foreground);
+				margin: 0 0 6px;
+			}
+			#palette,
+			.row-btns {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 5px;
+				margin: 4px 0;
+			}
+			.fields {
+				display: grid;
+				grid-template-columns: 1fr 1fr;
+				gap: 4px 10px;
+			}
+			.f {
+				display: flex;
+				justify-content: space-between;
+				align-items: center;
+				gap: 6px;
+				font-size: 12px;
+			}
+			.f span {
+				color: var(--muted-foreground);
+			}
+			.f input[type='number'],
+			.f input[type='text'],
+			.f select {
+				width: 84px;
+			}
+			.hint {
+				color: var(--muted-foreground);
+				font-size: 12px;
+			}
+			#json {
+				width: 100%;
+				height: 140px;
+				font:
+					11px/1.3 ui-monospace,
+					monospace;
+			}
+			#plan svg {
+				touch-action: none;
+				user-select: none;
+			}
+			.app > *,
+			.panel > * {
+				min-width: 0;
+			}
+			#preset {
+				max-width: 100%;
+				min-width: 0;
+			}
+			.fields {
+				grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)) !important;
+			}
+			.f span {
+				min-width: 0;
+				overflow: hidden;
+				text-overflow: ellipsis;
+				white-space: nowrap;
+			}
+			#seats {
+				overflow-x: auto;
+			}
+			@media (max-width: 900px) {
+				.app {
+					grid-template-columns: 1fr;
+					padding: 12px;
+				}
+				.bar {
+					padding: 12px 12px 0;
+				}
+			}
+		</style>
+	</head>
+	<body>
+		<div class="lr">
+			<div class="bar">
+				<h1>Living room builder</h1>
+				<select id="preset"></select
+				><button id="reset">Reset</button><button id="copy">Copy JSON</button>
+				<label class="hint"><input type="checkbox" id="v-routes" /> routes</label
+				><label class="hint"><input type="checkbox" id="v-sight" /> sightlines</label
+				><label class="hint"><input type="checkbox" id="v-openRect" /> open floor</label
+				><span id="title" class="hint"></span>
+			</div>
+			<div class="app">
+				<div>
+					<div id="plan" class="box"></div>
+					<div class="legend">
+						<span><span class="dot prime"></span>prime seat (≤30° off-axis, ≤35° head turn, screen fills 26–46°)</span
+						><span><span class="dot good"></span>good seat (≤45° off-axis, ≤50° head turn)</span
+						><span
+							><span class="dot side"></span>side seat (anything else: turns more than 50°, sits more than 45° off-axis,
+							or the screen fills more than 50°)</span
+						><span>shaded lines: walking routes from the kitchen, labeled at their narrowest point</span>
+					</div>
+					<div class="box">
+						<h3>Seats</h3>
+						<div id="seats"></div>
+					</div>
+				</div>
+				<div class="panel">
+					<div class="box">
+						<h3>Metrics</h3>
+						<div id="summary"></div>
+						<ul class="issues" id="issues"></ul>
+					</div>
+					<div class="box">
+						<h3>Selected</h3>
+						<div id="inspector"></div>
+					</div>
+					<div class="box">
+						<h3>Add</h3>
+						<div id="palette"></div>
+					</div>
+					<div class="box">
+						<h3>TV elevation</h3>
+						<div id="elev" class="elev"></div>
+					</div>
+					<div class="box">
+						<h3>Layout JSON</h3>
+						<textarea id="json" spellcheck="false"></textarea><button id="load">Load JSON</button>
+					</div>
+				</div>
+			</div>
+		</div>
+		<script type="module">
+			// model.ts
+			var ROOM = {
+				w: 199,
+				d: 204,
+				ceiling: 120,
+				column: { x: 61.5, y: 20.5, r: 16.5 },
+				island: [78, 195.4, 149, 236.4],
+				counter: [0, 204, 35, 300],
+				southGlassEnd: 146,
+				balconyDoor: [144, 185],
+				tvWall: { x: 199, y1: 0, y2: 122 },
+				landing: [199, 122, 300, 175],
+				bathDoor: [180, 215],
+				switchPlate: { y: 115.5, z1: 45, z2: 49.5 },
+				smoke: { y: 94, z: 105 },
+				outlet: { y: 63, z: 16 },
+				eyeZ: 40,
+				kitchenEntry: { x: 175, y: 262 },
+			};
+			var MAX_TV_DIAG = 98;
+			var MOUNT_WALLS = [
+				{ name: 'TV wall (east)', a: { x: 199, y: 0 }, b: { x: 199, y: 122 }, heading: 270 },
+				{ name: 'South solid return', a: { x: 146, y: 0 }, b: { x: 199, y: 0 }, heading: 0 },
+			];
+			var tvSize = diag => ({
+				w: (diag * 16) / Math.hypot(16, 9) + 1,
+				h: (diag * 9) / Math.hypot(16, 9) + 1,
+				screenW: (diag * 16) / Math.hypot(16, 9),
+			});
+			var rad = deg => (deg * Math.PI) / 180;
+			var deg = r => (r * 180) / Math.PI;
+			var sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
+			var len = a => Math.hypot(a.x, a.y);
+			var angleBetween = (a, b) =>
+				deg(Math.acos(Math.max(-1, Math.min(1, (a.x * b.x + a.y * b.y) / (len(a) * len(b) || 1)))));
+			function frame(c) {
+				const h = rad(c.rot);
+				const f = { x: Math.sin(h), y: Math.cos(h) };
+				const r = { x: Math.cos(h), y: -Math.sin(h) };
+				const pt = (lx, ly) => ({ x: c.x + lx * r.x + ly * f.x, y: c.y + lx * r.y + ly * f.y });
+				const dir = (lx, ly) => ({ x: lx * r.x + ly * f.x, y: lx * r.y + ly * f.y });
+				const rect = (x1, y1, x2, y2) => [pt(x1, y1), pt(x2, y1), pt(x2, y2), pt(x1, y2)];
+				return { pt, dir, rect, f };
+			}
+			var LEGROOM = 13;
+			function seatingShape(c) {
+				const { length: A, depth: D } = c,
+					back = c.back ?? 9,
+					eye = c.eye ?? 18;
+				const H = Math.max(D, c.left?.length ?? 0, c.right?.length ?? 0);
+				const bk = -H / 2;
+				const wL = c.left ? (c.left.width ?? D) : 0;
+				const wR = c.right ? (c.right.width ?? D) : 0;
+				const local = { A, D, H, bk, wL, wR, back, eye };
+				const rects = [[-A / 2, bk, A / 2, bk + D]];
+				if (c.left) rects.push([-A / 2, bk, -A / 2 + wL, bk + c.left.length]);
+				if (c.right) rects.push([A / 2 - wR, bk, A / 2, bk + c.right.length]);
+				const outline = [
+					[-A / 2, bk],
+					[A / 2, bk],
+				];
+				if (c.right)
+					outline.push([A / 2, bk + c.right.length], [A / 2 - wR, bk + c.right.length], [A / 2 - wR, bk + D]);
+				else outline.push([A / 2, bk + D]);
+				if (c.left)
+					outline.push([-A / 2 + wL, bk + D], [-A / 2 + wL, bk + c.left.length], [-A / 2, bk + c.left.length]);
+				else outline.push([-A / 2, bk + D]);
+				const backs = [[-A / 2, bk, A / 2, bk + back]];
+				const arms = [];
+				if (!c.left) arms.push([-A / 2, bk, -A / 2 + c.arm, bk + D]);
+				else if (c.left.kind === 'seats') {
+					backs.push([-A / 2, bk, -A / 2 + back, bk + c.left.length]);
+					arms.push([-A / 2, bk + c.left.length - c.arm, -A / 2 + wL, bk + c.left.length]);
+				} else arms.push([-A / 2, bk, -A / 2 + c.arm, bk + c.left.length]);
+				if (!c.right) arms.push([A / 2 - c.arm, bk, A / 2, bk + D]);
+				else if (c.right.kind === 'seats') {
+					backs.push([A / 2 - back, bk, A / 2, bk + c.right.length]);
+					arms.push([A / 2 - wR, bk + c.right.length - c.arm, A / 2, bk + c.right.length]);
+				} else arms.push([A / 2 - c.arm, bk, A / 2, bk + c.right.length]);
+				return { local, rects, outline, backs, arms };
+			}
+			function seatsOf(c) {
+				const F = frame(c);
+				const { local, rects } = seatingShape(c);
+				const { A, D, bk, wL, wR, back, eye } = local;
+				const out = [];
+				const mk = (kind, r, e, fdir, frontDist, leg) => {
+					const facing = F.dir(fdir[0], fdir[1]);
+					const fl = len(facing);
+					const nf = { x: facing.x / fl, y: facing.y / fl };
+					const eyeW = F.pt(e[0], e[1]);
+					out.push({
+						comp: c.id,
+						kind,
+						eye: eyeW,
+						facing: nf,
+						front: { x: eyeW.x + nf.x * frontDist, y: eyeW.y + nf.y * frontDist },
+						cushion: F.rect(...r),
+						legroom: leg ? F.rect(...leg) : undefined,
+						width: Math.max(Math.abs(r[2] - r[0]), Math.abs(r[3] - r[1])) > 0 ? seatWidth(kind, r) : 0,
+					});
+				};
+				const seatWidth = (kind, r) => (kind === 'leg' ? Math.abs(r[3] - r[1]) : Math.abs(r[2] - r[0]));
+				const legSide = side => {
+					const leg = c[side];
+					if (!leg) return;
+					const s = side === 'left' ? -1 : 1;
+					const outer = (s * A) / 2;
+					const w = side === 'left' ? wL : wR;
+					if (leg.kind === 'chaise') {
+						const x1 = side === 'left' ? outer + c.arm : outer - w;
+						const x2 = side === 'left' ? outer + w : outer - c.arm;
+						mk(
+							'chaise',
+							[x1, bk + back, x2, bk + leg.length],
+							[(x1 + x2) / 2, bk + eye],
+							[0, 1],
+							leg.length - eye + 8,
+							null,
+						);
+						return;
+					}
+					if (leg.corner) {
+						const x1 = side === 'left' ? outer + back : outer - w;
+						const x2 = side === 'left' ? outer + w : outer - back;
+						mk(
+							'corner',
+							[x1, bk + back, x2, bk + D],
+							[outer - s * eye * 0.85, bk + eye * 0.85],
+							[-s, 1],
+							(D - eye * 0.85) * Math.SQRT2 + 10,
+							side === 'left'
+								? [outer + w, bk + D, outer + w + LEGROOM, bk + D + LEGROOM]
+								: [outer - w - LEGROOM, bk + D, outer - w, bk + D + LEGROOM],
+						);
+					}
+					const y0 = bk + D,
+						y1 = bk + leg.length - c.arm;
+					const n = Math.max(1, leg.seats);
+					const step = (y1 - y0) / n;
+					for (let i = 0; i < n; i++) {
+						const ya = y0 + i * step,
+							yb = ya + step;
+						const x1 = side === 'left' ? outer + back : outer - w;
+						const x2 = side === 'left' ? outer + w : outer - back;
+						mk(
+							'leg',
+							[x1, ya, x2, yb],
+							[outer - s * eye, (ya + yb) / 2],
+							[-s, 0],
+							w - eye + 8,
+							side === 'left' ? [outer + w, ya, outer + w + LEGROOM, yb] : [outer - w - LEGROOM, ya, outer - w, yb],
+						);
+					}
+				};
+				const x0 = -A / 2 + (c.left ? wL : c.arm);
+				const x1 = A / 2 - (c.right ? wR : c.arm);
+				const n = Math.max(1, c.seats);
+				const step = (x1 - x0) / n;
+				const main = [];
+				for (let i = 0; i < n; i++) {
+					const xa = x0 + i * step,
+						xb = xa + step;
+					mk('main', [xa, bk + back, xb, bk + D], [(xa + xb) / 2, bk + eye], [0, 1], D - eye + 8, [
+						xa,
+						bk + D,
+						xb,
+						bk + D + LEGROOM,
+					]);
+					main.push(out.pop());
+				}
+				legSide('left');
+				const leftSeats = out.splice(0);
+				legSide('right');
+				const rightSeats = out.splice(0);
+				return [...leftSeats.reverse(), ...main, ...rightSeats].map((s, i) => ({ ...s, n: i + 1 }));
+			}
+			function pieces(c) {
+				const F = frame(c);
+				const label = c.label ?? c.id;
+				const p = (poly, solid = true) => ({ comp: c.id, type: c.type, label, poly, solid });
+				switch (c.type) {
+					case 'seating':
+						return seatingShape(c).rects.map(r => p(F.rect(...r)));
+					case 'tv': {
+						const { w } = tvSize(c.diag);
+						const t = c.thickness ?? (c.mount === 'wall' ? 5 : 3);
+						return [p(F.rect(-w / 2, -t, w / 2, 0))];
+					}
+					case 'console':
+						return [p(F.rect(-c.w / 2, -c.d / 2, c.w / 2, c.d / 2))];
+					case 'table':
+						return [p(F.rect(-c.w / 2, -c.d / 2, c.w / 2, c.d / 2))];
+					case 'rug':
+						return [p(F.rect(-c.w / 2, -c.d / 2, c.w / 2, c.d / 2), false)];
+					case 'decor':
+						return [p(F.rect(-c.size / 2, -c.size / 2, c.size / 2, c.size / 2))];
+				}
+			}
+			var rectPoly = ([x1, y1, x2, y2]) => [
+				{ x: x1, y: y1 },
+				{ x: x2, y: y1 },
+				{ x: x2, y: y2 },
+				{ x: x1, y: y2 },
+			];
+			function project(poly, ax) {
+				let lo = Infinity,
+					hi = -Infinity;
+				for (const v of poly) {
+					const d = v.x * ax.x + v.y * ax.y;
+					lo = Math.min(lo, d);
+					hi = Math.max(hi, d);
+				}
+				return [lo, hi];
+			}
+			function overlapDepth(a, b) {
+				let min = Infinity;
+				for (const poly of [a, b])
+					for (let i = 0; i < poly.length; i++) {
+						const e = sub(poly[(i + 1) % poly.length], poly[i]);
+						const l = len(e) || 1;
+						const ax = { x: -e.y / l, y: e.x / l };
+						const [a0, a1] = project(a, ax);
+						const [b0, b1] = project(b, ax);
+						min = Math.min(min, Math.min(a1, b1) - Math.max(a0, b0));
+					}
+				return min;
+			}
+			function segDist(p, a, b) {
+				const ab = sub(b, a);
+				const t = Math.max(
+					0,
+					Math.min(1, ((p.x - a.x) * ab.x + (p.y - a.y) * ab.y) / (ab.x * ab.x + ab.y * ab.y || 1)),
+				);
+				return len({ x: p.x - a.x - t * ab.x, y: p.y - a.y - t * ab.y });
+			}
+			function inside(p, poly) {
+				let sign = 0;
+				for (let i = 0; i < poly.length; i++) {
+					const a = poly[i],
+						b = poly[(i + 1) % poly.length];
+					const cr = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+					if (Math.abs(cr) < 0.000000001) continue;
+					const s = Math.sign(cr);
+					if (sign === 0) sign = s;
+					else if (s !== sign) return false;
+				}
+				return true;
+			}
+			function segmentsCross(a, b, c, d) {
+				const o = (p, q, r) => Math.sign((q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x));
+				return o(a, b, c) !== o(a, b, d) && o(c, d, a) !== o(c, d, b);
+			}
+			function segmentHitsPoly(a, b, poly) {
+				if (inside(a, poly) || inside(b, poly)) return true;
+				return poly.some((v, i) => segmentsCross(a, b, v, poly[(i + 1) % poly.length]));
+			}
+			function polyDist(a, b) {
+				if (overlapDepth(a, b) > 0) return -overlapDepth(a, b);
+				let d = Infinity;
+				for (const [p, q] of [
+					[a, b],
+					[b, a],
+				])
+					for (const v of p)
+						for (let i = 0; i < q.length; i++) d = Math.min(d, segDist(v, q[i], q[(i + 1) % q.length]));
+				return d;
+			}
+			function polyCircleDist(a, c) {
+				if (inside(c, a)) return -c.r;
+				let d = Infinity;
+				for (let i = 0; i < a.length; i++) d = Math.min(d, segDist(c, a[i], a[(i + 1) % a.length]));
+				return d - c.r;
+			}
+			var G = { x0: -61, y0: 0, x1: 300, y1: 300 };
+			var GW = G.x1 - G.x0;
+			var GH = G.y1 - G.y0;
+			var DOMAIN = [
+				[0, 0, ROOM.w, ROOM.d],
+				[35, ROOM.d, ROOM.w, G.y1],
+				[-61, 2, 0, 204],
+				ROOM.landing,
+				[199, ROOM.bathDoor[0], 300, ROOM.bathDoor[1]],
+			];
+			var FIXED_BLOCKS = [
+				ROOM.island,
+				[-0.5, 0, 0.5, ROOM.balconyDoor[0]],
+				[-0.5, ROOM.balconyDoor[1], 0.5, 204],
+				[199, 175, 300, ROOM.bathDoor[0]],
+			];
+			var TARGETS = [
+				{ key: 'office', name: 'Office / guest door', at: { x: 262, y: 150 }, min: 32, good: 36 },
+				{ key: 'bath', name: 'Bath 2 door', at: { x: 262, y: 197 }, min: 28, good: 32 },
+				{ key: 'balcony', name: 'Balcony door', at: { x: -30, y: 164 }, min: 28, good: 32 },
+			];
+			function edt1d(f, n, d, v, z) {
+				let k = 0;
+				v[0] = 0;
+				z[0] = -Infinity;
+				z[1] = Infinity;
+				for (let q = 1; q < n; q++) {
+					let s = (f[q] + q * q - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+					while (s <= z[k]) {
+						k--;
+						s = (f[q] + q * q - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+					}
+					k++;
+					v[k] = q;
+					z[k] = s;
+					z[k + 1] = Infinity;
+				}
+				k = 0;
+				for (let q = 0; q < n; q++) {
+					while (z[k + 1] < q) k++;
+					d[q] = (q - v[k]) * (q - v[k]) + f[v[k]];
+				}
+			}
+			function clearanceGrid(solids) {
+				const blocked = new Uint8Array(GW * GH).fill(1);
+				const mark = (r, val) => {
+					for (let y = Math.max(0, Math.floor(r[1] - G.y0)); y < Math.min(GH, Math.ceil(r[3] - G.y0)); y++)
+						for (let x = Math.max(0, Math.floor(r[0] - G.x0)); x < Math.min(GW, Math.ceil(r[2] - G.x0)); x++) {
+							const cx = x + G.x0 + 0.5,
+								cy = y + G.y0 + 0.5;
+							if (cx >= r[0] && cx <= r[2] && cy >= r[1] && cy <= r[3]) blocked[y * GW + x] = val;
+						}
+				};
+				for (const r of DOMAIN) mark(r, 0);
+				for (const r of FIXED_BLOCKS) mark(r, 1);
+				const col = ROOM.column;
+				const all = [...solids];
+				for (const poly of all) {
+					const xs = poly.map(p => p.x),
+						ys = poly.map(p => p.y);
+					for (
+						let y = Math.max(0, Math.floor(Math.min(...ys) - G.y0));
+						y < Math.min(GH, Math.ceil(Math.max(...ys) - G.y0));
+						y++
+					)
+						for (
+							let x = Math.max(0, Math.floor(Math.min(...xs) - G.x0));
+							x < Math.min(GW, Math.ceil(Math.max(...xs) - G.x0));
+							x++
+						)
+							if (inside({ x: x + G.x0 + 0.5, y: y + G.y0 + 0.5 }, poly)) blocked[y * GW + x] = 1;
+				}
+				for (let y = 0; y < 45; y++)
+					for (let x = 0; x < 140; x++) {
+						const cx = x + G.x0 + 0.5,
+							cy = y + G.y0 + 0.5;
+						if (Math.hypot(cx - col.x, cy - col.y) <= col.r) blocked[y * GW + x] = 1;
+					}
+				const INF = 1000000000000;
+				const tmp = new Float64Array(GW * GH);
+				const n = Math.max(GW, GH) + 2;
+				const f = new Float64Array(n),
+					d = new Float64Array(n),
+					v = new Int32Array(n),
+					z = new Float64Array(n + 1);
+				for (let x = 0; x < GW; x++) {
+					f[0] = 0;
+					for (let y = 0; y < GH; y++) f[y + 1] = blocked[y * GW + x] ? 0 : INF;
+					f[GH + 1] = 0;
+					edt1d(f, GH + 2, d, v, z);
+					for (let y = 0; y < GH; y++) tmp[y * GW + x] = d[y + 1];
+				}
+				const r = new Float32Array(GW * GH);
+				for (let y = 0; y < GH; y++) {
+					f[0] = 0;
+					for (let x = 0; x < GW; x++) f[x + 1] = tmp[y * GW + x];
+					f[GW + 1] = 0;
+					edt1d(f, GW + 2, d, v, z);
+					for (let x = 0; x < GW; x++) r[y * GW + x] = Math.max(0, Math.sqrt(d[x + 1]) - 0.5);
+				}
+				return { blocked, r };
+			}
+			function widestPaths(r) {
+				const val = new Float32Array(GW * GH).fill(-1);
+				const parent = new Int32Array(GW * GH).fill(-1);
+				const heap = [];
+				const hv = [];
+				const push = (i, w) => {
+					heap.push(i);
+					hv.push(w);
+					let k = heap.length - 1;
+					while (k > 0) {
+						const p = (k - 1) >> 1;
+						if (hv[p] >= hv[k]) break;
+						[heap[p], heap[k]] = [heap[k], heap[p]];
+						[hv[p], hv[k]] = [hv[k], hv[p]];
+						k = p;
+					}
+				};
+				const pop = () => {
+					const top = heap[0],
+						tv = hv[0];
+					const li = heap.pop(),
+						lv = hv.pop();
+					if (heap.length) {
+						heap[0] = li;
+						hv[0] = lv;
+						let k = 0;
+						for (;;) {
+							const a = 2 * k + 1,
+								b = a + 1;
+							let m = k;
+							if (a < heap.length && hv[a] > hv[m]) m = a;
+							if (b < heap.length && hv[b] > hv[m]) m = b;
+							if (m === k) break;
+							[heap[m], heap[k]] = [heap[k], heap[m]];
+							[hv[m], hv[k]] = [hv[k], hv[m]];
+							k = m;
+						}
+					}
+					return [top, tv];
+				};
+				const s = Math.floor(ROOM.kitchenEntry.y - G.y0) * GW + Math.floor(ROOM.kitchenEntry.x - G.x0);
+				val[s] = Infinity;
+				push(s, Infinity);
+				const nb = [-1, 1, -GW, GW, -GW - 1, -GW + 1, GW - 1, GW + 1];
+				while (heap.length) {
+					const [i, w] = pop();
+					if (w < val[i]) continue;
+					const x = i % GW;
+					for (const o of nb) {
+						const j = i + o;
+						if (j < 0 || j >= GW * GH) continue;
+						const xj = j % GW;
+						if (Math.abs(xj - x) > 1) continue;
+						const c = Math.min(w, r[j]);
+						if (c > val[j]) {
+							val[j] = c;
+							parent[j] = i;
+							push(j, c);
+						}
+					}
+				}
+				return { val, parent };
+			}
+			var cellOf = p => Math.floor(p.y - G.y0) * GW + Math.floor(p.x - G.x0);
+			var cellPt = i => ({ x: (i % GW) + G.x0 + 0.5, y: Math.floor(i / GW) + G.y0 + 0.5 });
+			function corridorPath(r, t, radius) {
+				const ok = i => r[i] >= radius - 0.001;
+				const dist = new Float32Array(GW * GH).fill(Infinity);
+				const parent = new Int32Array(GW * GH).fill(-1);
+				const s = cellOf(ROOM.kitchenEntry);
+				const open = [s];
+				dist[s] = 0;
+				const nb = [
+					[-1, 0, 1],
+					[1, 0, 1],
+					[0, -1, 1],
+					[0, 1, 1],
+					[-1, -1, Math.SQRT2],
+					[1, -1, Math.SQRT2],
+					[-1, 1, Math.SQRT2],
+					[1, 1, Math.SQRT2],
+				];
+				const buckets = [open];
+				for (let b = 0; b < buckets.length; b++) {
+					const q = buckets[b];
+					if (!q) continue;
+					for (let k = 0; k < q.length; k++) {
+						const i = q[k];
+						if (Math.round(dist[i]) !== b || i === t) continue;
+						const x = i % GW,
+							y = Math.floor(i / GW);
+						for (const [dx, dy, w] of nb) {
+							const nx = x + dx,
+								ny = y + dy;
+							if (nx < 0 || ny < 0 || nx >= GW || ny >= GH) continue;
+							const j = ny * GW + nx;
+							if (!ok(j) && j !== t) continue;
+							const nd = dist[i] + w;
+							if (nd < dist[j]) {
+								dist[j] = nd;
+								parent[j] = i;
+								(buckets[Math.round(nd)] ??= []).push(j);
+							}
+						}
+					}
+				}
+				const cells = [];
+				for (let i = t, guard = 0; i >= 0 && guard < GW * GH; guard++, i = parent[i]) cells.push(i);
+				let pinch = cells[0];
+				for (const i of cells) if (r[i] < r[pinch]) pinch = i;
+				const clear = (a, b) => {
+					const pa = cellPt(a),
+						pb = cellPt(b);
+					const n = Math.ceil(len(sub(pb, pa)));
+					for (let k = 1; k < n; k++) {
+						const c = cellOf({ x: pa.x + ((pb.x - pa.x) * k) / n, y: pa.y + ((pb.y - pa.y) * k) / n });
+						if (!ok(c)) return false;
+					}
+					return true;
+				};
+				const taut = [cells[0]];
+				let a = 0;
+				while (a < cells.length - 1) {
+					let b = cells.length - 1;
+					while (b > a + 1 && !clear(cells[a], cells[b])) b--;
+					taut.push(cells[b]);
+					a = b;
+				}
+				return { pts: taut.map(cellPt), pinch: cellPt(pinch) };
+			}
+			var rateSeat = (fov, off, turn) =>
+				fov >= 26 && fov <= 46 && off <= 30 && turn <= 35
+					? 'prime'
+					: fov >= 20 && fov <= 50 && off <= 45 && turn <= 50
+						? 'good'
+						: 'side';
+			function largestOpenRect(blockedLiving, w, h) {
+				const heights = Array.from({ length: w }, () => 0);
+				let best = { area: 0, rect: [0, 0, 0, 0] };
+				for (let y = 0; y < h; y++) {
+					for (let x = 0; x < w; x++) heights[x] = blockedLiving(x, y) ? 0 : heights[x] + 1;
+					const stack = [];
+					for (let x = 0; x <= w; x++) {
+						const hx = x === w ? 0 : heights[x];
+						while (stack.length && heights[stack.at(-1)] >= hx) {
+							const top = stack.pop();
+							const height = heights[top];
+							const left = stack.length ? stack.at(-1) + 1 : 0;
+							const width = x - left;
+							const sq = Math.min(width, height);
+							const area = Math.min(width * height, sq * sq * 2);
+							if (area > best.area) best = { area, rect: [left, y - height + 1, x, y + 1] };
+						}
+						stack.push(x);
+					}
+				}
+				return best.rect;
+			}
+			function evaluate(layout) {
+				const issues = [];
+				const comps = layout.components;
+				const all = comps.flatMap(c => pieces(c));
+				const solids = all.filter(p => p.solid);
+				const living = rectPoly([0, 0, ROOM.w, ROOM.d]);
+				const fixed = [
+					{ name: 'kitchen island', poly: rectPoly(ROOM.island) },
+					{ name: 'kitchen counter', poly: rectPoly(ROOM.counter) },
+				];
+				const cName = id => comps.find(c => c.id === id)?.label ?? id;
+				for (const p of all) {
+					const out = p.poly.some(v => v.x < -0.25 || v.y < -0.25 || v.x > ROOM.w + 0.25 || v.y > ROOM.d + 0.25);
+					if (out) issues.push({ level: 'bad', msg: `${cName(p.comp)} leaves the room` });
+				}
+				const seen = new Set();
+				for (let i = 0; i < solids.length; i++) {
+					const a = solids[i];
+					for (const f of fixed)
+						if (overlapDepth(a.poly, f.poly) > 0.25)
+							issues.push({ level: 'bad', msg: `${cName(a.comp)} hits the ${f.name}` });
+					const colGap = polyCircleDist(a.poly, ROOM.column);
+					if (colGap < -0.25) issues.push({ level: 'bad', msg: `${cName(a.comp)} hits the column` });
+					else if (colGap < 2 && !seen.has(`column|${a.comp}`)) {
+						seen.add(`column|${a.comp}`);
+						issues.push({
+							level: 'warn',
+							msg: `${cName(a.comp)} is ${Math.max(0, colGap).toFixed(1)}″ from the column`,
+						});
+					}
+					for (let j = i + 1; j < solids.length; j++) {
+						const b = solids[j];
+						if (a.comp === b.comp) continue;
+						const tvOnConsole = (a.type === 'tv' && b.type === 'console') || (a.type === 'console' && b.type === 'tv');
+						if (tvOnConsole) continue;
+						const k = [a.comp, b.comp].sort().join('|');
+						if (!seen.has(k) && overlapDepth(a.poly, b.poly) > 0.25) {
+							seen.add(k);
+							issues.push({ level: 'bad', msg: `${cName(a.comp)} overlaps ${cName(b.comp)}` });
+						}
+					}
+				}
+				for (const p of all.filter(p => p.type === 'rug'))
+					if (polyCircleDist(p.poly, ROOM.column) < 0)
+						issues.push({ level: 'warn', msg: `${cName(p.comp)} runs into the column; cut or shrink it` });
+				const tvs = comps.filter(c => c.type === 'tv');
+				let tvInfo;
+				if (tvs.length !== 1) issues.push({ level: 'bad', msg: `expected exactly one TV, found ${tvs.length}` });
+				const tv = tvs[0];
+				if (tv) {
+					const F = frame(tv);
+					const { w, h, screenW } = tvSize(tv.diag);
+					tvInfo = {
+						comp: tv,
+						w,
+						h,
+						center: F.pt(0, 0),
+						left: F.pt(-screenW / 2, 0),
+						right: F.pt(screenW / 2, 0),
+						normal: F.f,
+					};
+					const bottom = tv.center - h / 2,
+						top = tv.center + h / 2;
+					if (tv.diag > MAX_TV_DIAG)
+						issues.push({ level: 'bad', msg: `TV is ${tv.diag}″; the cap is ${MAX_TV_DIAG}″` });
+					if (top > ROOM.ceiling - 2) issues.push({ level: 'bad', msg: 'TV top hits the ceiling' });
+					if (tv.mount === 'wall') {
+						const t = tv.thickness ?? 5;
+						const backL = F.pt(-w / 2, -t),
+							backR = F.pt(w / 2, -t);
+						const wall = MOUNT_WALLS.find(
+							m =>
+								segDist(backL, m.a, m.b) < 1.5 &&
+								segDist(backR, m.a, m.b) < 1.5 &&
+								Math.abs(((tv.rot - m.heading + 540) % 360) - 180) < 1,
+						);
+						if (!wall)
+							issues.push({
+								level: 'bad',
+								msg: 'wall-mounted TV is not flat on a solid wall (east TV wall or south solid return)',
+							});
+						else {
+							tvInfo.wall = wall.name;
+							if (wall.heading === 270) {
+								const y1 = Math.min(backL.y, backR.y),
+									y2 = Math.max(backL.y, backR.y);
+								const sw = ROOM.switchPlate;
+								if (y2 > sw.y - 1.5 && y1 < sw.y + 1.5 && bottom < sw.z2 + 1 && top > sw.z1)
+									issues.push({ level: 'bad', msg: 'TV covers the light switch' });
+								if (y2 > ROOM.smoke.y - 3 && y1 < ROOM.smoke.y + 3 && top > ROOM.smoke.z - 4)
+									issues.push({ level: 'bad', msg: 'TV runs into the smoke alarm' });
+							}
+						}
+						if (bottom < 6) issues.push({ level: 'warn', msg: 'wall TV bottom is almost on the floor' });
+					} else {
+						const consoles = comps.filter(c => c.type === 'console');
+						const base = consoles.find(cs => inside(F.pt(0, -1.5), pieces(cs)[0].poly));
+						if (!base) issues.push({ level: 'bad', msg: 'TV on a stand needs a console under it' });
+						else {
+							if (bottom < base.h + 1)
+								issues.push({
+									level: 'bad',
+									msg: `TV bottom (${bottom.toFixed(0)}″) is below the console top (${base.h}″)`,
+								});
+							if (base.w < w * 0.6) issues.push({ level: 'warn', msg: 'console is narrow for this TV’s feet' });
+							if (base.d < 15)
+								issues.push({ level: 'warn', msg: 'console under 15″ deep is tight for a 98″+ TV stand' });
+						}
+						const panelDist = Math.min(...MOUNT_WALLS.map(m => segDist(tvInfo.center, m.a, m.b)));
+					}
+					if (ROOM.southGlassEnd > 0) {
+						const behind = F.pt(0, -30);
+						if (behind.y < 0 && behind.x < ROOM.southGlassEnd)
+							issues.push({
+								level: 'warn',
+								msg: 'TV stands in front of the south glass: backlit and blocks the lake view',
+							});
+						if (behind.x < 0)
+							issues.push({ level: 'warn', msg: 'TV stands in front of the west glass: sunset glare behind it' });
+					}
+				}
+				const seatComps = comps.filter(c => c.type === 'seating');
+				const rawSeats = seatComps.flatMap(seatsOf);
+				const { r } = clearanceGrid(solids.map(s => s.poly));
+				const { val, parent } = widestPaths(r);
+				const seats = rawSeats.map(s => {
+					let dist = 0,
+						fov = 0,
+						offAxis = 90,
+						turn = 180,
+						vert = 0;
+					if (tvInfo) {
+						const toC = sub(tvInfo.center, s.eye);
+						dist = len(toC);
+						fov = angleBetween(sub(tvInfo.left, s.eye), sub(tvInfo.right, s.eye));
+						offAxis = angleBetween(tvInfo.normal, sub(s.eye, tvInfo.center));
+						turn = angleBetween(s.facing, toC);
+						vert = deg(Math.atan2(tvInfo.comp.center - ROOM.eyeZ, dist));
+					}
+					const ci = cellOf(s.front);
+					const access = ci >= 0 && ci < val.length ? Math.max(0, val[ci]) * 2 : 0;
+					return { ...s, dist, fov, offAxis, turn, vert, rating: rateSeat(fov, offAxis, turn), access };
+				});
+				seats.forEach((s, i) => (s.n = i + 1));
+				for (const s of seatComps) {
+					for (const seat of seats.filter(x => x.comp === s.id))
+						if (seat.width < 21)
+							issues.push({
+								level: 'bad',
+								msg: `${cName(s.id)} seat ${seat.n} is only ${seat.width.toFixed(0)}″ wide`,
+							});
+				}
+				for (const s of seats) {
+					if (!s.legroom) continue;
+					const hits = solids
+						.filter(p => p.comp !== s.comp && overlapDepth(p.poly, s.legroom) > 0.5)
+						.map(p => cName(p.comp));
+					if (polyCircleDist(s.legroom, ROOM.column) < 0) hits.push('the column');
+					if (s.legroom.some(v => v.x < 0 || v.y < 0 || v.x > ROOM.w || v.y > ROOM.d)) hits.push('the wall');
+					if (hits.length)
+						issues.push({
+							level: 'bad',
+							msg: `${cName(s.comp)} seat ${s.n}: no legroom, ${[...new Set(hits)].join(' and ')} in the way`,
+						});
+				}
+				for (const s of seats)
+					if (s.access < 12)
+						issues.push({ level: 'warn', msg: `${cName(s.comp)} seat ${s.n}: ${s.access.toFixed(0)}″ to get in` });
+				if (tvInfo)
+					for (const s of seats) {
+						const blockers = new Set();
+						for (let k = 0; k <= 4; k++) {
+							const t = k / 4;
+							const target = {
+								x: tvInfo.left.x + (tvInfo.right.x - tvInfo.left.x) * t,
+								y: tvInfo.left.y + (tvInfo.right.y - tvInfo.left.y) * t,
+							};
+							for (const p of solids)
+								if (p.type === 'seating' && p.comp !== s.comp && segmentHitsPoly(s.eye, target, p.poly))
+									blockers.add(cName(p.comp));
+						}
+						if (blockers.size)
+							issues.push({
+								level: 'bad',
+								msg: `${cName(s.comp)} seat ${s.n}: view of the screen blocked by ${[...blockers].join(', ')}`,
+							});
+					}
+				if (tvInfo && seats.length) {
+					const best = Math.max(...seats.map(s => s.fov));
+					if (best > 50)
+						issues.push({
+							level: 'warn',
+							msg: `TV fills ${best.toFixed(0)}° from the closest seat (over 50° is too close)`,
+						});
+					const maxVert = Math.max(...seats.map(s => s.vert));
+					if (maxVert > 15) issues.push({ level: 'warn', msg: `screen center ${maxVert.toFixed(0)}° above eye level` });
+				}
+				const routes = TARGETS.map(t => {
+					const ti = cellOf(t.at);
+					const width = Math.max(0, val[ti]) * 2;
+					const { pts, pinch } = corridorPath(r, ti, Math.min(width, t.good) / 2);
+					if (width < t.min)
+						issues.push({ level: 'bad', msg: `${t.name}: route pinches to ${width.toFixed(0)}″ (needs ${t.min}″)` });
+					else if (width < t.good)
+						issues.push({ level: 'warn', msg: `${t.name}: route is ${width.toFixed(0)}″ (${t.good}″ is comfortable)` });
+					return { key: t.key, name: t.name, width, min: t.min, good: t.good, path: pts, pinch };
+				});
+				const coffees = comps.filter(c => c.type === 'table' && c.role !== 'side');
+				const seatPolys = seatComps.flatMap(c => pieces(c).map(p => p.poly));
+				let coffeeGap;
+				let tvGap;
+				if (!coffees.length) issues.push({ level: 'bad', msg: 'no coffee table' });
+				for (const t of coffees) {
+					const tp = pieces(t)[0].poly;
+					const g = Math.min(...seatPolys.map(sp => polyDist(sp, tp)));
+					coffeeGap = coffeeGap === undefined ? g : Math.min(coffeeGap, g);
+					if (tvInfo) {
+						const tvPolys = all.filter(p => p.type === 'tv' || p.type === 'console').map(p => p.poly);
+						const tg = Math.min(...tvPolys.map(q => polyDist(q, tp)));
+						tvGap = tvGap === undefined ? tg : Math.min(tvGap, tg);
+					}
+					const recline = Math.max(0, ...seatComps.map(s => s.recline ?? 0));
+					if (g < 12)
+						issues.push({
+							level: 'warn',
+							msg: `${cName(t.id)} is ${g.toFixed(0)}″ from the sofa (14–18″ is the norm)`,
+						});
+					else if (g > 24)
+						issues.push({ level: 'warn', msg: `${cName(t.id)} is ${g.toFixed(0)}″ from the sofa, a reach` });
+					if (recline && g < recline)
+						issues.push({ level: 'warn', msg: `recliner footrests (+${recline}″) hit ${cName(t.id)}` });
+					const reachable = seats.filter(s => polyDist([s.front, s.front, s.front], tp) < 30).length;
+					if (seats.length && reachable < Math.ceil(seats.length * 0.6))
+						issues.push({ level: 'warn', msg: `only ${reachable} of ${seats.length} seats can reach a table surface` });
+				}
+				const islandGap = Math.min(Infinity, ...solids.map(s => polyDist(s.poly, rectPoly(ROOM.island))));
+				const columnGap = Math.min(Infinity, ...solids.map(s => polyCircleDist(s.poly, ROOM.column)));
+				if (islandGap < 36)
+					issues.push({
+						level: 'warn',
+						msg: `${islandGap.toFixed(0)}″ behind the island stools (36″ to sit, 44″ to walk behind)`,
+					});
+				const seatingLength = seatComps.reduce(
+					(a, c) =>
+						a +
+						c.length +
+						(c.left?.length ?? 0) +
+						(c.right?.length ?? 0) -
+						(c.left ? c.depth : 0) -
+						(c.right ? c.depth : 0),
+					0,
+				);
+				const polyArea = p =>
+					Math.abs(p.reduce((a, v, i) => a + v.x * p[(i + 1) % p.length].y - p[(i + 1) % p.length].x * v.y, 0)) / 2;
+				const seatingArea = seatComps.reduce((a, c) => {
+					const sh = seatingShape(c);
+					const ring = sh.outline.map(([x, y]) => ({ x, y }));
+					return a + polyArea(ring);
+				}, 0);
+				const LW = ROOM.w,
+					LH = Math.floor(ROOM.island[1]);
+				const openRect = largestOpenRect(
+					(x, y) => {
+						const i = (y - G.y0) * GW + (x - G.x0);
+						return r[i] < 0.5;
+					},
+					LW,
+					LH,
+				);
+				const prime = seats.filter(s => s.rating === 'prime').length;
+				const good = seats.filter(s => s.rating === 'good').length;
+				const bad = issues.filter(i => i.level === 'bad').length;
+				const tvScore = tv ? Math.min(1, tv.diag / MAX_TV_DIAG) : 0;
+				const seatScore = Math.min(1, (prime + 0.6 * good) / 5);
+				const routeScore = routes.every(r => r.width >= r.good) ? 1 : routes.every(r => r.width >= r.min) ? 0.7 : 0.2;
+				const score = Math.round(
+					100 *
+						(0.35 * tvScore +
+							0.35 * seatScore +
+							0.15 * routeScore +
+							0.15 * (seats.length >= 5 ? 1 : seats.length / 5)) -
+						bad * 15,
+				);
+				const ftin = n => `${Math.floor(Math.round(n) / 12)}′${Math.round(n) % 12}″`;
+				const summary = {
+					TV: tv ? `${tv.diag}″ ${tv.mount === 'wall' ? 'wall-mounted' : 'on a stand'}` : 'none',
+					Seats: `${seats.length} (${prime} prime, ${good} good, ${seats.length - prime - good} side)`,
+					'Seat run': `${Math.round(seatingLength)}″`,
+					'Eye → screen': seats.length
+						? `${ftin(Math.min(...seats.map(s => s.dist)))} – ${ftin(Math.max(...seats.map(s => s.dist)))}`
+						: '—',
+					'Screen fills': seats.length
+						? `${Math.round(Math.min(...seats.map(s => s.fov)))}–${Math.round(Math.max(...seats.map(s => s.fov)))}°`
+						: '—',
+					'Coffee table gap': coffeeGap !== undefined ? `${coffeeGap.toFixed(0)}″` : '—',
+					'Island clearance': `${islandGap.toFixed(0)}″`,
+					'Open floor': `${openRect[2] - openRect[0]}″ × ${openRect[3] - openRect[1]}″`,
+				};
+				for (const rt of routes) summary[rt.name] = `${rt.width.toFixed(0)}″`;
+				if (!issues.some(i => i.level !== 'ok')) issues.push({ level: 'ok', msg: 'No collisions; every route clear' });
+				return {
+					issues,
+					seats,
+					tv: tvInfo,
+					routes,
+					coffeeGap,
+					tvGap,
+					islandGap,
+					columnGap,
+					seatingLength,
+					seatingArea,
+					openRect: { w: openRect[2] - openRect[0], d: openRect[3] - openRect[1], rect: openRect },
+					score,
+					summary,
+				};
+			}
+
+			// layouts.ts
+			function at(c, minX, minY) {
+				const probe = { ...c, x: 0, y: 0 };
+				const pts = pieces(probe).flatMap(p => p.poly);
+				const x1 = Math.min(...pts.map(p => p.x)),
+					y1 = Math.min(...pts.map(p => p.y));
+				return { ...c, x: Math.round((minX - x1) * 10) / 10, y: Math.round((minY - y1) * 10) / 10 };
+			}
+			var LAYOUTS = [
+				{
+					id: 'G2',
+					title: '98″ corner TV · 6-seat L facing it',
+					notes: [
+						'The TV angles across the south-east corner on a 56″ corner console, so the main run and the return both face it: no seat looks away from the screen.',
+						'L sectional 44″ deep, 18″ off the west glass (room for shades). Main run 106″ (y 41–147) with two 28½″ seats plus the corner, 4″ clear of the column; return 136″ (x 18–154) with three 29″ seats.',
+						'Seats sit 8′3″–13′8″ from the screen, which fills 29–43° of view; four seats are prime, two are good.',
+						'Coffee table: Living Spaces Aries II cocktail ottoman, 66 × 27 × 18″, with the 30 × 24″ MAGIGO walnut tray (both from ideas/README.md), 16″ from both seat fronts.',
+					],
+					components: [
+						{ id: 'rug', label: 'Rug 12′×8′4″', type: 'rug', x: 106, y: 95, rot: 0, w: 144, d: 100 },
+						{
+							id: 'sofa',
+							label: 'L sectional',
+							type: 'seating',
+							x: 86,
+							y: 94,
+							rot: 90,
+							length: 106,
+							depth: 44,
+							arm: 5,
+							seats: 2,
+							left: { length: 136, kind: 'seats', seats: 3, corner: true },
+						},
+						{
+							id: 'console',
+							label: 'Corner console',
+							type: 'console',
+							x: 171.8,
+							y: 28.2,
+							rot: 315,
+							w: 56,
+							d: 18,
+							h: 20,
+						},
+						{ id: 'tv', label: 'TV', type: 'tv', x: 165.4, y: 34.6, rot: 315, diag: 98, mount: 'stand', center: 48 },
+						{
+							id: 'ottoman',
+							label: 'Aries ottoman + tray',
+							type: 'table',
+							role: 'coffee',
+							x: 111,
+							y: 73.5,
+							rot: 0,
+							w: 66,
+							d: 27,
+							h: 18,
+							shape: 'rect',
+						},
+						{
+							id: 'side',
+							label: 'Side table',
+							type: 'table',
+							role: 'side',
+							x: 15,
+							y: 20,
+							rot: 0,
+							w: 18,
+							d: 18,
+							h: 22,
+							shape: 'round',
+						},
+						{ id: 'lamp', label: 'Floor lamp', type: 'decor', kind: 'lamp', x: 34, y: 10, rot: 0, size: 12 },
+						{ id: 'plant', label: 'Plant', type: 'decor', kind: 'plant', x: 186, y: 96, rot: 0, size: 18 },
+					],
+				},
+				{
+					id: 'G1',
+					title: '98″ corner TV · 5-seat L floated toward it',
+					notes: [
+						'The same corner TV; the L floats 36″ off the west glass so every seat is prime: 9–12½ ft away, the screen filling 31–40°.',
+						'The strip behind the sofa holds a sofa console with lamps and leads to the balcony door.',
+					],
+					components: [
+						{ id: 'rug', label: 'Rug 10×8', type: 'rug', x: 106, y: 92, rot: 0, w: 120, d: 96 },
+						{
+							id: 'sofa',
+							label: 'L sectional',
+							type: 'seating',
+							x: 92,
+							y: 102,
+							rot: 90,
+							length: 106,
+							depth: 44,
+							arm: 5,
+							seats: 2,
+							left: { length: 112, kind: 'seats', seats: 2, corner: true },
+						},
+						{ id: 'behind', label: 'Sofa console', type: 'console', x: 28, y: 95, rot: 90, w: 72, d: 12, h: 28 },
+						{
+							id: 'console',
+							label: 'Corner console',
+							type: 'console',
+							x: 171.8,
+							y: 28.2,
+							rot: 315,
+							w: 56,
+							d: 18,
+							h: 20,
+						},
+						{ id: 'tv', label: 'TV', type: 'tv', x: 165.4, y: 34.6, rot: 315, diag: 98, mount: 'stand', center: 48 },
+						{
+							id: 'ottoman',
+							label: 'Coffee ottoman + tray',
+							type: 'table',
+							role: 'coffee',
+							x: 122,
+							y: 80,
+							rot: 0,
+							w: 50,
+							d: 26,
+							h: 18,
+							shape: 'rect',
+						},
+						{ id: 'plant', label: 'Plant', type: 'decor', kind: 'plant', x: 14, y: 16, rot: 0, size: 18 },
+					],
+				},
+				{
+					id: 'A8',
+					title: '98″ wall TV · 6-seat L against the west glass (round 3’s pick, re-run at 98″)',
+					notes: [
+						'The 115″ round-3 layout with the TV capped at 98″: main seats now sit 14½ ft from a screen that fills only 28°, and the three return seats still face away.',
+						'Main run 104″ (y 36–140), 4″ off the west glass; return 150″ with three 34″ seats. Aries II ottoman with walnut tray, 16″ from both seat fronts.',
+					],
+					components: [
+						{ id: 'rug', label: 'Rug 12′×8′4″', type: 'rug', x: 96, y: 88, rot: 0, w: 144, d: 100 },
+						at(
+							{
+								id: 'sofa',
+								label: 'L sectional',
+								type: 'seating',
+								x: 0,
+								y: 0,
+								rot: 90,
+								length: 104,
+								depth: 42,
+								arm: 5,
+								seats: 2,
+								left: { length: 150, kind: 'seats', seats: 3, corner: true },
+							},
+							4,
+							36,
+						),
+						{ id: 'tv', label: 'TV', type: 'tv', x: 194, y: 59, rot: 270, diag: 98, mount: 'wall', center: 50 },
+						{
+							id: 'console',
+							label: 'Floating console',
+							type: 'console',
+							x: 192,
+							y: 59,
+							rot: 270,
+							w: 100,
+							d: 14,
+							h: 16,
+							floating: true,
+						},
+						{
+							id: 'ottoman',
+							label: 'Aries ottoman + tray',
+							type: 'table',
+							role: 'coffee',
+							x: 95,
+							y: 68.5,
+							rot: 0,
+							w: 66,
+							d: 27,
+							h: 18,
+							shape: 'rect',
+						},
+						{
+							id: 'side',
+							label: 'Side table',
+							type: 'table',
+							role: 'side',
+							x: 15,
+							y: 20,
+							rot: 0,
+							w: 18,
+							d: 18,
+							h: 22,
+							shape: 'round',
+						},
+						{ id: 'lamp', label: 'Floor lamp', type: 'decor', kind: 'lamp', x: 34, y: 10, rot: 0, size: 12 },
+					],
+				},
+				{
+					id: 'F1',
+					title: '98″ wall TV · L floated off the glass at 12 ft',
+					notes: [
+						'The L moves 30″ off the west glass, so the main run can pass the balcony-door line and the return sits farther north-east.',
+						'Main seats at 12 ft with the screen filling 31–33°; the two return seats still turn 41° and 54°.',
+						'The aisle behind the sofa is the balcony route; a sofa console with lamps runs along its back.',
+					],
+					components: [
+						{ id: 'rug', label: 'Rug 10×8', type: 'rug', x: 110, y: 95, rot: 0, w: 120, d: 96 },
+						at(
+							{
+								id: 'sofa',
+								label: 'L sectional',
+								type: 'seating',
+								x: 0,
+								y: 0,
+								rot: 90,
+								length: 114,
+								depth: 42,
+								arm: 5,
+								seats: 2,
+								left: { length: 122, kind: 'seats', seats: 2, corner: true },
+							},
+							30,
+							38,
+						),
+						{ id: 'behind', label: 'Sofa console', type: 'console', x: 23, y: 80, rot: 90, w: 72, d: 12, h: 28 },
+						{ id: 'tv', label: 'TV', type: 'tv', x: 194, y: 59, rot: 270, diag: 98, mount: 'wall', center: 50 },
+						{
+							id: 'console',
+							label: 'Floating console',
+							type: 'console',
+							x: 192,
+							y: 59,
+							rot: 270,
+							w: 100,
+							d: 14,
+							h: 16,
+							floating: true,
+						},
+						{
+							id: 'ottoman',
+							label: 'Ottoman + walnut top',
+							type: 'table',
+							role: 'coffee',
+							x: 120,
+							y: 77,
+							rot: 0,
+							w: 64,
+							d: 34,
+							h: 17,
+							shape: 'rect',
+						},
+						{ id: 'plant', label: 'Plant', type: 'decor', kind: 'plant', x: 14, y: 16, rot: 0, size: 18 },
+					],
+				},
+				{
+					id: 'V1',
+					title: '98″ wall TV · two sofas in a V, both turned to the screen',
+					notes: [
+						'A 2-seat sofa on the west glass faces the TV square on; a 3-seat sofa north of its sightlines turns 15° toward the screen.',
+						'Head turns 25–46° on the second sofa instead of 43–63° on an L return; five seats instead of six.',
+					],
+					components: [
+						{ id: 'rug', label: 'Rug 10×8', type: 'rug', x: 100, y: 88, rot: 0, w: 120, d: 96 },
+						{
+							id: 'sofa',
+							label: 'Main sofa',
+							type: 'seating',
+							x: 24,
+							y: 74,
+							rot: 90,
+							length: 80,
+							depth: 40,
+							arm: 5,
+							seats: 2,
+						},
+						{
+							id: 'sofa2',
+							label: 'Angled sofa',
+							type: 'seating',
+							x: 106,
+							y: 127,
+							rot: 165,
+							length: 88,
+							depth: 38,
+							arm: 5,
+							seats: 3,
+						},
+						{ id: 'tv', label: 'TV', type: 'tv', x: 194, y: 59, rot: 270, diag: 98, mount: 'wall', center: 50 },
+						{
+							id: 'console',
+							label: 'Floating console',
+							type: 'console',
+							x: 192,
+							y: 59,
+							rot: 270,
+							w: 100,
+							d: 14,
+							h: 16,
+							floating: true,
+						},
+						{
+							id: 'table',
+							label: 'Coffee table',
+							type: 'table',
+							role: 'coffee',
+							x: 88,
+							y: 70,
+							rot: 0,
+							w: 52,
+							d: 26,
+							h: 16,
+							shape: 'oval',
+						},
+						{
+							id: 'side',
+							label: 'Corner table',
+							type: 'table',
+							role: 'side',
+							x: 30,
+							y: 128,
+							rot: 0,
+							w: 20,
+							d: 20,
+							h: 22,
+							shape: 'round',
+						},
+					],
+				},
+				{
+					id: 'B1',
+					title: 'Wall TV · two separate sofas in an L',
+					notes: ['3-seat facing the TV, a second 3-seat backed toward the island; a side table fills the corner gap.'],
+					components: [
+						at(
+							{
+								id: 'sofa',
+								label: 'Sofa 1',
+								type: 'seating',
+								x: 0,
+								y: 0,
+								rot: 90,
+								length: 100,
+								depth: 40,
+								arm: 6,
+								seats: 3,
+							},
+							3,
+							38,
+						),
+						at(
+							{
+								id: 'sofa2',
+								label: 'Sofa 2',
+								type: 'seating',
+								x: 0,
+								y: 0,
+								rot: 180,
+								length: 92,
+								depth: 40,
+								arm: 6,
+								seats: 3,
+							},
+							66,
+							116,
+						),
+						{ id: 'tv', label: 'TV', type: 'tv', x: 194, y: 61, rot: 270, diag: 98, mount: 'wall', center: 50 },
+						{
+							id: 'console',
+							label: 'Floating console',
+							type: 'console',
+							x: 192,
+							y: 61,
+							rot: 270,
+							w: 100,
+							d: 14,
+							h: 16,
+							floating: true,
+						},
+						{
+							id: 'ottoman',
+							label: 'Coffee table',
+							type: 'table',
+							role: 'coffee',
+							x: 87,
+							y: 69,
+							rot: 0,
+							w: 48,
+							d: 42,
+							h: 16,
+							shape: 'rect',
+						},
+						{
+							id: 'side',
+							label: 'Corner table',
+							type: 'table',
+							role: 'side',
+							x: 52,
+							y: 148,
+							rot: 0,
+							w: 18,
+							d: 18,
+							h: 22,
+							shape: 'round',
+						},
+					],
+				},
+				{
+					id: 'A3',
+					title: 'Wall TV · AMERLIFE 5-seat power-reclining L (already imported)',
+					notes: [
+						'The 128″ × 115″ reclining sectional from the catalog: 30″ seats, 38″ modules, about 25″ more when reclined.',
+					],
+					components: [
+						at(
+							{
+								id: 'sofa',
+								label: 'AMERLIFE L',
+								type: 'seating',
+								x: 0,
+								y: 0,
+								rot: 90,
+								length: 115,
+								depth: 38,
+								arm: 6,
+								seats: 2,
+								recline: 25,
+								left: { length: 128, kind: 'seats', seats: 2, corner: true },
+							},
+							3,
+							31,
+						),
+						{ id: 'tv', label: 'TV', type: 'tv', x: 194, y: 61, rot: 270, diag: 98, mount: 'wall', center: 50 },
+						{
+							id: 'console',
+							label: 'Floating console',
+							type: 'console',
+							x: 192,
+							y: 61,
+							rot: 270,
+							w: 100,
+							d: 14,
+							h: 16,
+							floating: true,
+						},
+						{
+							id: 'ottoman',
+							label: 'Coffee table',
+							type: 'table',
+							role: 'coffee',
+							x: 93,
+							y: 64,
+							rot: 0,
+							w: 44,
+							d: 30,
+							h: 16,
+							shape: 'rect',
+						},
+					],
+				},
+				{
+					id: 'X1',
+					title: 'Tested: floating 4-seat sofa at 12 ft (grok’s alternative)',
+					notes: [
+						'All four seats square to the screen, but only four: a fifth cushion is 20″ wide or pushes into the island aisle.',
+					],
+					components: [
+						{
+							id: 'sofa',
+							label: 'Sofa',
+							type: 'seating',
+							x: 56,
+							y: 100.5,
+							rot: 90,
+							length: 109,
+							depth: 40,
+							arm: 4,
+							seats: 4,
+						},
+						{ id: 'tv', label: 'TV', type: 'tv', x: 194, y: 61, rot: 270, diag: 98, mount: 'wall', center: 50 },
+						{
+							id: 'console',
+							label: 'Floating console',
+							type: 'console',
+							x: 192,
+							y: 61,
+							rot: 270,
+							w: 100,
+							d: 14,
+							h: 16,
+							floating: true,
+						},
+						{
+							id: 'table',
+							label: 'Coffee table',
+							type: 'table',
+							role: 'coffee',
+							x: 108,
+							y: 100,
+							rot: 0,
+							w: 32,
+							d: 60,
+							h: 16,
+							shape: 'rect',
+						},
+					],
+				},
+				{
+					id: 'X3',
+					title: 'Tested: straight 5-seat sofa angled toward the TV',
+					notes: [
+						'The best angle the search found that keeps every seat’s legroom off the column: 24″ seats, and the two end seats still sit 36–41° off.',
+					],
+					components: [
+						{
+							id: 'sofa',
+							label: 'Sofa',
+							type: 'seating',
+							x: 60,
+							y: 96,
+							rot: 132,
+							length: 130,
+							depth: 40,
+							arm: 4,
+							seats: 5,
+						},
+						{ id: 'tv', label: 'TV', type: 'tv', x: 194, y: 58, rot: 270, diag: 98, mount: 'wall', center: 50 },
+						{
+							id: 'console',
+							label: 'Floating console',
+							type: 'console',
+							x: 192,
+							y: 58,
+							rot: 270,
+							w: 100,
+							d: 14,
+							h: 16,
+							floating: true,
+						},
+						{
+							id: 'table',
+							label: 'Coffee table',
+							type: 'table',
+							role: 'coffee',
+							x: 107,
+							y: 64,
+							rot: 132,
+							w: 56,
+							d: 26,
+							h: 16,
+							shape: 'rect',
+						},
+					],
+				},
+				{
+					id: 'X4',
+					title: 'Tested: 3-seat sofa plus a 3-seat sofa angled 38° at the screen',
+					notes: [
+						'Every head turn under 25°, but the angled sofa sits in the main sofa’s sightlines: its occupants block the screen for two main seats.',
+					],
+					components: [
+						at(
+							{
+								id: 'sofa',
+								label: 'Main sofa',
+								type: 'seating',
+								x: 0,
+								y: 0,
+								rot: 90,
+								length: 109,
+								depth: 40,
+								arm: 5,
+								seats: 3,
+							},
+							4,
+							34,
+						),
+						{
+							id: 'sofa2',
+							label: 'Angled sofa',
+							type: 'seating',
+							x: 100,
+							y: 108,
+							rot: 128,
+							length: 92,
+							depth: 38,
+							arm: 5,
+							seats: 3,
+						},
+						{ id: 'tv', label: 'TV', type: 'tv', x: 194, y: 59, rot: 270, diag: 98, mount: 'wall', center: 50 },
+						{
+							id: 'console',
+							label: 'Floating console',
+							type: 'console',
+							x: 192,
+							y: 59,
+							rot: 270,
+							w: 100,
+							d: 14,
+							h: 16,
+							floating: true,
+						},
+						{
+							id: 'table',
+							label: 'Coffee table',
+							type: 'table',
+							role: 'coffee',
+							x: 74,
+							y: 46,
+							rot: 0,
+							w: 28,
+							d: 18,
+							h: 16,
+							shape: 'oval',
+						},
+					],
+				},
+				{
+					id: 'C1',
+					title: 'Corner TV on a stand · L sectional',
+					notes: ['TV angled across the south-east corner on a corner console, so the throw runs diagonally.'],
+					components: [
+						at(
+							{
+								id: 'sofa',
+								label: 'L sectional',
+								type: 'seating',
+								x: 0,
+								y: 0,
+								rot: 90,
+								length: 109,
+								depth: 42,
+								arm: 5,
+								seats: 2,
+								left: { length: 118, kind: 'seats', seats: 2, corner: true },
+							},
+							4,
+							34,
+						),
+						{
+							id: 'console',
+							label: 'Corner console',
+							type: 'console',
+							x: 165.7,
+							y: 33.3,
+							rot: 315,
+							w: 72,
+							d: 20,
+							h: 18,
+						},
+						{ id: 'tv', label: 'TV', type: 'tv', x: 160, y: 39, rot: 315, diag: 98, mount: 'stand', center: 52 },
+						{
+							id: 'ottoman',
+							label: 'Ottoman',
+							type: 'table',
+							role: 'coffee',
+							x: 89,
+							y: 70,
+							rot: 0,
+							w: 56,
+							d: 36,
+							h: 17,
+							shape: 'rect',
+						},
+					],
+				},
+				{
+					id: 'D1',
+					title: 'TV on a stand at the south glass · sectional backed to the island',
+					notes: ['The long axis runs north–south: sofa faces the lake, TV stands in front of it.'],
+					components: [
+						{ id: 'console', label: 'Media console', type: 'console', x: 140, y: 10, rot: 0, w: 110, d: 18, h: 20 },
+						{ id: 'tv', label: 'TV', type: 'tv', x: 140, y: 13, rot: 0, diag: 98, mount: 'stand', center: 52 },
+						at(
+							{
+								id: 'sofa',
+								label: 'L sectional',
+								type: 'seating',
+								x: 0,
+								y: 0,
+								rot: 180,
+								length: 124,
+								depth: 40,
+								arm: 6,
+								seats: 2,
+								right: { length: 100, kind: 'seats', seats: 2, corner: true },
+							},
+							36,
+							58,
+						),
+						{
+							id: 'ottoman',
+							label: 'Ottoman',
+							type: 'table',
+							role: 'coffee',
+							x: 120,
+							y: 86,
+							rot: 0,
+							w: 56,
+							d: 32,
+							h: 17,
+							shape: 'rect',
+						},
+					],
+				},
+				{
+					id: 'E1',
+					title: 'TV on a stand at the west glass · sofa on the TV wall',
+					notes: [
+						'Reverses the room: the long solid wall takes the sofa, the TV stands in front of the west glass. Only four seats: any second sofa lands in their sightlines.',
+					],
+					components: [
+						{ id: 'console', label: 'Media console', type: 'console', x: 10, y: 93, rot: 90, w: 104, d: 18, h: 20 },
+						{ id: 'tv', label: 'TV', type: 'tv', x: 13, y: 93, rot: 90, diag: 98, mount: 'stand', center: 52 },
+						at(
+							{
+								id: 'sofa',
+								label: 'Chaise sofa',
+								type: 'seating',
+								x: 0,
+								y: 0,
+								rot: 270,
+								length: 120,
+								depth: 40,
+								arm: 6,
+								seats: 3,
+								left: { length: 66, width: 36, kind: 'chaise', seats: 1 },
+							},
+							131,
+							1,
+						),
+						{
+							id: 'ottoman',
+							label: 'Ottoman',
+							type: 'table',
+							role: 'coffee',
+							x: 125,
+							y: 75,
+							rot: 90,
+							w: 56,
+							d: 30,
+							h: 17,
+							shape: 'rect',
+						},
+					],
+				},
+				{
+					id: 'A9',
+					title: '98″ wall TV · L floated toward it, turned 5°',
+					notes: [
+						'The best 98″ layout with the TV on the wall: the L floats 32″ off the glass and turns 5° toward the screen.',
+					],
+					components: [
+						{
+							id: 'sofa',
+							label: 'L sectional',
+							type: 'seating',
+							x: 92,
+							y: 96,
+							rot: 85,
+							length: 106,
+							depth: 44,
+							arm: 5,
+							seats: 2,
+							left: { length: 112, kind: 'seats', seats: 2, corner: true },
+						},
+						{ id: 'tv', label: 'TV', type: 'tv', x: 194, y: 54, rot: 270, diag: 98, mount: 'wall', center: 46 },
+						{
+							id: 'console',
+							label: 'Floating console',
+							type: 'console',
+							x: 192,
+							y: 54,
+							rot: 270,
+							w: 90,
+							d: 14,
+							h: 16,
+							floating: true,
+						},
+						{
+							id: 'ottoman',
+							label: 'Coffee ottoman + tray',
+							type: 'table',
+							role: 'coffee',
+							x: 124,
+							y: 74,
+							rot: 0,
+							w: 50,
+							d: 30,
+							h: 18,
+							shape: 'rect',
+						},
+					],
+				},
+			];
+
+			// render.ts
+			var VB = { x0: -40, y0: -22, x1: 262, y1: 250 };
+			var sy = y => VB.y1 + VB.y0 - y;
+			var f1 = n => Math.round(n * 2) / 2;
+			var P = pts => pts.map(p => `${f1(p.x)},${f1(sy(p.y))}`).join(' ');
+			var esc = s => s.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch]);
+			var rectPts = ([x1, y1, x2, y2]) => [
+				{ x: x1, y: y1 },
+				{ x: x2, y: y1 },
+				{ x: x2, y: y2 },
+				{ x: x1, y: y2 },
+			];
+			var line = (a, b, cls, extra = '') =>
+				`<line class="${cls}" x1="${f1(a.x)}" y1="${f1(sy(a.y))}" x2="${f1(b.x)}" y2="${f1(sy(b.y))}" ${extra}/>`;
+			var text = (p, s, cls = 'lbl', rot = 0) =>
+				`<text class="${cls}" x="${f1(p.x)}" y="${f1(sy(p.y))}"${rot ? ` transform="rotate(${rot} ${f1(p.x)} ${f1(sy(p.y))})"` : ''}>${esc(s)}</text>`;
+			var ftin = n => `${Math.floor(Math.round(n) / 12)}′${Math.round(n) % 12}″`;
+			function drawComponent(c, selected) {
+				const F = frame(c);
+				const sel = selected ? ' sel' : '';
+				const g = [];
+				switch (c.type) {
+					case 'seating': {
+						const sh = seatingShape(c);
+						g.push(`<polygon class="sofa${sel}" points="${P(sh.outline.map(([x, y]) => F.pt(x, y)))}"/>`);
+						for (const r of sh.backs) g.push(`<polygon class="sofaback" points="${P(F.rect(...r))}"/>`);
+						for (const r of sh.arms) g.push(`<polygon class="sofaback" points="${P(F.rect(...r))}"/>`);
+						break;
+					}
+					case 'tv': {
+						const { w } = tvSize(c.diag);
+						const t = c.thickness ?? (c.mount === 'wall' ? 5 : 3);
+						g.push(`<polygon class="tv${sel}" points="${P(F.rect(-w / 2, -Math.min(t, 2.5), w / 2, 0))}"/>`);
+						if (c.mount === 'wall') g.push(`<polygon class="console" points="${P(F.rect(-14, -t, 14, -2.5))}"/>`);
+						break;
+					}
+					case 'console':
+						g.push(`<polygon class="console${sel}" points="${P(pieces(c)[0].poly)}"/>`);
+						break;
+					case 'table':
+						if (c.shape === 'rect') g.push(`<polygon class="table${sel}" points="${P(pieces(c)[0].poly)}"/>`);
+						else {
+							const ctr = F.pt(0, 0);
+							g.push(
+								`<ellipse class="table${sel}" cx="${f1(ctr.x)}" cy="${f1(sy(ctr.y))}" rx="${c.w / 2}" ry="${c.d / 2}" transform="rotate(${c.rot} ${f1(ctr.x)} ${f1(sy(ctr.y))})"/>`,
+							);
+						}
+						break;
+					case 'rug':
+						g.push(`<polygon class="rug${sel}" points="${P(pieces(c)[0].poly)}"/>`);
+						break;
+					case 'decor': {
+						const ctr = F.pt(0, 0);
+						g.push(`<circle class="decor${sel}" cx="${f1(ctr.x)}" cy="${f1(sy(ctr.y))}" r="${c.size / 2}"/>`);
+						break;
+					}
+				}
+				return `<g data-id="${esc(c.id)}">${g.join('')}</g>`;
+			}
+			function roomUnder() {
+				const o = [];
+				o.push(`<polygon class="floor" points="${P(rectPts([0, 0, ROOM.w, ROOM.d]))}"/>`);
+				o.push(`<polygon class="floor2" points="${P(rectPts([35, ROOM.d, ROOM.w, VB.y1]))}"/>`);
+				o.push(`<polygon class="floor2" points="${P(rectPts([ROOM.w, ROOM.landing[1], VB.x1, ROOM.landing[3]]))}"/>`);
+				o.push(`<polygon class="floor2" points="${P(rectPts([-38, 2, -1, 204]))}"/>`);
+				o.push(text({ x: -20, y: 100 }, 'balcony', 'mut', -90));
+				o.push(text({ x: 232, y: 148 }, 'office', 'mut'));
+				o.push(text({ x: 232, y: 141 }, 'landing', 'mut'));
+				o.push(text({ x: 218, y: 197 }, 'bath 2', 'mut'));
+				o.push(`<polygon class="fixed" points="${P(rectPts(ROOM.island))}"/>`);
+				o.push(text({ x: (ROOM.island[0] + ROOM.island[2]) / 2, y: 216 }, 'island 71×41', 'mut'));
+				o.push(`<polygon class="fixed" points="${P(rectPts([7, ROOM.d, 35, VB.y1]))}"/>`);
+				o.push(text({ x: 21, y: 228 }, 'counter', 'mut', -90));
+				o.push(text({ x: 175, y: 240 }, 'kitchen / entry ↑', 'mut'));
+				return o.join('');
+			}
+			function roomOver() {
+				const o = [];
+				o.push(`<circle class="column" cx="${ROOM.column.x}" cy="${sy(ROOM.column.y)}" r="${ROOM.column.r}"/>`);
+				o.push(text({ x: ROOM.column.x, y: ROOM.column.y }, 'column', 'mut'));
+				const W = (a, b, cls) => line(a, b, cls);
+				o.push(W({ x: 0, y: 0 }, { x: ROOM.southGlassEnd, y: 0 }, 'glass'));
+				o.push(W({ x: ROOM.southGlassEnd, y: 0 }, { x: ROOM.w, y: 0 }, 'wall'));
+				o.push(W({ x: 0, y: 0 }, { x: 0, y: ROOM.balconyDoor[0] }, 'glass'));
+				o.push(W({ x: 0, y: ROOM.balconyDoor[1] }, { x: 0, y: ROOM.d }, 'glass'));
+				o.push(line({ x: 0, y: ROOM.balconyDoor[0] }, { x: -30, y: ROOM.balconyDoor[0] + 12 }, 'open'));
+				o.push(text({ x: -9, y: (ROOM.balconyDoor[0] + ROOM.balconyDoor[1]) / 2 }, 'door', 'mut', -90));
+				o.push(W({ x: ROOM.w, y: 0 }, { x: ROOM.w, y: ROOM.tvWall.y2 }, 'wall'));
+				o.push(W({ x: ROOM.w, y: ROOM.landing[3] }, { x: ROOM.w, y: ROOM.bathDoor[0] }, 'wall'));
+				o.push(W({ x: ROOM.w, y: ROOM.bathDoor[1] }, { x: ROOM.w, y: VB.y1 }, 'wall'));
+				o.push(W({ x: ROOM.w, y: ROOM.tvWall.y2 }, { x: ROOM.landing[2], y: ROOM.tvWall.y2 }, 'wall'));
+				o.push(W({ x: ROOM.w + 14, y: ROOM.landing[3] }, { x: ROOM.landing[2], y: ROOM.landing[3] }, 'wall'));
+				o.push(line({ x: 0, y: ROOM.d }, { x: 35, y: ROOM.d }, 'wall'));
+				o.push(line({ x: 35, y: ROOM.island[1] }, { x: ROOM.w, y: ROOM.island[1] }, 'open'));
+				o.push(text({ x: 70, y: -8 }, 'south glass (lake)', 'mut'));
+				o.push(text({ x: 172, y: -8 }, 'solid', 'mut'));
+				o.push(text({ x: -9, y: 70 }, 'west glass', 'mut', -90));
+				o.push(text({ x: ROOM.w + 9, y: 61 }, 'TV wall 122″', 'mut', 90));
+				o.push(line({ x: 150, y: -16 }, { x: 198, y: -16 }, 'dim'));
+				o.push(line({ x: 150, y: -14 }, { x: 150, y: -18 }, 'dim'));
+				o.push(line({ x: 198, y: -14 }, { x: 198, y: -18 }, 'dim'));
+				o.push(text({ x: 210, y: -16 }, '4 ft', 'mut'));
+				o.push(text({ x: 245, y: 10 }, 'N ↑', 'lbl'));
+				return o.join('');
+			}
+			function renderPlan(layout, ev, opts = {}) {
+				const { routes = true, sight = true } = opts;
+				const o = [];
+				o.push(
+					`<svg class="lr-plan" viewBox="${VB.x0} ${VB.y0} ${VB.x1 - VB.x0} ${VB.y1 - VB.y0}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="${esc(layout.title)} floor plan">`,
+				);
+				o.push(opts.shared ? '<use href="#lr-under"/>' : roomUnder());
+				for (const c of layout.components.filter(c => c.type === 'rug'))
+					o.push(drawComponent(c, opts.selected === c.id));
+				if (opts.openRect) {
+					const r = ev.openRect.rect;
+					o.push(`<polygon class="open-rect" points="${P(rectPts(r))}"/>`);
+				}
+				if (routes)
+					for (const rt of ev.routes) {
+						const cls = rt.width >= rt.good ? 'rok' : rt.width >= rt.min ? 'rwarn' : 'rbad';
+						const pts = rt.path.map(p => `${f1(p.x)},${f1(sy(p.y))}`).join(' ');
+						o.push(`<polyline class="route ${cls}" stroke-width="${Math.max(4, rt.width)}" points="${pts}"/>`);
+						o.push(`<polyline class="routec ${cls}" points="${pts}"/>`);
+						o.push(text({ x: rt.pinch.x, y: rt.pinch.y + 4 }, `${Math.round(rt.width)}″`, 'mut'));
+					}
+				if (ev.tv && sight && ev.seats.length) {
+					const best = [...ev.seats].sort((a, b) => a.offAxis + a.turn - (b.offAxis + b.turn))[0];
+					o.push(`<polygon class="wedge" points="${P([best.eye, ev.tv.left, ev.tv.right])}"/>`);
+					for (const s of ev.seats) o.push(line(s.eye, ev.tv.center, `sight ${s.rating}`));
+				}
+				for (const c of layout.components.filter(c => c.type !== 'rug' && c.type !== 'tv'))
+					o.push(drawComponent(c, opts.selected === c.id));
+				for (const s of ev.seats) {
+					o.push(`<polygon class="cushion" points="${P(s.cushion)}"/>`);
+					o.push(
+						`<circle class="${s.rating}" cx="${f1(s.eye.x)}" cy="${f1(sy(s.eye.y))}" r="2.6" stroke="white" stroke-width=".5"/>`,
+					);
+					o.push(`<text class="seatn" fill="white" x="${f1(s.eye.x)}" y="${f1(sy(s.eye.y)) + 0.2}">${s.n}</text>`);
+				}
+				for (const c of layout.components.filter(c => c.type === 'tv'))
+					o.push(drawComponent(c, opts.selected === c.id));
+				o.push(opts.shared ? '<use href="#lr-over"/>' : roomOver());
+				if (ev.tv) {
+					const t = ev.tv;
+					const lp = { x: t.center.x + t.normal.x * 8, y: t.center.y + t.normal.y * 8 };
+					o.push(text(lp, `${t.comp.diag}″ TV`, 'big', ((t.comp.rot + 90) % 180) - 90));
+					const best = [...ev.seats].sort((a, b) => a.offAxis + a.turn - (b.offAxis + b.turn))[0];
+					if (best) {
+						const mid = { x: (best.eye.x + t.center.x) / 2, y: (best.eye.y + t.center.y) / 2 + 4 };
+						o.push(text(mid, `${ftin(best.dist)} · ${Math.round(best.fov)}°`, 'lbl'));
+					}
+				}
+				o.push('</svg>');
+				return o.join('');
+			}
+			function renderElevation(layout, ev) {
+				const t = ev.tv;
+				if (!t) return '';
+				const onEast = t.wall === 'TV wall (east)';
+				const span = onEast ? 122 : Math.max(130, t.w + 30);
+				const W = span + 20,
+					H = 135;
+				const X = y => 10 + y,
+					Z = z => H - 8 - z;
+				const o = [
+					`<svg class="lr-plan" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="TV elevation">`,
+				];
+				o.push(`<rect class="floor" x="${X(0)}" y="${Z(120)}" width="${span}" height="120"/>`);
+				o.push(`<line class="wall" x1="${X(0)}" y1="${Z(0)}" x2="${X(span)}" y2="${Z(0)}"/>`);
+				o.push(`<line class="open" x1="${X(0)}" y1="${Z(120)}" x2="${X(span)}" y2="${Z(120)}"/>`);
+				const along = p => (onEast ? 122 - p.y : p.x - (t.center.x - span / 2));
+				const a = along(t.left),
+					b = along(t.right);
+				const l = Math.min(a, b),
+					r = Math.max(a, b);
+				const consoles = layout.components.filter(c => c.type === 'console');
+				for (const c of consoles) {
+					if (c.type !== 'console') continue;
+					const ctr = frame(c).pt(0, 0);
+					const cx = along(ctr);
+					const bottom = c.floating ? Math.max(4, c.h - 10) : 0;
+					o.push(
+						`<rect class="console" x="${f1(X(cx - c.w / 2))}" y="${f1(Z(c.h))}" width="${c.w}" height="${f1(c.h - bottom)}"/>`,
+					);
+				}
+				const bz = t.comp.center - t.h / 2;
+				o.push(
+					`<rect class="tv" x="${f1(X(l - 0.5))}" y="${f1(Z(bz + t.h))}" width="${f1(r - l + 1)}" height="${f1(t.h)}" rx="1"/>`,
+				);
+				o.push(
+					`<text class="lbl" style="fill:var(--background,#fff)" x="${f1(X((l + r) / 2))}" y="${f1(Z(t.comp.center))}">${t.comp.diag}″ · ${f1(t.w)}″ × ${f1(t.h)}″</text>`,
+				);
+				o.push(
+					`<line class="dim" x1="${X(0)}" y1="${Z(ROOM.eyeZ)}" x2="${X(span)}" y2="${Z(ROOM.eyeZ)}" stroke-dasharray="2 2"/>`,
+				);
+				o.push(`<text class="mut" x="${X(span) - 14}" y="${Z(ROOM.eyeZ) - 3}">eye 40″</text>`);
+				if (onEast) {
+					const sw = ROOM.switchPlate;
+					o.push(
+						`<rect class="console" x="${X(122 - sw.y) - 1.5}" y="${Z(sw.z2)}" width="3" height="${sw.z2 - sw.z1}"/>`,
+					);
+					o.push(`<text class="mut" x="${X(122 - sw.y) + 9}" y="${Z(sw.z2 + 4)}">switch</text>`);
+					o.push(`<circle class="console" cx="${X(122 - ROOM.smoke.y)}" cy="${Z(ROOM.smoke.z)}" r="2.5"/>`);
+					o.push(`<text class="mut" x="${X(122 - ROOM.smoke.y)}" y="${Z(ROOM.smoke.z) - 5}">smoke</text>`);
+					o.push(
+						`<rect class="console" x="${X(122 - ROOM.outlet.y) - 2}" y="${Z(ROOM.outlet.z + 2)}" width="4" height="4"/>`,
+					);
+					o.push(`<text class="mut" x="${X(122 - ROOM.outlet.y)}" y="${Z(6)}">outlet</text>`);
+					o.push(
+						`<text class="mut" x="${X(4)}" y="${Z(-5)}">N</text><text class="mut" x="${X(118)}" y="${Z(-5)}">S</text>`,
+					);
+				}
+				o.push(
+					`<text class="mut" x="${X(span / 2)}" y="${Z(114)}">${onEast ? 'TV wall, seen from the sofa (122″ × 120″)' : 'TV, seen from the sofa'}</text>`,
+				);
+				o.push(`</svg>`);
+				return o.join('');
+			}
+			function seatTable(ev) {
+				const rows = ev.seats
+					.map(
+						s =>
+							`<tr><td><span class="dot ${s.rating}"></span>${s.n}</td><td>${s.kind}</td><td>${ftin(s.dist)}</td><td>${Math.round(s.fov)}°</td><td>${Math.round(s.offAxis)}°</td><td>${Math.round(s.turn)}°</td><td>${Math.round(s.width * 2) / 2}″</td></tr>`,
+					)
+					.join('');
+				return `<table class="seats"><thead><tr><th>Seat</th><th>Type</th><th>To screen</th><th>Fills</th><th>Off-axis</th><th>Head turn</th><th>Width</th></tr></thead><tbody>${rows}</tbody></table>`;
+			}
+			var toPlanY = svgY => VB.y1 + VB.y0 - svgY;
+
+			// ui.ts
+			var LEG = ['left', 'right'].flatMap(side => [
+				{ path: `${side}.length`, label: `${side} leg length`, kind: 'num' },
+				{ path: `${side}.width`, label: `${side} leg width`, kind: 'num' },
+				{ path: `${side}.kind`, label: `${side} leg kind`, kind: 'select', options: ['seats', 'chaise'] },
+				{ path: `${side}.seats`, label: `${side} leg seats`, kind: 'num' },
+				{ path: `${side}.corner`, label: `${side} corner seat`, kind: 'bool' },
+			]);
+			var FIELDS = {
+				seating: [
+					{ path: 'length', label: 'main run length', kind: 'num' },
+					{ path: 'depth', label: 'depth', kind: 'num' },
+					{ path: 'arm', label: 'arm width', kind: 'num' },
+					{ path: 'seats', label: 'main seats', kind: 'num' },
+					{ path: 'back', label: 'back cushion', kind: 'num' },
+					{ path: 'eye', label: 'eye from back', kind: 'num' },
+					{ path: 'recline', label: 'recline extension', kind: 'num' },
+					...LEG,
+				],
+				tv: [
+					{ path: 'diag', label: 'diagonal', kind: 'num' },
+					{ path: 'mount', label: 'mount', kind: 'select', options: ['wall', 'stand'] },
+					{ path: 'center', label: 'center height', kind: 'num' },
+					{ path: 'thickness', label: 'depth incl. mount', kind: 'num', step: 0.5 },
+				],
+				console: [
+					{ path: 'w', label: 'width', kind: 'num' },
+					{ path: 'd', label: 'depth', kind: 'num' },
+					{ path: 'h', label: 'top height', kind: 'num' },
+					{ path: 'floating', label: 'floating', kind: 'bool' },
+				],
+				table: [
+					{ path: 'role', label: 'role', kind: 'select', options: ['coffee', 'ottoman', 'side'] },
+					{ path: 'shape', label: 'shape', kind: 'select', options: ['rect', 'oval', 'round'] },
+					{ path: 'w', label: 'width', kind: 'num' },
+					{ path: 'd', label: 'depth', kind: 'num' },
+					{ path: 'h', label: 'height', kind: 'num' },
+				],
+				rug: [
+					{ path: 'w', label: 'width', kind: 'num' },
+					{ path: 'd', label: 'depth', kind: 'num' },
+				],
+				decor: [
+					{ path: 'kind', label: 'kind', kind: 'select', options: ['plant', 'lamp'] },
+					{ path: 'size', label: 'size', kind: 'num' },
+				],
+			};
+			var TEMPLATES = {
+				'Sofa 3-seat': { type: 'seating', label: 'Sofa', rot: 90, length: 96, depth: 40, arm: 6, seats: 3 },
+				'Sofa + chaise': {
+					type: 'seating',
+					label: 'Chaise sofa',
+					rot: 90,
+					length: 110,
+					depth: 40,
+					arm: 6,
+					seats: 2,
+					right: { length: 66, width: 36, kind: 'chaise', seats: 1 },
+				},
+				'L sectional': {
+					type: 'seating',
+					label: 'L sectional',
+					rot: 90,
+					length: 110,
+					depth: 40,
+					arm: 6,
+					seats: 2,
+					left: { length: 100, kind: 'seats', seats: 2, corner: true },
+				},
+				'U sectional': {
+					type: 'seating',
+					label: 'U sectional',
+					rot: 90,
+					length: 120,
+					depth: 40,
+					arm: 6,
+					seats: 2,
+					left: { length: 90, kind: 'seats', seats: 1, corner: true },
+					right: { length: 90, kind: 'seats', seats: 1, corner: true },
+				},
+				Recliner: { type: 'seating', label: 'Recliner', rot: 90, length: 36, depth: 39, arm: 5, seats: 1, recline: 22 },
+				'Coffee table': {
+					type: 'table',
+					label: 'Coffee table',
+					role: 'coffee',
+					rot: 0,
+					w: 48,
+					d: 28,
+					h: 16,
+					shape: 'rect',
+				},
+				Ottoman: { type: 'table', label: 'Ottoman', role: 'ottoman', rot: 0, w: 60, d: 26, h: 17, shape: 'rect' },
+				'Side table': { type: 'table', label: 'Side table', role: 'side', rot: 0, w: 18, d: 18, h: 22, shape: 'round' },
+				'Wall TV': { type: 'tv', label: 'TV', rot: 270, diag: 98, mount: 'wall', center: 50 },
+				'TV on stand': { type: 'tv', label: 'TV', rot: 270, diag: 98, mount: 'stand', center: 52 },
+				Console: { type: 'console', label: 'Console', rot: 270, w: 90, d: 16, h: 20 },
+				Rug: { type: 'rug', label: 'Rug', rot: 0, w: 120, d: 96 },
+				Plant: { type: 'decor', label: 'Plant', kind: 'plant', rot: 0, size: 18 },
+			};
+			function $(id) {
+				const el = document.getElementById(id);
+				if (!el) throw new Error(`missing #${id}`);
+				return el;
+			}
+			function clone(v) {
+				return JSON.parse(JSON.stringify(v));
+			}
+			var get = (o, path) => path.split('.').reduce((a, k) => a?.[k], o);
+			function set(o, path, v) {
+				const ks = path.split('.');
+				let cur = o;
+				for (const k of ks.slice(0, -1)) cur = cur[k] ??= {};
+				cur[ks.at(-1)] = v;
+			}
+			var STORE = 'living-room-builder:v1';
+			var layout = clone(LAYOUTS[0]);
+			var selected;
+			var view = { routes: true, sight: true, openRect: false };
+			function loadInitial() {
+				const hash = decodeURIComponent(location.hash.slice(1));
+				if (hash.startsWith('{')) {
+					layout = JSON.parse(hash);
+					return;
+				}
+				const preset = LAYOUTS.find(l => l.id === hash);
+				if (preset) {
+					layout = clone(preset);
+					return;
+				}
+				try {
+					const saved = localStorage.getItem(STORE);
+					if (saved) layout = JSON.parse(saved);
+				} catch {}
+			}
+			function save() {
+				try {
+					localStorage.setItem(STORE, JSON.stringify(layout));
+				} catch {}
+			}
+			var frame2 = 0;
+			function schedule() {
+				if (frame2) return;
+				frame2 = requestAnimationFrame(() => {
+					frame2 = 0;
+					render();
+				});
+			}
+			function render() {
+				const ev = evaluate(layout);
+				$('plan').innerHTML = renderPlan(layout, ev, { selected, ...view });
+				$('elev').innerHTML = renderElevation(layout, ev);
+				$('seats').innerHTML = seatTable(ev);
+				$('summary').innerHTML =
+					`<div class="score">self-check ${ev.score}</div>` +
+					Object.entries(ev.summary)
+						.map(([k, v]) => `<div class="kv"><span>${k}</span><b>${v}</b></div>`)
+						.join('');
+				$('issues').innerHTML = ev.issues.map(i => `<li class="${i.level}">${i.msg}</li>`).join('');
+				$('json').value = JSON.stringify(layout, null, 1);
+				$('title').textContent = `${layout.id} · ${layout.title}`;
+				save();
+			}
+			function renderInspector() {
+				const box = $('inspector');
+				const c = layout.components.find(x => x.id === selected);
+				if (!c) {
+					box.innerHTML =
+						'<p class="hint">Click a piece to edit it. Drag to move; arrows nudge 1″ (shift 6″); R / shift-R turn 15°; Delete removes.</p>';
+					return;
+				}
+				const fields = [
+					{ path: 'label', label: 'label', kind: 'text' },
+					{ path: 'x', label: 'x (center)', kind: 'num', step: 0.5 },
+					{ path: 'y', label: 'y (center)', kind: 'num', step: 0.5 },
+					{ path: 'rot', label: 'faces (°, 0 = N)', kind: 'num', step: 15 },
+					...FIELDS[c.type],
+				];
+				box.innerHTML =
+					`<div class="insp-head"><b>${c.label ?? c.id}</b> <span class="hint">${c.type}</span></div>` +
+					`<div class="row-btns"><button data-act="rot-90">⟲ 90</button><button data-act="rot-15">⟲ 15</button><button data-act="rot15">⟳ 15</button><button data-act="rot90">⟳ 90</button><button data-act="dup">Duplicate</button><button data-act="del" class="danger">Delete</button></div>` +
+					(c.type === 'tv'
+						? `<div class="row-btns">${[65, 75, 85, 98].map(d => `<button data-diag="${d}">${d}″</button>`).join('')}</div>`
+						: '') +
+					'<div class="fields">' +
+					fields
+						.map(f => {
+							const v = get(c, f.path);
+							const id = `f-${f.path}`;
+							if (f.kind === 'bool')
+								return `<label class="f"><span>${f.label}</span><input id="${id}" data-path="${f.path}" data-kind="bool" type="checkbox" ${v ? 'checked' : ''}></label>`;
+							if (f.kind === 'select')
+								return `<label class="f"><span>${f.label}</span><select id="${id}" data-path="${f.path}" data-kind="select"><option value=""></option>${f.options.map(o => `<option ${o === v ? 'selected' : ''}>${o}</option>`).join('')}</select></label>`;
+							return `<label class="f"><span>${f.label}</span><input id="${id}" data-path="${f.path}" data-kind="${f.kind}" type="${f.kind === 'num' ? 'number' : 'text'}" step="${f.step ?? 1}" value="${v ?? ''}"></label>`;
+						})
+						.join('') +
+					'</div>';
+			}
+			function selectComp(id) {
+				selected = id;
+				renderInspector();
+				render();
+			}
+			function current() {
+				return layout.components.find(x => x.id === selected);
+			}
+			function onField(e) {
+				const el = e.target;
+				const c = current();
+				if (!c || !el.dataset['path']) return;
+				const path = el.dataset['path'];
+				const kind = el.dataset['kind'];
+				const legSide = path.match(/^(left|right)\./)?.[1];
+				if (kind === 'bool') set(c, path, el.checked);
+				else if (kind === 'num') {
+					if (el.value === '') {
+						if (legSide && path.endsWith('.length')) delete c[legSide];
+						else set(c, path, undefined);
+					} else set(c, path, Number(el.value));
+				} else if (el.value === '' && legSide && path.endsWith('.kind')) delete c[legSide];
+				else set(c, path, el.value);
+				if (legSide && c[legSide]) {
+					const leg = c[legSide];
+					leg.kind ??= 'seats';
+					leg.seats ??= 1;
+					leg.length ??= 80;
+				}
+				render();
+			}
+			function act(a) {
+				const c = current();
+				if (!c) return;
+				if (a.startsWith('rot')) c.rot = (((c.rot + Number(a.slice(3))) % 360) + 360) % 360;
+				if (a === 'dup') {
+					const n = clone(c);
+					n.id = uid(c.type);
+					n.x += 12;
+					n.y -= 12;
+					layout.components.push(n);
+					selected = n.id;
+				}
+				if (a === 'del') {
+					layout.components = layout.components.filter(x => x !== c);
+					selected = undefined;
+				}
+				renderInspector();
+				render();
+			}
+			var uid = t => {
+				let i = 1;
+				while (layout.components.some(c => c.id === `${t}${i}`)) i++;
+				return `${t}${i}`;
+			};
+			function planPoint(e) {
+				const svg = $('plan').querySelector('svg');
+				const pt = new DOMPoint(e.clientX, e.clientY).matrixTransform(svg.getScreenCTM().inverse());
+				return { x: pt.x, y: toPlanY(pt.y) };
+			}
+			function setup() {
+				const presets = $('preset');
+				presets.innerHTML = LAYOUTS.map(l => `<option value="${l.id}">${l.id} · ${l.title}</option>`).join('');
+				presets.value = LAYOUTS.some(l => l.id === layout.id) ? layout.id : '';
+				presets.addEventListener('change', () => {
+					layout = clone(LAYOUTS.find(l => l.id === presets.value));
+					history.replaceState(null, '', `#${layout.id}`);
+					selectComp(undefined);
+				});
+				$('reset').addEventListener('click', () => {
+					layout = clone(LAYOUTS.find(l => l.id === presets.value) ?? LAYOUTS[0]);
+					selectComp(undefined);
+				});
+				$('copy').addEventListener('click', async () => {
+					await navigator.clipboard.writeText(JSON.stringify(layout, null, '\t'));
+					$('copy').textContent = 'Copied';
+					setTimeout(() => ($('copy').textContent = 'Copy JSON'), 1200);
+				});
+				$('load').addEventListener('click', () => {
+					layout = JSON.parse($('json').value);
+					selectComp(undefined);
+				});
+				for (const k of ['routes', 'sight', 'openRect']) {
+					const cb = $(`v-${k}`);
+					cb.checked = view[k];
+					cb.addEventListener('change', () => {
+						view[k] = cb.checked;
+						render();
+					});
+				}
+				$('palette').innerHTML = Object.keys(TEMPLATES)
+					.map(k => `<button data-add="${k}">${k}</button>`)
+					.join('');
+				$('palette').addEventListener('click', e => {
+					const k = e.target.dataset['add'];
+					if (!k) return;
+					const t = clone(TEMPLATES[k]);
+					const c = { ...t, id: uid(t.type), x: 100, y: 90 };
+					layout.components.push(c);
+					selectComp(c.id);
+				});
+				const insp = $('inspector');
+				insp.addEventListener('input', onField);
+				insp.addEventListener('change', onField);
+				insp.addEventListener('click', e => {
+					const b = e.target;
+					if (b.dataset['act']) act(b.dataset['act']);
+					if (b.dataset['diag']) {
+						const c = current();
+						if (c?.type === 'tv') {
+							c.diag = Number(b.dataset['diag']);
+							renderInspector();
+							render();
+						}
+					}
+				});
+				let drag;
+				$('plan').addEventListener('pointerdown', e => {
+					const g = e.target.closest('[data-id]');
+					if (!g) {
+						selectComp(undefined);
+						return;
+					}
+					const id = g.getAttribute('data-id');
+					if (id !== selected) selectComp(id);
+					const c = current();
+					const p = planPoint(e);
+					drag = { id, sx: p.x, sy: p.y, ox: c.x, oy: c.y };
+					e.preventDefault();
+				});
+				window.addEventListener('pointermove', e => {
+					if (!drag) return;
+					const c = layout.components.find(x => x.id === drag.id);
+					if (!c) return;
+					const p = planPoint(e);
+					const snap = e.altKey ? 0.5 : 1;
+					c.x = Math.round((drag.ox + p.x - drag.sx) / snap) * snap;
+					c.y = Math.round((drag.oy + p.y - drag.sy) / snap) * snap;
+					schedule();
+				});
+				window.addEventListener('pointerup', () => {
+					if (drag) renderInspector();
+					drag = undefined;
+				});
+				window.addEventListener('keydown', e => {
+					const tag = e.target.tagName;
+					if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+					const c = current();
+					if (!c) return;
+					const step = e.shiftKey ? 6 : 1;
+					const moves = {
+						ArrowLeft: [-step, 0],
+						ArrowRight: [step, 0],
+						ArrowUp: [0, step],
+						ArrowDown: [0, -step],
+					};
+					if (moves[e.key]) {
+						c.x += moves[e.key][0];
+						c.y += moves[e.key][1];
+						e.preventDefault();
+						renderInspector();
+						render();
+					} else if (e.key === 'r' || e.key === 'R') act(e.shiftKey ? 'rot-15' : 'rot15');
+					else if (e.key === 'Delete' || e.key === 'Backspace') act('del');
+					else if (e.key === 'd') act('dup');
+				});
+			}
+			loadInitial();
+			setup();
+			renderInspector();
+			render();
+		</script>
+	</body>
+</html>

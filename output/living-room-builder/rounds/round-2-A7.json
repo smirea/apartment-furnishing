@@ -1,0 +1,136 @@
+{
+	"round": 2,
+	"date": "2026-11-05",
+	"layout": {
+		"id": "A7",
+		"title": "115″ wall TV · 6-seat L clear of door and column · walnut-topped ottoman",
+		"notes": [
+			"Main run 4″ off the west glass (shade clearance), y 34–143: 5″ south of the column’s legroom line, 1″ short of the balcony door.",
+			"Two main seats (31″) and the corner face the TV square on at 14 ft; three 34″ seats on the north return face the lake and see the TV over their left shoulder.",
+			"68″ × 34″ upholstered ottoman with a full-length rigid walnut top (the coffee-table footrest idea), 16″ from both seat fronts.",
+			"TV centered at y 59: 4.5″ of wall between its edge and the light-switch plate."
+		],
+		"components": [
+			{
+				"id": "rug",
+				"label": "Rug 12×9",
+				"type": "rug",
+				"x": 88,
+				"y": 92,
+				"rot": 0,
+				"w": 144,
+				"d": 108
+			},
+			{
+				"id": "sofa",
+				"label": "L sectional",
+				"type": "seating",
+				"x": 79,
+				"y": 88.5,
+				"rot": 90,
+				"length": 109,
+				"depth": 42,
+				"arm": 5,
+				"seats": 2,
+				"left": {
+					"length": 150,
+					"kind": "seats",
+					"seats": 3,
+					"corner": true
+				}
+			},
+			{
+				"id": "tv",
+				"label": "TV",
+				"type": "tv",
+				"x": 194,
+				"y": 59,
+				"rot": 270,
+				"diag": 115,
+				"mount": "wall",
+				"center": 50
+			},
+			{
+				"id": "console",
+				"label": "Floating console",
+				"type": "console",
+				"x": 192,
+				"y": 59,
+				"rot": 270,
+				"w": 100,
+				"d": 14,
+				"h": 16,
+				"floating": true
+			},
+			{
+				"id": "ottoman",
+				"label": "Ottoman + walnut top",
+				"type": "table",
+				"role": "coffee",
+				"x": 96,
+				"y": 68,
+				"rot": 0,
+				"w": 68,
+				"d": 34,
+				"h": 17,
+				"shape": "rect"
+			},
+			{
+				"id": "side",
+				"label": "Side table",
+				"type": "table",
+				"role": "side",
+				"x": 15,
+				"y": 19,
+				"rot": 0,
+				"w": 18,
+				"d": 18,
+				"h": 22,
+				"shape": "round"
+			},
+			{
+				"id": "lamp",
+				"label": "Floor lamp",
+				"type": "decor",
+				"kind": "lamp",
+				"x": 34,
+				"y": 9,
+				"rot": 0,
+				"size": 12
+			}
+		]
+	},
+	"scores": {
+		"grok-4.7": {
+			"overall": 7.5,
+			"seating": 7,
+			"tv": 9,
+			"coffeeTable": 8,
+			"space": 8,
+			"floorPlan": 7
+		},
+		"gpt-6.1-terra": {
+			"overall": 7.5,
+			"seating": 7,
+			"tv": 8,
+			"coffeeTable": 8,
+			"space": 8,
+			"floorPlan": 7.5
+		},
+		"claude-sonnet-5-5": {
+			"overall": 8,
+			"seating": 7.5,
+			"tv": 9,
+			"coffeeTable": 6.5,
+			"space": 8.5,
+			"floorPlan": 8
+		}
+	},
+	"findings": [
+		"All three: the right scheme for this room; no placement found that beats it.",
+		"Return seats still turn 43–63°; the nearest is 7′7″ from the screen at a 48° fill.",
+		"1″ to the balcony door and 2.2″ of legroom at the column are tighter than the traced measurements (grok, codex, sonnet).",
+		"The walnut-topped ottoman is a custom build, not a product (sonnet); a 76″ table would reach the east return seat (codex).",
+		"Rug edge 3″ past the sofa back (sonnet)."
+	]
+}

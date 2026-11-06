@@ -1,0 +1,129 @@
+{
+	"round": 3,
+	"date": "2026-11-05",
+	"layout": {
+		"id": "A8",
+		"title": "115″ wall TV · 6-seat L sectional · Aries ottoman with walnut tray",
+		"notes": [
+			"Main run 104″ (y 36–140), 4″ off the west glass: 4″ short of the balcony door, south seat’s legroom 4″ clear of the column.",
+			"Two 28½″ main seats and the corner face the TV square on at 14–15½ ft; three 34″ return seats face the lake and turn 44–64° to the screen.",
+			"Coffee table: Living Spaces Aries II cocktail ottoman, 66 × 27 × 18″, with the 30 × 24″ MAGIGO walnut tray (both from ideas/README.md, both deliver to Austin); 16″ from both seat fronts. A C-shaped side table slides over the east arm.",
+			"115″ TV (101.4″ wide, about 160 lb) on a stud-mounted low-profile bracket, centered at y 59, screen center 50″ up: 4.5″ clear of the switch plate. Solar or blackout shades in the 4″ behind the sofa cut west-glass glare."
+		],
+		"components": [
+			{
+				"id": "rug",
+				"label": "Rug 12×8½",
+				"type": "rug",
+				"x": 96,
+				"y": 88,
+				"rot": 0,
+				"w": 144,
+				"d": 100
+			},
+			{
+				"id": "sofa",
+				"label": "L sectional",
+				"type": "seating",
+				"x": 79,
+				"y": 88,
+				"rot": 90,
+				"length": 104,
+				"depth": 42,
+				"arm": 5,
+				"seats": 2,
+				"left": {
+					"length": 150,
+					"kind": "seats",
+					"seats": 3,
+					"corner": true
+				}
+			},
+			{
+				"id": "tv",
+				"label": "TV",
+				"type": "tv",
+				"x": 194,
+				"y": 59,
+				"rot": 270,
+				"diag": 115,
+				"mount": "wall",
+				"center": 50
+			},
+			{
+				"id": "console",
+				"label": "Floating console",
+				"type": "console",
+				"x": 192,
+				"y": 59,
+				"rot": 270,
+				"w": 100,
+				"d": 14,
+				"h": 16,
+				"floating": true
+			},
+			{
+				"id": "ottoman",
+				"label": "Aries ottoman + tray",
+				"type": "table",
+				"role": "coffee",
+				"x": 95,
+				"y": 68.5,
+				"rot": 0,
+				"w": 66,
+				"d": 27,
+				"h": 18,
+				"shape": "rect"
+			},
+			{
+				"id": "side",
+				"label": "Side table",
+				"type": "table",
+				"role": "side",
+				"x": 15,
+				"y": 20,
+				"rot": 0,
+				"w": 18,
+				"d": 18,
+				"h": 22,
+				"shape": "round"
+			},
+			{
+				"id": "lamp",
+				"label": "Floor lamp",
+				"type": "decor",
+				"kind": "lamp",
+				"x": 34,
+				"y": 10,
+				"rot": 0,
+				"size": 12
+			}
+		]
+	},
+	"scores": {
+		"gpt-6.1-terra": {
+			"overall": 9,
+			"seating": 9,
+			"tv": 9,
+			"coffeeTable": 9,
+			"space": 9,
+			"floorPlan": 9
+		},
+		"claude-sonnet-5-5": {
+			"overall": 8.5,
+			"seating": 8.5,
+			"tv": 9.5,
+			"coffeeTable": 9,
+			"space": 9,
+			"floorPlan": 9.5
+		},
+		"grok-4.7": "pending when the owner capped the TV at 98 inches; superseded"
+	},
+	"findings": [
+		"terra: no material change; 9 not 10 only because the tested alternatives do not prove nothing better exists.",
+		"sonnet: deducted 1.0 for the three side seats and 0.25 for the island aisle with stools occupied, while finding no buildable alternative that fixes either.",
+		"Legend, side-table note, rug label and TV width (101.2 modeled vs 101.4 sold) were inconsistent; fixed.",
+		"Column y, stud positions and the door jamb need tape checks before ordering."
+	],
+	"outcome": "Owner capped the TV at 98 inches after this round, so the layouts were re-optimized."
+}
