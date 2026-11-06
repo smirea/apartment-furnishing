@@ -3,7 +3,7 @@ import { join } from 'node:path';
 
 const FILE = join(import.meta.dir, '../../../data/app.db');
 
-// Nested values (dimensions, highlights, the texture tile, vectors) are JSON text: nothing queries inside them.
+// Nested values (dimensions, highlights, the texture tile, vectors, carpet sizes and poses) are JSON text: nothing queries inside them.
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS catalog_items (
 	id TEXT PRIMARY KEY,
@@ -49,6 +49,21 @@ CREATE TABLE IF NOT EXISTS wall_textures (
 	"group" TEXT,
 	image TEXT,
 	texture TEXT
+) STRICT;
+
+CREATE TABLE IF NOT EXISTS carpets (
+	id TEXT PRIMARY KEY,
+	url TEXT NOT NULL,
+	importedAt TEXT NOT NULL,
+	name TEXT NOT NULL,
+	brand TEXT,
+	currency TEXT NOT NULL,
+	summary TEXT NOT NULL,
+	sizes TEXT NOT NULL,
+	size TEXT NOT NULL,
+	image TEXT,
+	texture TEXT,
+	placement TEXT
 ) STRICT;
 
 CREATE TABLE IF NOT EXISTS tv_models (
