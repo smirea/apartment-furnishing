@@ -56,7 +56,7 @@ Names were assigned by looking at each image, so a couple are best guesses (`bed
 
 ## Where it runs
 
-The web plan and its API live at [apartment.stf.lol](https://apartment.stf.lol), a Cloudflare Worker (`apps/server`). The data is in the D1 database `apartment-furnishing` and the photos, models and textures in the R2 bucket `apartment-furnishing-assets`, under `items/<id>/`. Every request but the product media needs the `API_TOKEN` from env-manager prod: a browser signs in with it once and keeps a cookie, and the iOS app and the runner send it as a bearer.
+The web plan and its API live at [apartment.stf.lol](https://apartment.stf.lol), a Cloudflare Worker (`apps/server`). The data is in the D1 database `apartment-furnishing` and the photos, models and textures in the R2 bucket `apartment-furnishing-assets`, under `items/<id>/`. Every request needs the `API_TOKEN` from env-manager prod, the UI, photos and models included; only the sign-in form answers without it. A browser signs in once and keeps a cookie, and the iOS app and the runner send it as a bearer. The bucket has no public URL and the Worker no workers.dev one. `bun scripts/auth-sweep.ts --prod` sends every route in `apps/server/src/worker.ts`, a real photo and model, the UI and unknown paths without the token and with a wrong one, and fails on anything but a 401.
 
 Imports and the Codex builds need tools only the laptop has (Camoufox, `grok`, `codex`, `pdftotext` and Apple's USD tools), so they run in the job runner (`apps/runner`) on the laptop. The Worker queues each one in the `jobs` table and the runner claims it, reading and writing through the Worker. An import waits for the runner and fails right away when it isn't running; a build waits in the queue until it comes back.
 
