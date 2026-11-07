@@ -39,7 +39,7 @@ export const assets = {
 		await call(`/api/assets/${path}`, { method: 'PUT', headers: { 'content-type': type }, body: body as BodyInit });
 	},
 	async get(path: string): Promise<Response | null> {
-		const res = await fetch(new URL(`/api/assets/${path}`, env.SERVER_URL));
+		const res = await fetch(new URL(`/api/assets/${path}`, env.SERVER_URL), { headers: auth });
 		if (res.status === 404) return null;
 		if (!res.ok) throw new Error(`GET /api/assets/${path}: ${res.status}`);
 		return res;

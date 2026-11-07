@@ -10,7 +10,7 @@ import {
 } from '@repo/shared/items';
 import { planGeometry } from '@repo/shared/plan';
 import { env } from 'cloudflare:workers';
-import { authorized, isPublic, loginPage, signIn } from './auth';
+import { authorized, loginPage, signIn } from './auth';
 import { CarpetError, updateCarpet } from './carpets';
 import { db } from './db';
 import {
@@ -59,7 +59,10 @@ async function serveAsset(request: Request, key: string) {
 	const object = await env.FILES.get(key, { onlyIf: request.headers });
 	if (!object) {
 		// `wrangler dev` starts with an empty bucket, so a local server reads the photos and models production has.
-		if (env.ASSETS_FALLBACK_URL) return fetch(new URL(new URL(request.url).pathname, env.ASSETS_FALLBACK_URL));
+		if (env.ASSETS_FALLBACK_URL)
+			return fetch(new URL(new URL(request.url).pathname, env.ASSETS_FALLBACK_URL), {
+				headers: { authorization: `Bearer ${env.ASSETS_FALLBACK_TOKEN}` },
+			});
 		return new Response('Not found', { status: 404 });
 	}
 	const headers = new Headers();
@@ -68,7 +71,7 @@ async function serveAsset(request: Request, key: string) {
 	// Every URL the catalog hands out carries a `?v=` version, so a changed file comes with a new URL.
 	headers.set(
 		'cache-control',
-		new URL(request.url).searchParams.has('v') ? 'public, max-age=31536000, immutable' : 'no-cache',
+		new URL(request.url).searchParams.has('v') ? 'private, max-age=31536000, immutable' : 'private, no-cache',
 	);
 	if (!('body' in object)) return new Response(null, { status: 304, headers });
 	return new Response(object.body, { headers });
@@ -347,7 +350,7 @@ export default {
 		const path = url.pathname;
 
 		if (path === '/login' && request.method === 'POST') return signIn(request, env.API_TOKEN);
-		if (!isPublic(request, path) && !authorized(request, env.API_TOKEN))
+		if (!authorized(request, env.API_TOKEN))
 			return path.startsWith('/api/') ? Response.json({ error: 'Sign in first' }, { status: 401 }) : loginPage();
 
 		if (path.startsWith('/api/'))

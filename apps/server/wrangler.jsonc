@@ -24,6 +24,6 @@
 	],
 	// Photos, models and textures under items/<id>/, as data/items/ held them on the laptop.
 	"r2_buckets": [{ "binding": "FILES", "bucket_name": "apartment-furnishing-assets" }],
-	"vars": { "ASSETS_FALLBACK_URL": "" },
+	"vars": { "ASSETS_FALLBACK_URL": "", "ASSETS_FALLBACK_TOKEN": "" },
 	"observability": { "enabled": true },
 }

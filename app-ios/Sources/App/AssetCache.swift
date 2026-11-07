@@ -45,7 +45,7 @@ final class AssetCache {
         if let download = downloads[url] { return try await download.value }
         let download = Task {
             defer { downloads[url] = nil }
-            let (temporary, response) = try await URLSession.shared.download(from: url)
+            let (temporary, response) = try await URLSession.shared.download(for: API.authorized(URLRequest(url: url)))
             guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw URLError(.badServerResponse) }
             try? FileManager.default.removeItem(at: file)
             try FileManager.default.moveItem(at: temporary, to: file)

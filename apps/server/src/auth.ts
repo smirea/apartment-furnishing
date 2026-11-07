@@ -1,5 +1,5 @@
-// One shared token guards everything but the product media: the iOS app and the laptop runner send it as a bearer,
-// and a browser keeps it in a cookie after signing in once.
+// One shared token guards every route, the product media and the UI itself; only the sign-in form is open. The iOS app
+// and the laptop runner send it as a bearer, and a browser keeps it in a cookie after signing in once.
 const COOKIE = 'apartment_token';
 const encoder = new TextEncoder();
 
@@ -19,12 +19,6 @@ export const authorized = (request: Request, token: string) => {
 	const given = presented(request);
 	return given !== null && same(given, token);
 };
-
-// Photos, models and textures are product media, public on the listings anyway, and the iOS app's download cache
-// fetches them without headers.
-export const isPublic = (request: Request, path: string) =>
-	(request.method === 'GET' || request.method === 'HEAD') &&
-	(path.startsWith('/api/assets/') || /^\/api\/catalog\/[^/]+\/model\.usdz$/.test(path) || path === '/api/status');
 
 export async function signIn(request: Request, token: string) {
 	const form = await request.formData();

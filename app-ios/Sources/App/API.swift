@@ -209,11 +209,15 @@ enum API {
         try await send(URLRequest(url: baseURL.appending(path: path), timeoutInterval: 5))
     }
 
-    // Photos, models and textures are public; everything through here needs the token.
-    private static func send<T: Decodable>(_ request: URLRequest) async throws -> T {
+    // Every request needs the token, the photos, models and textures included.
+    static func authorized(_ request: URLRequest) -> URLRequest {
         var request = request
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        let (data, response) = try await URLSession.shared.data(for: request)
+        return request
+    }
+
+    private static func send<T: Decodable>(_ request: URLRequest) async throws -> T {
+        let (data, response) = try await URLSession.shared.data(for: authorized(request))
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard status == 200 else {
             let message = (try? JSONDecoder().decode(ServerError.self, from: data))?.error ?? "\(request.url!.path) returned \(status)"

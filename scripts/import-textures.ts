@@ -14,7 +14,7 @@ if (!urls.length) {
 	process.exit(1);
 }
 const auth = { authorization: `Bearer ${env.API_TOKEN}` };
-const status = await fetch(new URL('/api/status', env.SERVER_URL)).catch(() => null);
+const status = await fetch(new URL('/api/status', env.SERVER_URL), { headers: auth }).catch(() => null);
 if (!status?.ok) throw new Error(`The server at ${env.SERVER_URL} is not answering; start it with bun run dev`);
 
 // Queue whatever imported even when some pages failed, then report the failures.

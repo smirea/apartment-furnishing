@@ -2,12 +2,20 @@
 // from production when the local bucket lacks them.
 import env from '@repo/shared/env';
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { readEnv } from '../../../scripts/lib';
 
 if (!env.API_TOKEN) throw new Error('API_TOKEN is not set in .env.local: env-manager down');
 const PERSIST = '../../.wrangler/state';
 const PRODUCTION = 'https://apartment.stf.lol';
 
-writeFileSync('.dev.vars', `API_TOKEN=${env.API_TOKEN}\nASSETS_FALLBACK_URL=${PRODUCTION}\n`, { mode: 0o600 });
+// Production's media needs production's token, read from env-manager prod; without AWS access the fallback is off.
+let fallback = '';
+try {
+	fallback = `ASSETS_FALLBACK_URL=${PRODUCTION}\nASSETS_FALLBACK_TOKEN=${readEnv('prod').API_TOKEN}\n`;
+} catch (error) {
+	console.warn(`No production media in dev: ${error instanceof Error ? error.message : error}`);
+}
+writeFileSync('.dev.vars', `API_TOKEN=${env.API_TOKEN}\n${fallback}`, { mode: 0o600 });
 // The Worker serves the UI build; `bun run dev` serves the UI from Vite instead, so an empty folder will do.
 mkdirSync('../ui/build', { recursive: true });
 
