@@ -129,6 +129,8 @@ export async function generateCarpetTexture(carpet: Carpet) {
 		.json()
 		.catch(() => null);
 	if (typeof raw?.note !== 'string') throw new Error(`codex wrote no valid texture.json: ${JSON.stringify(raw)}`);
+	// Read before uploading, so a build of an item deleted meanwhile fails without leaving files behind.
+	const current = await carpets.read(carpet.id);
 	const outputs = { 'texture.png': 'carpet.png', 'build.py': 'carpet.py', 'preview.png': 'carpet-preview.png' };
 	await Promise.all(
 		Object.entries(outputs).map(async ([from, to]) =>
@@ -136,7 +138,7 @@ export async function generateCarpetTexture(carpet: Carpet) {
 		),
 	);
 	await carpets.put({
-		...(await carpets.read(carpet.id)),
+		...current,
 		// Cache-busting version: the path stays the same across rebuilds.
 		texture: { map: `/api/assets/${carpet.id}/carpet.png?v=${Date.now()}`, note: raw.note },
 	});

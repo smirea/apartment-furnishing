@@ -15,6 +15,7 @@ import { CarpetError, updateCarpet } from './carpets';
 import { db } from './db';
 import {
 	buildOption,
+	dropPicks,
 	FixtureError,
 	importOption,
 	isFixtureKey,
@@ -26,6 +27,7 @@ import {
 	selectOption,
 } from './fixtures';
 import { RunnerOffline, runImport, startBuild } from './jobs';
+import { clearAssets, deleteProduct } from './products';
 import { router } from './router';
 
 const { catalog, placements, textures, carpets } = db;
@@ -114,6 +116,16 @@ const api = router({
 			}
 		},
 	},
+	// After /import, which the :id pattern would match too.
+	'/api/catalog/:id': {
+		DELETE: async request => {
+			const { id } = request.params as { id: string };
+			if (!(await catalog.get(id))) return Response.json({ error: `No catalog item ${id}` }, { status: 404 });
+			await deleteProduct('item', id);
+			await dropPicks(id);
+			return Response.json({ ok: true });
+		},
+	},
 	'/api/catalog/:id/model.usdz': async request => serveAsset(request, `items/${request.params.id}/model.usdz`),
 	'/api/textures': {
 		GET: async () => {
@@ -150,6 +162,12 @@ const api = router({
 			} catch (error) {
 				return failure(error);
 			}
+		},
+		DELETE: async request => {
+			const { id } = request.params as { id: string };
+			if (!(await carpets.get(id))) return Response.json({ error: `No carpet ${id}` }, { status: 404 });
+			await deleteProduct('carpet', id);
+			return Response.json({ ok: true });
 		},
 	},
 	'/api/carpets/:id/build': {
@@ -311,11 +329,7 @@ const api = router({
 		DELETE: async request => {
 			const prefix = assetKey(new URL(request.url).searchParams.get('prefix') ?? '');
 			if (!prefix?.endsWith('/')) return new Response('Bad prefix', { status: 400 });
-			let page;
-			do {
-				page = await env.FILES.list({ prefix });
-				if (page.objects.length) await env.FILES.delete(page.objects.map(o => o.key));
-			} while (page.truncated);
+			await clearAssets(prefix);
 			return Response.json({ ok: true });
 		},
 	},

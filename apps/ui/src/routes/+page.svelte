@@ -166,10 +166,6 @@
 					await queryClient.invalidateQueries({ queryKey: [next.kind === 'wallTexture' ? 'textures' : 'catalog'] });
 				},
 			})),
-			remove: createMutation(() => ({
-				mutationFn: (id: string) => api<Fixture>(`/api/fixtures/${key}/options/${id}`, { method: 'DELETE' }),
-				onSuccess: storeFixture,
-			})),
 		};
 	}
 	const fixtureActions = Object.fromEntries(FIXTURE_KEYS.map(key => [key, fixtureMutations(key)])) as Record<
@@ -203,9 +199,15 @@
 	);
 	const applied = (t: WallTexture) => fixtures.wallTexture?.selected === t.id;
 	function clickSwatch(t: WallTextureEntry) {
-		if (t.texture && t.textureJob?.state !== 'failed')
-			fixtureActions.wallTexture.select.mutate(applied(t) ? null : t.id);
-		else if (!t.textureJob || t.textureJob.state === 'failed') fixtureActions.wallTexture.build.mutate(t.id);
+		if (t.texture && t.textureJob?.state !== 'failed') {
+			if (!applied(t)) fixtureActions.wallTexture.select.mutate(t.id);
+		} else if (!t.textureJob || t.textureJob.state === 'failed') fixtureActions.wallTexture.build.mutate(t.id);
+		openCard({ kind: 'option', key: 'wallTexture', id: t.id });
+	}
+	// Clicking the current pick only opens its card, which has the button to take it out.
+	function clickOption(f: Fixture, option: FixtureOption) {
+		if (option.ready && option.id !== f.selected) fixtureActions[f.key].select.mutate(option.id);
+		openCard({ kind: 'option', key: f.key, id: option.id });
 	}
 	type Product = {
 		name: string;
@@ -347,6 +349,121 @@
 	const selectedPlacement = $derived(placements.find(p => p.key === selectedKey) ?? null);
 	const selected = $derived(selectedPlacement ? catalog[selectedPlacement.itemId] : null);
 	const placedCount = (itemId: string) => placements.filter(p => p.itemId === itemId).length;
+
+	// A product opened from a list. Selecting in the plan replaces it, and opening one clears the plan's selection.
+	type Opened =
+		| { kind: 'item'; id: string }
+		| { kind: 'carpet'; id: string }
+		| { kind: 'option'; key: FixtureKey; id: string };
+	let opened = $state<Opened | null>(null);
+	function openCard(next: Opened) {
+		viewer?.select(null);
+		opened = next;
+		peek = null;
+	}
+	function closeCard() {
+		viewer?.select(null);
+		opened = null;
+	}
+	type Card =
+		| { kind: 'item'; item: CatalogEntry; placement: Placement | null; fixture: Fixture | null }
+		| { kind: 'carpet'; carpet: CarpetEntry }
+		| { kind: 'texture'; texture: WallTextureEntry; fixture: Fixture }
+		| { kind: 'tv'; option: FixtureOption; fixture: Fixture };
+	const card = $derived.by((): Card | null => {
+		if (selected && selectedPlacement)
+			return { kind: 'item', item: selected, placement: selectedPlacement, fixture: null };
+		if (selectedCarpet) return { kind: 'carpet', carpet: selectedCarpet };
+		const o = opened;
+		if (o?.kind === 'item') {
+			const item = catalog[o.id];
+			return item ? { kind: 'item', item, placement: null, fixture: null } : null;
+		}
+		if (o?.kind === 'carpet') {
+			const carpet = carpetList.find(c => c.id === o.id);
+			return carpet ? { kind: 'carpet', carpet } : null;
+		}
+		const fixture = o && fixtures[o.key];
+		const option = fixture?.options.find(x => x.id === o!.id);
+		if (!fixture || !option) return null;
+		if (fixture.kind === 'item') {
+			const item = catalog[option.id];
+			return item ? { kind: 'item', item, placement: null, fixture } : null;
+		}
+		if (fixture.kind === 'wallTexture') {
+			const texture = textureList.find(t => t.id === option.id);
+			return texture ? { kind: 'texture', texture, fixture } : null;
+		}
+		return { kind: 'tv', option, fixture };
+	});
+	const idOf = (c: Card) =>
+		c.kind === 'item'
+			? c.item.id
+			: c.kind === 'carpet'
+				? c.carpet.id
+				: c.kind === 'texture'
+					? c.texture.id
+					: c.option.id;
+	const cardId = $derived(card && idOf(card));
+
+	// What deleting the card's product also takes away, for the confirmation.
+	function deletion(c: Card): { name: string; path: string; also: string | null } {
+		const id = encodeURIComponent(idOf(c));
+		const option = (f: Fixture) => `/api/fixtures/${f.key}/options/${id}`;
+		if (c.kind === 'item') {
+			if (c.fixture)
+				return {
+					name: c.item.name,
+					path: option(c.fixture),
+					also: c.fixture.selected === c.item.id ? `The ${c.fixture.title.toLowerCase()} spot goes empty.` : null,
+				};
+			const n = placedCount(c.item.id);
+			return {
+				name: c.item.name,
+				path: `/api/catalog/${id}`,
+				also: n ? `The ${n === 1 ? 'one' : n} in the room ${n === 1 ? 'goes' : 'go'} too.` : null,
+			};
+		}
+		if (c.kind === 'carpet')
+			return {
+				name: c.carpet.name,
+				path: `/api/carpets/${id}`,
+				also: c.carpet.placement ? 'It comes off the floor too.' : null,
+			};
+		if (c.kind === 'texture')
+			return {
+				name: c.texture.name,
+				path: option(c.fixture),
+				also: applied(c.texture) ? 'The walls go back to paint.' : null,
+			};
+		return {
+			name: c.option.name,
+			path: option(c.fixture),
+			also: c.fixture.selected === c.option.id ? 'The TV stays up at this size.' : null,
+		};
+	}
+	const deleteMutation = createMutation(() => ({
+		mutationFn: ({ path }: { path: string; itemId: string | null }) => api(path, { method: 'DELETE' }),
+		onSuccess: async (_: unknown, { itemId }: { path: string; itemId: string | null }) => {
+			closeCard();
+			// The server dropped the item's placements; a save of one still pending would only fail.
+			if (itemId) {
+				for (const p of placements) if (p.itemId === itemId) unsaved.delete(p.key);
+				placements = placements.filter(p => p.itemId !== itemId);
+			}
+			await Promise.all(
+				['catalog', 'carpets', 'textures', 'fixtures'].map(key => queryClient.invalidateQueries({ queryKey: [key] })),
+			);
+		},
+	}));
+	function deleteCard(c: Card) {
+		const { name, path, also } = deletion(c);
+		if (
+			!confirm(`Delete ${name} for good?${also ? ` ${also}` : ''} Its photos and generated files are deleted with it.`)
+		)
+			return;
+		deleteMutation.mutate({ path, itemId: c.kind === 'item' ? c.item.id : null });
+	}
 	const inches = (n: number) => `${Math.round(n * 10) / 10}"`;
 	const money = (item: CatalogItem) =>
 		item.price === null ? null : item.price.toLocaleString('en-US', { style: 'currency', currency: item.currency });
@@ -562,18 +679,22 @@
 	}
 
 	function onKey(e: KeyboardEvent) {
-		if (!selection || mode !== 'orbit' || (e.target as HTMLElement).closest('input, textarea, select')) return;
-		if (e.key === 'Delete' || e.key === 'Backspace') {
+		if (mode !== 'orbit' || (e.target as HTMLElement).closest('input, textarea, select')) return;
+		if (e.key === 'Escape' && card) closeCard();
+		else if (selection && (e.key === 'Delete' || e.key === 'Backspace')) {
 			if (selectedCarpet) removeCarpet(selectedCarpet);
 			else removeSelected();
-		} else if (e.key === 'Escape') viewer?.select(null);
+		}
 	}
 
 	onMount(() => {
 		const v = createViewer(
 			container,
 			next => (mode = next),
-			next => (selection = next),
+			next => {
+				selection = next;
+				if (next) opened = null;
+			},
 			(key, position, rotation) => patchPlacement(key, { position, rotation }),
 			(id, placement) => void saveCarpet(id, { placement }),
 			state => (measure = state),
@@ -759,6 +880,7 @@
 										type="button"
 										class="swatch"
 										class:on-target={applied(t)}
+										class:open={t.id === cardId}
 										class:busy={t.textureJob?.state === 'queued' || t.textureJob?.state === 'running'}
 										class:failed={t.textureJob?.state === 'failed'}
 										style:background-image="url({t.texture?.map ?? t.image})"
@@ -779,7 +901,7 @@
 					{:else}
 						<ul>
 							{#if actions.import.isPending}
-								<li class="fixture-option">
+								<li class="product-row">
 									<span class="pick">
 										<span class="thumb"></span>
 										<span class="text">
@@ -791,8 +913,9 @@
 							{/if}
 							{#each f.options as option (option.id)}
 								<li
-									class="fixture-option"
+									class="product-row"
 									class:current={option.id === f.selected}
+									class:open={option.id === cardId}
 									{@attach peekOn(() => {
 										const product = optionProduct(f, option);
 										return product && { kind: 'product', product };
@@ -802,8 +925,7 @@
 										type="button"
 										class="pick"
 										aria-pressed={option.id === f.selected}
-										disabled={!option.ready}
-										onclick={() => actions.select.mutate(option.id === f.selected ? null : option.id)}
+										onclick={() => clickOption(f, option)}
 									>
 										{#if option.image}<img src={option.image} alt="" />{:else}<span class="thumb"></span>{/if}
 										<span class="text">
@@ -822,14 +944,6 @@
 									{:else if option.url}
 										<a href={option.url} target="_blank" rel="noreferrer" aria-label="Open {option.name} listing">↗</a>
 									{/if}
-									{#if f.removable && option.url}
-										<button
-											type="button"
-											class="remove"
-											aria-label="Remove {option.name}"
-											onclick={() => actions.remove.mutate(option.id)}>×</button
-										>
-									{/if}
 								</li>
 							{:else}
 								{#if !actions.import.isPending}
@@ -840,8 +954,8 @@
 					{/if}
 					{#if f.kind === 'item'}
 						<p class="muted">
-							Back flush to the wall, centered on its {round1(f.spot.span * 12)}″. Click one to switch to it, again to
-							clear the room.
+							Back flush to the wall, centered on its {round1(f.spot.span * 12)}″. Click one to switch to it and open
+							its details.
 						</p>
 					{/if}
 					<form
@@ -926,19 +1040,25 @@
 						{#if expanded}
 							<ul>
 								{#each items! as item (item.id)}
-									<li {@attach peekOn(() => ({ kind: 'product', product: itemProduct(item) }))}>
-										{#if item.image}<img src={item.image} alt="" />{:else}<span class="thumb"></span>{/if}
-										<div>
-											<strong>{item.name}</strong>
-											{#if item.modelJob?.state === 'running'}
-												<span class="status busy">Building 3D model · 2–5 min</span>
-											{:else if item.modelJob?.state === 'failed'}
-												<span class="status failed" title={item.modelJob.error}
-													>3D model failed · select it to retry</span
-												>
-											{/if}
-											<span class="muted">{furnitureFacts(item)}</span>
-										</div>
+									<li
+										class="product-row"
+										class:open={item.id === cardId}
+										{@attach peekOn(() => ({ kind: 'product', product: itemProduct(item) }))}
+									>
+										<button type="button" class="pick" onclick={() => openCard({ kind: 'item', id: item.id })}>
+											{#if item.image}<img src={item.image} alt="" />{:else}<span class="thumb"></span>{/if}
+											<span class="text">
+												<strong>{item.name}</strong>
+												{#if item.modelJob?.state === 'queued' || item.modelJob?.state === 'running'}
+													<span class="status busy">Building 3D model · 2–5 min</span>
+												{:else if item.modelJob?.state === 'failed'}
+													<span class="status failed" title={item.modelJob.error}
+														>3D model failed · open it to retry</span
+													>
+												{/if}
+												<span class="muted">{furnitureFacts(item)}</span>
+											</span>
+										</button>
 										<button type="button" onclick={() => addToRoom(item.id)}>Add</button>
 									</li>
 								{/each}
@@ -989,19 +1109,26 @@
 					{/if}
 					{#each carpetList as carpet (carpet.id)}
 						{@const thumb = carpet.texture?.map ?? carpet.image}
-						<li>
-							{#if thumb}<img src={thumb} alt="" />{:else}<span class="thumb"></span>{/if}
-							<div>
-								<strong>{carpet.name}</strong>
-								{#if carpet.textureJob?.state === 'queued' || carpet.textureJob?.state === 'running'}
-									<span class="status busy">Drawing the rug · 2–5 min</span>
-								{:else if carpet.textureJob?.state === 'failed'}
-									<span class="status failed" title={carpet.textureJob.error}>Image failed · select it to retry</span>
-								{/if}
-								<span class="muted">{carpetFacts(carpet)}</span>
-								<!-- A carpet out of the room has no card to open, so its row picks the size, say one that fits. -->
-								{#if !carpet.placement && carpet.sizes.length > 1}{@render sizePicker(carpet)}{/if}
-							</div>
+						<li class="product-row" class:open={carpet.id === cardId}>
+							<button
+								type="button"
+								class="pick"
+								onclick={() =>
+									carpet.placement
+										? viewer?.select({ kind: 'carpet', id: carpet.id })
+										: openCard({ kind: 'carpet', id: carpet.id })}
+							>
+								{#if thumb}<img src={thumb} alt="" />{:else}<span class="thumb"></span>{/if}
+								<span class="text">
+									<strong>{carpet.name}</strong>
+									{#if carpet.textureJob?.state === 'queued' || carpet.textureJob?.state === 'running'}
+										<span class="status busy">Drawing the rug · 2–5 min</span>
+									{:else if carpet.textureJob?.state === 'failed'}
+										<span class="status failed" title={carpet.textureJob.error}>Image failed · open it to retry</span>
+									{/if}
+									<span class="muted">{carpetFacts(carpet)}</span>
+								</span>
+							</button>
 							{#if carpet.placement}
 								<button type="button" onclick={() => removeCarpet(carpet)}>Remove</button>
 							{:else}
@@ -1089,137 +1216,232 @@
 		{/if}
 	{/if}
 
-	{#if selected && selectedPlacement}
+	{#if card}
+		{@const cardJob =
+			card.kind === 'item' ? card.item.modelJob : card.kind === 'carpet' ? card.carpet.textureJob : null}
 		<aside class="panel card">
-			<button type="button" class="close" aria-label="Close" onclick={() => viewer?.select(null)}>×</button>
-			{#if selected.image}<img src={selected.image} alt={selected.name} />{/if}
-			<h2>{selected.name}</h2>
-			<p class="meta">
-				{#if money(selected)}<strong>{money(selected)}</strong>{/if}
-				{#if selected.brand}<span>{selected.brand}</span>{/if}
-				<span>{mountLabel[selected.mount]}</span>
-			</p>
-			{#if selected.dimensions}
-				<p class="dims">
-					{inches(selected.dimensions.width)} W × {inches(selected.dimensions.height)} H × {inches(
-						selected.dimensions.depth,
-					)} D{#if selected.weightLb}
-						· {selected.weightLb} lb{/if}
+			<button type="button" class="close" aria-label="Close" onclick={closeCard}>×</button>
+			{#if card.kind === 'item'}
+				{@const item = card.item}
+				{@const placement = card.placement}
+				{@const fixture = card.fixture}
+				{#if item.image}<img src={item.image} alt={item.name} />{/if}
+				<h2>{item.name}</h2>
+				<p class="meta">
+					{#if money(item)}<strong>{money(item)}</strong>{/if}
+					{#if item.brand}<span>{item.brand}</span>{/if}
+					<span>{mountLabel[item.mount]}</span>
 				</p>
-				{#if selected.dimensionsNote}<p class="note">{selected.dimensionsNote}</p>{/if}
-			{/if}
+				{#if item.dimensions}
+					<p class="dims">
+						{inches(item.dimensions.width)} W × {inches(item.dimensions.height)} H × {inches(item.dimensions.depth)} D{#if item.weightLb}
+							· {item.weightLb} lb{/if}
+					</p>
+					{#if item.dimensionsNote}<p class="note">{item.dimensionsNote}</p>{/if}
+				{/if}
 
-			<div class="controls">
-				<div class="row">
-					<span>Turn</span>
-					<button type="button" onclick={() => rotate(-90)}>↺ 90°</button>
-					<button type="button" onclick={() => rotate(-15)}>−15°</button>
-					<button type="button" onclick={() => rotate(15)}>+15°</button>
-					<button type="button" onclick={() => rotate(90)}>↻ 90°</button>
+				<div class="controls">
+					{#if placement}
+						<div class="row">
+							<span>Turn</span>
+							<button type="button" onclick={() => rotate(-90)}>↺ 90°</button>
+							<button type="button" onclick={() => rotate(-15)}>−15°</button>
+							<button type="button" onclick={() => rotate(15)}>+15°</button>
+							<button type="button" onclick={() => rotate(90)}>↻ 90°</button>
+						</div>
+						<label class="row">
+							<span>Height off floor</span>
+							<input
+								type="number"
+								min="0"
+								max="100"
+								step="1"
+								value={Math.round(placement.position[1] * 12 * 10) / 10}
+								oninput={e => {
+									const [x, , z] = placement.position;
+									patchPlacement(placement.key, { position: [x, (Number(e.currentTarget.value) || 0) / 12, z] });
+								}}
+							/>
+							<span class="muted">in</span>
+						</label>
+						<div class="row">
+							<button type="button" onclick={() => addToRoom(item.id)}>Add another</button>
+							<button type="button" class="danger" onclick={removeSelected}>Remove from room</button>
+						</div>
+					{:else if fixture}
+						{@const picked = fixture.selected === item.id}
+						<div class="row">
+							<button
+								type="button"
+								class:danger={picked}
+								onclick={() => fixtureActions[fixture.key].select.mutate(picked ? null : item.id)}
+							>
+								{picked ? 'Take out of the room' : 'Put in the room'}
+							</button>
+						</div>
+					{:else}
+						<div class="row">
+							<button type="button" onclick={() => addToRoom(item.id)}>Add to room</button>
+							{#if placedCount(item.id)}<span class="muted">{placedCount(item.id)} in the room</span>{/if}
+						</div>
+					{/if}
 				</div>
-				<label class="row">
-					<span>Height off floor</span>
-					<input
-						type="number"
-						min="0"
-						max="100"
-						step="1"
-						value={Math.round(selectedPlacement.position[1] * 12 * 10) / 10}
-						oninput={e => {
-							const [x, , z] = selectedPlacement.position;
-							patchPlacement(selectedPlacement.key, { position: [x, (Number(e.currentTarget.value) || 0) / 12, z] });
-						}}
-					/>
-					<span class="muted">in</span>
-				</label>
-				<div class="row">
-					<button type="button" onclick={() => addToRoom(selected.id)}>Add another</button>
-					<button type="button" class="danger" onclick={removeSelected}>Remove from room</button>
-				</div>
-			</div>
 
-			<p class="model-status">
-				{#if selected.modelJob?.state === 'running'}
-					<span class="status busy"
-						>Codex is building a 3D model from the listing photos (2–5 min). Shown as a box until then.</span
-					>
-				{:else}
-					{#if selected.modelJob?.state === 'failed'}<span class="error"
-							>Model generation failed: {selected.modelJob.error}</span
+				<p class="model-status">
+					{#if cardJob?.state === 'queued' || cardJob?.state === 'running'}
+						<span class="status busy"
+							>Codex is building a 3D model from the listing photos (2–5 min). Shown as a box until then.</span
 						>
-					{:else if selected.modelSource === 'listing'}<span class="muted">3D model from the listing.</span>
-					{:else if selected.modelSource === 'generated'}<span class="muted"
-							>3D model approximated by Codex from the listing photos.</span
+					{:else}
+						{#if cardJob?.state === 'failed'}<span class="error">Model generation failed: {cardJob.error}</span>
+						{:else if item.modelSource === 'listing'}<span class="muted">3D model from the listing.</span>
+						{:else if item.modelSource === 'generated'}<span class="muted"
+								>3D model approximated by Codex from the listing photos.</span
+							>
+						{:else}<span class="muted">The listing has no 3D model.</span>{/if}
+						{#if item.modelSource !== 'listing'}
+							<button type="button" onclick={() => generateMutation.mutate(item.id)}>
+								{item.modelSource === 'generated' ? 'Regenerate' : 'Generate'} 3D model
+							</button>
+						{/if}
+					{/if}
+				</p>
+
+				<p>{item.summary}</p>
+				{#if item.highlights.length}
+					<ul>
+						{#each item.highlights as h (h)}<li>{h}</li>{/each}
+					</ul>
+				{/if}
+				<a href={item.url} target="_blank" rel="noreferrer">View on {host(item.url)} ↗</a>
+			{:else if card.kind === 'carpet'}
+				{@const c = card.carpet}
+				{#if c.texture ?? c.image}<img src={c.texture?.map ?? c.image} alt={c.name} />{/if}
+				<h2>{c.name}</h2>
+				<p class="meta">
+					{#if carpetPrice(c)}<strong>{carpetPrice(c)}</strong>{/if}
+					{#if c.brand}<span>{c.brand}</span>{/if}
+					<span>Carpet</span>
+				</p>
+
+				<div class="controls">
+					<label class="row">
+						<span>Size</span>
+						{@render sizePicker(c)}
+					</label>
+					{#if c.placement}
+						<div class="row">
+							<span>Turn</span>
+							<button type="button" onclick={() => turnCarpet(c, -90)}>↺ 90°</button>
+							<button type="button" onclick={() => turnCarpet(c, -15)}>−15°</button>
+							<button type="button" onclick={() => turnCarpet(c, 15)}>+15°</button>
+							<button type="button" onclick={() => turnCarpet(c, 90)}>↻ 90°</button>
+						</div>
+						<div class="row">
+							<button type="button" class="danger" onclick={() => removeCarpet(c)}>Remove from room</button>
+						</div>
+					{:else}
+						<div class="row">
+							<button type="button" onclick={() => addCarpet(c)}>Add to room</button>
+						</div>
+					{/if}
+					{#if carpetError}<p class="error">{carpetError}</p>{/if}
+				</div>
+
+				<p class="model-status">
+					{#if cardJob?.state === 'queued' || cardJob?.state === 'running'}
+						<span class="status busy"
+							>Codex is drawing the rug from the listing photos (2–5 min). Shown as a plain rug until then.</span
 						>
-					{:else}<span class="muted">The listing has no 3D model.</span>{/if}
-					{#if selected.modelSource !== 'listing'}
-						<button type="button" onclick={() => generateMutation.mutate(selected.id)}>
-							{selected.modelSource === 'generated' ? 'Regenerate' : 'Generate'} 3D model
+					{:else}
+						{#if cardJob?.state === 'failed'}<span class="error">Drawing the rug failed: {cardJob.error}</span>
+						{:else if c.texture}<span class="muted">{c.texture.note}</span>
+						{:else}<span class="muted">No image of the rug yet.</span>{/if}
+						<button type="button" onclick={() => carpetBuild.mutate(c.id)}>
+							{c.texture ? 'Redraw' : 'Draw'} the rug
 						</button>
 					{/if}
-				{/if}
-			</p>
+				</p>
 
-			<p>{selected.summary}</p>
-			{#if selected.highlights.length}
-				<ul>
-					{#each selected.highlights as h (h)}<li>{h}</li>{/each}
-				</ul>
+				<p>{c.summary}</p>
+				<a href={c.url} target="_blank" rel="noreferrer">View on {host(c.url)} ↗</a>
+			{:else if card.kind === 'texture'}
+				{@const t = card.texture}
+				{@const building = t.textureJob?.state === 'queued' || t.textureJob?.state === 'running'}
+				{#if t.texture}<span class="tip-swatch" style:background-image="url({t.texture.map})"></span>
+				{:else if t.image}<img src={t.image} alt={t.name} />{/if}
+				<h2>{t.name}</h2>
+				<div class="controls">
+					<div class="row">
+						{#if t.texture && !building}
+							<button
+								type="button"
+								class:danger={applied(t)}
+								onclick={() => fixtureActions.wallTexture.select.mutate(applied(t) ? null : t.id)}
+							>
+								{applied(t) ? 'Take off the walls' : 'Put on the TV wall and column'}
+							</button>
+						{/if}
+						{#if building}
+							<span class="status busy">Building texture · 2–5 min</span>
+						{:else}
+							<button type="button" onclick={() => fixtureActions.wallTexture.build.mutate(t.id)}>
+								{t.texture ? 'Rebuild' : 'Build'} texture
+							</button>
+						{/if}
+					</div>
+					{#if t.textureJob?.state === 'failed'}<p class="error">
+							Texture failed: {t.textureJob.error.slice(0, 300)}
+						</p>{/if}
+				</div>
+				{@render textureFacts(t)}
+			{:else}
+				{@const option = card.option}
+				{@const picked = card.fixture.selected === option.id}
+				<h2>{option.name}</h2>
+				<p class="meta"><span>{option.detail}</span></p>
+				<div class="controls">
+					<div class="row">
+						<button
+							type="button"
+							class:danger={picked}
+							onclick={() => fixtureActions[card.fixture.key].select.mutate(picked ? null : option.id)}
+						>
+							{picked ? 'Hide the TV' : 'Use this TV'}
+						</button>
+					</div>
+				</div>
+				{#if option.url}<a href={option.url} target="_blank" rel="noreferrer">View on {host(option.url)} ↗</a>{/if}
 			{/if}
-			<a href={selected.url} target="_blank" rel="noreferrer">View on {host(selected.url)} ↗</a>
-		</aside>
-	{/if}
-
-	{#if selectedCarpet}
-		{@const c = selectedCarpet}
-		<aside class="panel card">
-			<button type="button" class="close" aria-label="Close" onclick={() => viewer?.select(null)}>×</button>
-			{#if c.texture ?? c.image}<img src={c.texture?.map ?? c.image} alt={c.name} />{/if}
-			<h2>{c.name}</h2>
-			<p class="meta">
-				{#if carpetPrice(c)}<strong>{carpetPrice(c)}</strong>{/if}
-				{#if c.brand}<span>{c.brand}</span>{/if}
-				<span>Carpet</span>
-			</p>
-
-			<div class="controls">
-				<label class="row">
-					<span>Size</span>
-					{@render sizePicker(c)}
-				</label>
-				<div class="row">
-					<span>Turn</span>
-					<button type="button" onclick={() => turnCarpet(c, -90)}>↺ 90°</button>
-					<button type="button" onclick={() => turnCarpet(c, -15)}>−15°</button>
-					<button type="button" onclick={() => turnCarpet(c, 15)}>+15°</button>
-					<button type="button" onclick={() => turnCarpet(c, 90)}>↻ 90°</button>
-				</div>
-				<div class="row">
-					<button type="button" class="danger" onclick={() => removeCarpet(c)}>Remove from room</button>
-				</div>
-				{#if carpetError}<p class="error">{carpetError}</p>{/if}
-			</div>
-
-			<p class="model-status">
-				{#if c.textureJob?.state === 'queued' || c.textureJob?.state === 'running'}
-					<span class="status busy"
-						>Codex is drawing the rug from the listing photos (2–5 min). Shown as a plain rug until then.</span
-					>
-				{:else}
-					{#if c.textureJob?.state === 'failed'}<span class="error">Drawing the rug failed: {c.textureJob.error}</span>
-					{:else if c.texture}<span class="muted">{c.texture.note}</span>
-					{:else}<span class="muted">No image of the rug yet.</span>{/if}
-					<button type="button" onclick={() => carpetBuild.mutate(c.id)}>
-						{c.texture ? 'Redraw' : 'Draw'} the rug
+			{#if card.kind !== 'tv' || card.option.url}
+				<div class="delete">
+					<button type="button" class="danger" disabled={deleteMutation.isPending} onclick={() => deleteCard(card)}>
+						{deleteMutation.isPending ? 'Deleting…' : 'Delete'}
 					</button>
-				{/if}
-			</p>
-
-			<p>{c.summary}</p>
-			<a href={c.url} target="_blank" rel="noreferrer">View on {host(c.url)} ↗</a>
+					<span class="muted">From the catalog and the room, for good.</span>
+				</div>
+				{#if deleteMutation.isError}<p class="error">{deleteMutation.error.message}</p>{/if}
+			{/if}
 		</aside>
 	{/if}
 </div>
+
+{#snippet textureFacts(t: WallTextureEntry)}
+	<span>
+		{t.price === null ? 'No price' : t.price.toLocaleString('en-US', { style: 'currency', currency: t.currency })}
+		{#if t.panelsPerPack > 1}for {t.panelsPerPack} panels{/if}{#if t.brand}
+			· {t.brand}{/if}
+	</span>
+	{#if t.panel}
+		<span class="muted">Panel {t.panel.width}" × {t.panel.height}" × {t.panel.depth}"</span>
+		<span>TV wall: {estimate(t, 'tvWall')}</span>
+		<span>Column: {estimate(t, 'column')}</span>
+	{/if}
+	<p class="muted">{t.summary}</p>
+	{#if t.texture}<p class="note">{t.texture.note}</p>{/if}
+	{#if applied(t)}<span class="applied">On the TV wall and column</span>{/if}
+	<a href={t.url} target="_blank" rel="noreferrer">View on {host(t.url)} ↗</a>
+{/snippet}
 
 {#snippet sizePicker(c: CarpetEntry)}
 	{@const current = c.sizes.findIndex(s => s.widthIn === c.size.widthIn && s.lengthIn === c.size.lengthIn)}
@@ -1261,20 +1483,7 @@
 			{:else if !t.texture}
 				<span class="muted">No texture yet · click to build it</span>
 			{/if}
-			<span>
-				{t.price === null ? 'No price' : t.price.toLocaleString('en-US', { style: 'currency', currency: t.currency })}
-				{#if t.panelsPerPack > 1}for {t.panelsPerPack} panels{/if}{#if t.brand}
-					· {t.brand}{/if}
-			</span>
-			{#if t.panel}
-				<span class="muted">Panel {t.panel.width}" × {t.panel.height}" × {t.panel.depth}"</span>
-				<span>TV wall: {estimate(t, 'tvWall')}</span>
-				<span>Column: {estimate(t, 'column')}</span>
-			{/if}
-			<p class="muted">{t.summary}</p>
-			{#if t.texture}<p class="note">{t.texture.note}</p>{/if}
-			{#if applied(t)}<span class="applied">On the TV wall and column</span>{/if}
-			<a href={t.url} target="_blank" rel="noreferrer">View on {host(t.url)} ↗</a>
+			{@render textureFacts(t)}
 		{:else}
 			{@const p = peek.content.product}
 			{#if p.image}<img src={p.image} alt={p.name} />{/if}
@@ -1449,6 +1658,11 @@
 		border-color: var(--app-accent);
 	}
 
+	.swatch.open {
+		outline: 2px solid var(--app-panel-text);
+		outline-offset: 1px;
+	}
+
 	.swatch.busy::after,
 	.swatch.failed::after {
 		content: '';
@@ -1473,20 +1687,13 @@
 		background: color-mix(in srgb, var(--app-error) 55%, transparent);
 	}
 
-	.fixture-option .remove {
-		padding: 0 0.4rem;
-		border: none;
-		color: var(--app-muted);
-		font-size: 1.1rem;
-	}
-
-	.items li.fixture-option {
+	.items li.product-row {
 		grid-template-columns: 1fr;
 		grid-auto-columns: auto;
 		grid-auto-flow: column;
 	}
 
-	.fixture-option .pick {
+	.product-row .pick {
 		display: grid;
 		grid-template-columns: 3rem 1fr;
 		gap: 0.6rem;
@@ -1498,22 +1705,26 @@
 		text-align: left;
 	}
 
-	.fixture-option.current .pick {
+	.product-row.current .pick {
 		border-color: var(--app-accent);
 	}
 
-	.fixture-option .text {
+	.product-row.open .pick {
+		background: color-mix(in srgb, var(--app-accent) 14%, transparent);
+	}
+
+	.product-row .text {
 		display: grid;
 		min-width: 0;
 	}
 
-	.fixture-option .text strong {
+	.product-row .text strong {
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 
-	.fixture-option a {
+	.product-row a {
 		padding: 0 0.4rem;
 		color: var(--app-muted);
 		text-decoration: none;
@@ -1570,7 +1781,8 @@
 		background-size: 3rem auto;
 	}
 
-	.peek .applied {
+	.peek .applied,
+	.card .applied {
 		color: var(--app-accent);
 		font-weight: 600;
 	}
@@ -2022,6 +2234,14 @@
 
 	.card .note {
 		font-size: 0.75rem;
+	}
+
+	.card .delete {
+		display: flex;
+		gap: 0.6rem;
+		align-items: center;
+		padding-top: 0.6rem;
+		border-top: 1px solid var(--app-border);
 	}
 
 	.card .close {

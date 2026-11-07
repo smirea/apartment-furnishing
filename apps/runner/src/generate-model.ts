@@ -105,9 +105,11 @@ export async function generateModel(item: CatalogItem, log: (line: string) => vo
 	log(`codex: modeling ${item.id} from ${photos.length} photo(s) in ${work}`);
 	await runCodex(work, photos, await prompt(item, photos), ['model.glb', 'build.py']);
 	const size = await readDimensions(join(work, 'dimensions.json'));
+	// Read before uploading, so a build of an item deleted meanwhile fails without leaving files behind.
+	const current = await db.catalog.read(item.id);
 	await assets.put(`${item.id}/model.py`, await Bun.file(join(work, 'build.py')).text());
 	const model = await uploadModel(item.id, await Bun.file(join(work, 'model.glb')).bytes());
-	const updated: CatalogItem = { ...(await db.catalog.read(item.id)), ...size, model, modelSource: 'generated' };
+	const updated: CatalogItem = { ...current, ...size, model, modelSource: 'generated' };
 	await db.catalog.put(updated);
 	log(`codex: ${item.id} done, ${JSON.stringify(size)} (${work})`);
 	return updated;

@@ -179,6 +179,8 @@ export async function generateTexture(texture: WallTexture, log: (line: string) 
 	log(`codex: texturing ${texture.id} from ${photos.length} photo(s) in ${work}`);
 	await runCodex(work, photos, await prompt(texture, photos), ['texture.png', 'normal.png', 'build.py', 'preview.png']);
 	const size = await readRepeat(join(work, 'texture.json'));
+	// Read before uploading, so a build of an item deleted meanwhile fails without leaving files behind.
+	const current = await textures.read(texture.id);
 	const outputs = {
 		'texture.png': 'texture.png',
 		'normal.png': 'texture-normal.png',
@@ -193,7 +195,7 @@ export async function generateTexture(texture: WallTexture, log: (line: string) 
 	// Cache-busting version: the paths stay the same across regenerations.
 	const v = Date.now();
 	await textures.put({
-		...(await textures.read(texture.id)),
+		...current,
 		texture: {
 			map: `/api/assets/${texture.id}/texture.png?v=${v}`,
 			normalMap: `/api/assets/${texture.id}/texture-normal.png?v=${v}`,

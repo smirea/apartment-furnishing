@@ -14,6 +14,7 @@ import {
 import { DEFAULT_TV, tvDiagonal, type CatalogItem, type Job, type TvSettings } from '@repo/shared/items';
 import { db } from './db';
 import { runImport, startBuild } from './jobs';
+import { deleteProduct } from './products';
 
 const { catalog, textures, tvs } = db;
 
@@ -64,7 +65,8 @@ type Source = {
 	import(url: string): Promise<string>;
 	// Restarts a failed or missing model or texture build.
 	build?(id: string): Promise<void>;
-	remove?(id: string): Promise<void>;
+	// Deletes the option everywhere: see deleteProduct.
+	remove(id: string): Promise<void>;
 	extra?(): Promise<Pick<Fixture, 'tv'>>;
 };
 
@@ -114,6 +116,7 @@ function itemSource(key: FixtureKey, category: string, spot: WallSpot): Source {
 			return item.id;
 		},
 		build: async id => void (await startBuild('buildModel', (await catalog.read(id)).id)),
+		remove: id => deleteProduct('item', id),
 	};
 }
 
@@ -165,7 +168,7 @@ const tvSource: Source = {
 		if (model) await picks.patch({ tv: model.id });
 	},
 	import: url => runImport('importTv', url),
-	remove: id => tvs.remove(id),
+	remove: id => deleteProduct('tv', id),
 	extra: async () => ({ tv: await tvSettings.get() }),
 };
 
@@ -196,6 +199,7 @@ const wallTextureSource: Source = {
 		return texture.id;
 	},
 	build: async id => void (await startBuild('buildTexture', (await textures.read(id)).id)),
+	remove: id => deleteProduct('texture', id),
 };
 
 const SOURCES: Record<FixtureKey, Source> = Object.fromEntries(
@@ -221,7 +225,7 @@ export async function readFixture(key: FixtureKey): Promise<Fixture> {
 		key,
 		// A pick whose option was deleted since reads as nothing picked.
 		selected: options.some(o => o.id === selected) ? selected : null,
-		removable: !!source.remove,
+		removable: true,
 		options,
 		...(await source.extra?.()),
 	};
@@ -260,7 +264,17 @@ export async function buildOption(key: FixtureKey, id: string) {
 }
 
 export async function removeOption(key: FixtureKey, id: string) {
-	const { remove } = SOURCES[key];
-	if (!remove) throw new FixtureError(`${FIXTURES[key].title} options can't be removed`);
-	await remove(id);
+	const option = (await SOURCES[key].options()).find(o => o.id === id);
+	if (!option) throw new FixtureError(`${FIXTURES[key].title} has no option ${id}`);
+	if (!option.url) throw new FixtureError(`${option.name} isn't an imported product`);
+	await SOURCES[key].remove(id);
+	await dropPicks(id);
+}
+
+// A pick naming a deleted product already reads as nothing picked, but would come back if the same link were imported
+// again under the same id.
+export async function dropPicks(id: string) {
+	const current = await picks.get();
+	const stale = FIXTURE_KEYS.filter(key => current[key] === id);
+	if (stale.length) await picks.patch(Object.fromEntries(stale.map(key => [key, null])));
 }
