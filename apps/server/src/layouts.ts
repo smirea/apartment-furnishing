@@ -73,6 +73,31 @@ export async function createLayout(name: string, from: string | null) {
 	return id;
 }
 
+// Products only this layout had in its room stay in the catalog for the others. Deleting the active layout makes the
+// oldest one left active.
+export async function deleteLayout(id: string) {
+	const { active: current, layouts } = await listLayouts();
+	await existing(id);
+	const next = layouts.find(l => l.id !== id);
+	if (!next) throw new LayoutError('The last layout cannot be deleted');
+	await db.sql([
+		statement('DELETE FROM placements WHERE layoutId = ?1', id),
+		statement('DELETE FROM layout_carpets WHERE layoutId = ?1', id),
+		statement('DELETE FROM layout_hidden WHERE layoutId = ?1', id),
+		statement(`DELETE FROM settings WHERE key IN ('fixtures:' || ?1, 'tv:' || ?1)`, id),
+		statement('DELETE FROM layouts WHERE id = ?1', id),
+		...(current === id
+			? [
+					statement(
+						'INSERT INTO settings (key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = ?2',
+						'layout',
+						JSON.stringify(next.id),
+					),
+				]
+			: []),
+	]);
+}
+
 // The pick of every fixture but the TV, whose size and mount live in the layout's `tv` setting.
 export const picksOf = (layout: string) =>
 	db.setting<Partial<Record<FixtureKey, string | null>>>(`fixtures:${layout}`, () => ({}));

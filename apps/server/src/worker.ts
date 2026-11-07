@@ -29,6 +29,7 @@ import { RunnerOffline, runImport, startBuild } from './jobs';
 import {
 	carpetStates,
 	createLayout,
+	deleteLayout,
 	hiddenIn,
 	layoutOf,
 	LayoutError,
@@ -114,6 +115,13 @@ const api = router({
 			const { id } = await body<{ id: unknown }>(request);
 			if (typeof id !== 'string') return Response.json({ error: 'Expected a layout id' }, { status: 400 });
 			await setActive(id);
+			return Response.json(await listLayouts());
+		},
+	},
+	// After /active, which the :id pattern would match too.
+	'/api/layouts/:id': {
+		DELETE: async request => {
+			await deleteLayout(request.params.id!);
 			return Response.json(await listLayouts());
 		},
 	},

@@ -912,6 +912,24 @@
 			switchLayout(list.active);
 		},
 	}));
+	const deleteLayout = createMutation(() => ({
+		// The plan moves to the layout the server will make active before the delete, so its polls never ask for a layout
+		// that is gone. Edits still pending are saved to the old one first.
+		onMutate: (id: string) => switchLayout(layoutList.find(l => l.id !== id)!.id),
+		mutationFn: async (id: string) => {
+			await flushEdits();
+			return api<LayoutList>(`/api/layouts/${encodeURIComponent(id)}`, { method: 'DELETE' }, null);
+		},
+		onSuccess: (list: LayoutList) => {
+			queryClient.setQueryData(['layouts'], list);
+			switchLayout(list.active);
+		},
+	}));
+	function confirmDeleteLayout() {
+		const current = layoutList.find(l => l.id === layout);
+		if (current && confirm(`Delete the layout ${current.name}? Its room, picks and carpets go with it.`))
+			deleteLayout.mutate(current.id);
+	}
 	const focusAndSelect: Attachment<HTMLInputElement> = el => {
 		el.focus();
 		el.select();
@@ -1000,6 +1018,20 @@
 <div class="left panel">
 	<header class="hud">
 		<div class="layouts">
+			<button
+				type="button"
+				class="icon"
+				aria-label="Delete layout"
+				title={layoutList.length > 1 ? 'Delete layout' : 'The last layout cannot be deleted'}
+				disabled={layoutList.length < 2 || !!naming || deleteLayout.isPending}
+				onclick={confirmDeleteLayout}
+			>
+				<svg viewBox="0 0 16 16" aria-hidden="true"
+					><path
+						d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.1a1 1 0 0 0 1 .9h4.6a1 1 0 0 0 1-.9L12 4M6.75 6.5v5M9.25 6.5v5"
+					/></svg
+				>
+			</button>
 			{#if naming}
 				<input
 					type="text"
@@ -1050,6 +1082,7 @@
 			</button>
 		</div>
 		{#if createLayout.isError}<p class="error">{createLayout.error.message}</p>{/if}
+		{#if deleteLayout.isError}<p class="error">{deleteLayout.error.message}</p>{/if}
 		{#if activateLayout.isError}<p class="error">{activateLayout.error.message}</p>{/if}
 		{#if layoutsQuery.isError}<p class="error">{layoutsQuery.error.message}</p>{/if}
 		<button type="button" class="primary" onclick={() => viewer?.setMode(mode === 'orbit' ? 'walk' : 'orbit')}>
