@@ -42,7 +42,7 @@ import {
 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
-import { CSS2DObject, CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
+import { CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import {
 	CEILING_FT,
 	columns,
@@ -117,8 +117,7 @@ export function createViewer(
 
 	const wallGroup = new Group();
 	const ceilingGroup = new Group();
-	const labelGroup = new Group();
-	scene.add(wallGroup, ceilingGroup, labelGroup);
+	scene.add(wallGroup, ceilingGroup);
 	const colliders: Box[] = [];
 	// Snap targets: wall faces for flush placement, fixture tops (counters, vanities) for surface items.
 	const wallBoxes: Box[] = [];
@@ -146,15 +145,6 @@ export function createViewer(
 	for (const room of rooms) {
 		const mat = new MeshStandardMaterial({ color: floorColors[room.floor], roughness: 0.8 });
 		addBox(scene, room.rect, -0.1, 0.1, mat);
-		if (!room.name) continue;
-		const el = document.createElement('div');
-		el.className = 'room-label';
-		el.textContent = room.name;
-		if (room.size) el.append(Object.assign(document.createElement('small'), { textContent: room.size }));
-		const label = new CSS2DObject(el);
-		const [x1, z1, x2, z2] = room.rect.map(ft);
-		label.position.set((x1! + x2!) / 2, 0.3, (z1! + z2!) / 2);
-		labelGroup.add(label);
 	}
 
 	const plaster = new MeshStandardMaterial({ color: 0xf1efea, roughness: 0.95 });
@@ -244,15 +234,25 @@ export function createViewer(
 		}
 	}
 
-	const doorMat = new MeshStandardMaterial({ color: 0xfafaf7, roughness: 0.7 });
+	const doorMat = new MeshStandardMaterial({ color: 0x9a9ea3, roughness: 0.7 });
 	const doorLeaves = doors.map(door => door.map(ft) as Segment);
+	// Measuring reads this list on every step, so hidden doors stop blocking a measurement too.
+	const doorObstacles = [...doorLeaves];
+	const doorGroup = new Group();
+	wallGroup.add(doorGroup);
 	for (const [hx, hy, ex, ey] of doors) {
 		const length = ft(Math.hypot(ex - hx, ey - hy));
 		const mesh = new Mesh(new BoxGeometry(length, 7, 0.15), doorMat);
 		mesh.position.set(ft((hx + ex) / 2), 3.5, ft((hy + ey) / 2));
 		mesh.rotation.y = -Math.atan2(ey - hy, ex - hx);
-		wallGroup.add(mesh);
+		doorGroup.add(mesh);
 		cutawayWalls.push({ mesh, fullHeight: 7, y: 0, glass: false });
+	}
+	// Hidden doors come out of the scene rather than turning invisible, since clicks would still hit an invisible one.
+	function setDoors(shown: boolean) {
+		if (shown) wallGroup.add(doorGroup);
+		else doorGroup.removeFromParent();
+		doorObstacles.splice(0, doorObstacles.length, ...(shown ? doorLeaves : []));
 	}
 
 	// Walking treats the column as its bounding square; measuring uses the true circle.
@@ -932,7 +932,7 @@ export function createViewer(
 		{
 			boxes: colliders.filter(b => !columnBoxes.has(b)),
 			circles: columns.map(c => ({ x: ft(c.x), z: ft(c.y), r: ft(c.r) })),
-			segments: doorLeaves,
+			segments: doorObstacles,
 		},
 		onMeasure,
 	);
@@ -987,7 +987,6 @@ export function createViewer(
 
 	let mode: Mode = 'orbit';
 	let cutaway = true;
-	let labels = false;
 
 	function applyHeights() {
 		const low = mode === 'orbit' && cutaway;
@@ -1000,7 +999,6 @@ export function createViewer(
 			w.onHeight?.(target);
 		}
 		ceilingGroup.visible = mode === 'walk';
-		labelGroup.visible = mode === 'orbit' && labels;
 	}
 
 	function setMode(next: Mode) {
@@ -1019,11 +1017,6 @@ export function createViewer(
 		}
 		applyHeights();
 		onMode(next);
-	}
-
-	function setLabels(value: boolean) {
-		labels = value;
-		applyHeights();
 	}
 
 	function setCutaway(value: boolean) {
@@ -1135,7 +1128,7 @@ export function createViewer(
 	return {
 		setMode,
 		setCutaway,
-		setLabels,
+		setDoors,
 		setPlacements,
 		setCarpets,
 		setTv,

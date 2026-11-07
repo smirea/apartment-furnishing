@@ -46,7 +46,7 @@
 	const OPTIONS_KEY = 'viewer-options';
 	const saved = JSON.parse(localStorage.getItem(OPTIONS_KEY) ?? '{}');
 	let cutaway = $state<boolean>(saved.cutaway ?? true);
-	let labels = $state<boolean>(saved.labels ?? false);
+	let doors = $state<boolean>(saved.doors ?? true);
 	let open = $state<Record<FixtureKey | 'furniture' | 'wall' | 'carpets' | 'ideas', boolean>>({
 		furniture: true,
 		wall: true,
@@ -1078,7 +1078,7 @@
 	});
 
 	$effect(() => viewer?.setCutaway(cutaway));
-	$effect(() => viewer?.setLabels(labels));
+	$effect(() => viewer?.setDoors(doors));
 	$effect(() => {
 		if (viewer && tv) viewer.setTv($state.snapshot(tv));
 	});
@@ -1097,7 +1097,7 @@
 		const id = fixtures.wallTexture?.selected;
 		viewer?.setWallTexture(textureList.find(t => t.id === id) ?? null);
 	});
-	$effect(() => localStorage.setItem(OPTIONS_KEY, JSON.stringify({ cutaway, labels, open, collapsedGroups })));
+	$effect(() => localStorage.setItem(OPTIONS_KEY, JSON.stringify({ cutaway, doors, open, collapsedGroups })));
 </script>
 
 <svelte:window onkeydown={onKey} />
@@ -1194,7 +1194,7 @@
 		{#if mode === 'orbit'}
 			<div class="toggles">
 				<label><input type="checkbox" bind:checked={cutaway} /> Cutaway walls</label>
-				<label><input type="checkbox" bind:checked={labels} /> Room labels</label>
+				<label><input type="checkbox" bind:checked={doors} /> Render doors</label>
 			</div>
 		{:else}
 			<p class="help">WASD or arrows to move, mouse to look, click to inspect, Shift to run, Esc to exit.</p>
@@ -2580,23 +2580,6 @@
 	.card a {
 		color: var(--app-accent);
 		font-weight: 600;
-	}
-
-	:global(.room-label) {
-		display: grid;
-		justify-items: center;
-		padding: 0.15rem 0.4rem;
-		border-radius: 0.25rem;
-		background: rgb(0 0 0 / 0.55);
-		color: #fff;
-		font-size: 0.7rem;
-		font-weight: 600;
-		white-space: nowrap;
-	}
-
-	:global(.room-label small) {
-		font-weight: 400;
-		opacity: 0.75;
 	}
 
 	@media (max-width: 640px) {
