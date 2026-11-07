@@ -138,8 +138,17 @@ struct TVSettings: Codable, Equatable {
 private struct ServerError: Decodable { let error: String }
 
 enum API {
-    // The laptop's server over the tailnet. Override with `defaults write com.stefan.apartment-ar serverURL <url>`.
-    static let baseURL = URL(string: UserDefaults.standard.string(forKey: "serverURL") ?? "http://stefans-macbook-pro.tailff2195.ts.net:6161")!
+    // apartment.stf.lol and its token, built in from Config/App.xcconfig. A simulator on a local `bun run dev` overrides
+    // both: `defaults write com.stefan.apartment-ar serverURL <url>` and `defaults write com.stefan.apartment-ar apiToken <token>`.
+    static let baseURL = URL(string: UserDefaults.standard.string(forKey: "serverURL") ?? setting("APIURL"))!
+    private static let token = UserDefaults.standard.string(forKey: "apiToken") ?? setting("APIToken")
+
+    private static func setting(_ key: String) -> String {
+        guard let value = Bundle.main.object(forInfoDictionaryKey: key) as? String, !value.isEmpty else {
+            preconditionFailure("\(key) is missing from the build. Run `bun run env:ios` at the repo root, then rebuild.")
+        }
+        return value
+    }
 
     static func plan() async throws -> Plan { try await get("api/plan") }
     static func catalog() async throws -> [CatalogItem] { try await get("api/catalog") }
@@ -151,7 +160,7 @@ enum API {
         try await send(json(["selected": option ?? NSNull()], "PUT", "api/fixtures/\(fixture)", timeout: 10))
     }
 
-    // Reading the page and a grok call take about a minute.
+    // The laptop reads the page and calls grok, which takes about a minute.
     static func importOption(_ fixture: String, url: String) async throws -> Fixture {
         try await send(json(["url": url], "POST", "api/fixtures/\(fixture)/import", timeout: 240))
     }
@@ -200,7 +209,10 @@ enum API {
         try await send(URLRequest(url: baseURL.appending(path: path), timeoutInterval: 5))
     }
 
+    // Photos, models and textures are public; everything through here needs the token.
     private static func send<T: Decodable>(_ request: URLRequest) async throws -> T {
+        var request = request
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         let (data, response) = try await URLSession.shared.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
         guard status == 200 else {

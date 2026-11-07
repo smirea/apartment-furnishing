@@ -20,4 +20,4 @@
 - Edit SwiftUI code and resources in `Sources/App`; Xcode picks up new files automatically. Open `App.xcodeproj` and use the shared `App` scheme for debugging.
 - Build errors leave the watcher running; fix the error and save again. Build output is in `DerivedData/device/build.log`, or `DerivedData/simulator/build.log`.
 - Compile check: `xcodebuild -quiet -project App.xcodeproj -scheme App -destination 'generic/platform=iOS' -derivedDataPath DerivedData/check -allowProvisioningUpdates build`.
-- The simulator build points at the laptop's tailnet URL by default. Point it at your worktree's server with `xcrun simctl spawn <udid> defaults write com.stefan.apartment-ar serverURL http://127.0.0.1:<PORT>` (`PORT` from the root `.env.local`).
+- Builds point at production, https://apartment.stf.lol, with the token `bun run env:ios` writes to the git-ignored `Config/LocalSecrets.xcconfig` (`./scripts/run` writes it when missing). Point a simulator at your worktree's `bun run dev` with `xcrun simctl spawn <udid> defaults write com.stefan.apartment-ar serverURL http://127.0.0.1:<PORT>` and `... apiToken <API_TOKEN>`, both from the root `.env.local`.

@@ -20,7 +20,13 @@ build
 
 # other
 .DS_Store
-data/items/*/model.usdz
 
-# local data; worktrees copy it from the main checkout in worktree:setup
-data/app.db*
+# The SQLite database and item files from before D1 and R2, kept on the laptop as a backup
+data/
+
+# Cloudflare: local D1 and R2 state, and the dev Worker's secrets written by apps/server/scripts/dev.ts
+.wrangler
+.dev.vars
+
+# rendered from ideas/ by scripts/build-ideas.ts
+apps/ui/static/ideas

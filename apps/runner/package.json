@@ -1,0 +1,13 @@
+{
+	"name": "@repo/runner",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "bun --env-file=../../.env --env-file=../../.env.local --watch src/index.ts",
+		"start": "bun --env-file=../../.env --env-file=../../.env.local src/index.ts",
+		"typecheck": "bun check"
+	},
+	"dependencies": {
+		"@repo/shared": "workspace:*"
+	}
+}

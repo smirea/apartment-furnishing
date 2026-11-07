@@ -2,18 +2,16 @@
 	"name": "@repo/server",
 	"private": true,
 	"type": "module",
-	"exports": {
-		".": "./src/index.ts",
-		"./package.json": "./package.json"
-	},
 	"scripts": {
-		"build": "bun build src/index.ts --target bun --outdir dist",
-		"dev": "bun --env-file=../../.env --env-file=../../.env.local --watch src/index.ts",
-		"start": "bun --env-file=../../.env --env-file=../../.env.local src/index.ts",
+		"dev": "bun --env-file=../../.env --env-file=../../.env.local scripts/dev.ts",
+		"deploy": "wrangler d1 migrations apply apartment-furnishing --remote && wrangler deploy",
+		"types": "wrangler types --strict-vars=false",
 		"typecheck": "bun check"
 	},
 	"dependencies": {
-		"@repo/shared": "workspace:*",
-		"es-toolkit": "^1.52.0"
+		"@repo/shared": "workspace:*"
+	},
+	"devDependencies": {
+		"wrangler": "^4.158.0"
 	}
 }
