@@ -53,5 +53,5 @@ async function deleteProduct(kind: ProductKind, id: string) {
 		id,
 		(await listLayouts()).layouts.map(l => l.id),
 	);
-	if (kind !== 'tv') await clearAssets(`items/${id}/`);
+	await clearAssets(`items/${id}/`);
 }

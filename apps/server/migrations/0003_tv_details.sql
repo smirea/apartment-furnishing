@@ -1,0 +1,4 @@
+ALTER TABLE tv_models ADD COLUMN brand TEXT;
+ALTER TABLE tv_models ADD COLUMN price REAL;
+ALTER TABLE tv_models ADD COLUMN currency TEXT NOT NULL DEFAULT 'USD';
+ALTER TABLE tv_models ADD COLUMN image TEXT;

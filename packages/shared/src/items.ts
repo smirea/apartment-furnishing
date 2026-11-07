@@ -131,4 +131,16 @@ export const DEFAULT_TV: TvSettings = {
 };
 
 // A TV whose size was read off a product page, kept so the TV panel can switch between candidates.
-export type TvModel = { id: string; url: string; importedAt: string; name: string; widthIn: number; heightIn: number };
+export type TvModel = {
+	id: string;
+	url: string;
+	importedAt: string;
+	name: string;
+	brand: string | null;
+	price: number | null;
+	currency: string;
+	// Served by the API under /api/assets/<id>/, like catalog photos.
+	image: string | null;
+	widthIn: number;
+	heightIn: number;
+};

@@ -1535,6 +1535,7 @@
 			{:else}
 				{@const option = card.option}
 				{@const picked = card.fixture.selected === option.id}
+				{#if option.image}<img src={option.image} alt={option.name} />{/if}
 				<h2>{option.name}</h2>
 				<p class="meta"><span>{option.detail}</span></p>
 				<div class="controls">
