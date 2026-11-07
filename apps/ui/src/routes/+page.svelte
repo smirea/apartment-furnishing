@@ -1764,21 +1764,24 @@
 		position: relative;
 		aspect-ratio: 1;
 		padding: 0;
-		border: 2px solid transparent;
+		border: none;
 		border-radius: 0.3rem;
 		background-color: #fff;
 		background-position: center;
 		background-repeat: repeat;
-		box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.25);
 	}
 
-	.swatch.on-target {
-		border-color: var(--app-accent);
-	}
-
-	.swatch.open {
+	/* Outlines sit outside the square, so a picked or open swatch keeps its full image. */
+	.swatch.open,
+	.tile.open .face {
 		outline: 2px solid var(--app-panel-text);
-		outline-offset: 1px;
+		outline-offset: 2px;
+	}
+
+	.swatch.on-target,
+	.tile.on .face {
+		outline: 2px solid var(--app-accent);
+		outline-offset: 2px;
 	}
 
 	.swatch.busy::after,
@@ -1786,7 +1789,7 @@
 		content: '';
 		position: absolute;
 		inset: 0;
-		border-radius: 0.2rem;
+		border-radius: 0.3rem;
 		background: rgb(0 0 0 / 0.45);
 	}
 
@@ -1822,8 +1825,8 @@
 		width: 100%;
 		height: 100%;
 		overflow: hidden;
-		padding: 0.3rem;
-		border: 2px solid transparent;
+		padding: 0;
+		border: none;
 		border-radius: 0.4rem;
 		background-color: #fff;
 		background-position: center;
@@ -1833,26 +1836,18 @@
 	.tile img {
 		width: 100%;
 		height: 100%;
-		object-fit: contain;
+		object-fit: cover;
 	}
 
 	.tile .name {
 		overflow: hidden;
+		padding: 0.3rem;
 		color: #1c1f24;
 		font-size: 0.7rem;
 		font-weight: 600;
 		line-height: 1.2;
 		text-align: center;
 		overflow-wrap: anywhere;
-	}
-
-	.tile.on .face {
-		border-color: var(--app-accent);
-	}
-
-	.tile.open .face {
-		outline: 2px solid var(--app-panel-text);
-		outline-offset: 1px;
 	}
 
 	.tile.busy .face::after,
