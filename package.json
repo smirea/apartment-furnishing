@@ -8,7 +8,7 @@
 	"type": "module",
 	"scripts": {
 		"build": "bun --filter @repo/ui build",
-		"dev": "concurrently --raw -k -s first -n server,ui,runner \"bun --filter @repo/server dev\" \"bun --filter @repo/ui dev --host 127.0.0.1\" \"bun --filter @repo/runner dev\"",
+		"dev": "concurrently --raw -k -s first \"bun run --cwd apps/server dev\" \"bun run --cwd apps/ui dev --host 127.0.0.1\" \"bun run --cwd apps/runner dev\"",
 		"format": "oxfmt --write .",
 		"import": "bun scripts/import-item.ts",
 		"import-textures": "bun scripts/import-textures.ts",
