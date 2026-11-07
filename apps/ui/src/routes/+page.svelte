@@ -1016,6 +1016,7 @@
 <div class="viewer" bind:this={container}></div>
 
 <div class="left panel">
+	{#if import.meta.env.DEV}<p class="dev-band">local dev database</p>{/if}
 	<header class="hud">
 		<div class="layouts">
 			<button
@@ -1697,6 +1698,19 @@
 
 	.left > * {
 		flex-shrink: 0;
+	}
+
+	/* Pinned while the panel scrolls, so a change made here is never mistaken for one made in production. */
+	.left > .dev-band {
+		position: sticky;
+		top: 0;
+		z-index: 1;
+		margin: 0;
+		padding: 0.3rem 0.75rem;
+		background: #b45309;
+		color: #fff;
+		font-weight: 600;
+		text-align: center;
 	}
 
 	.hud {
