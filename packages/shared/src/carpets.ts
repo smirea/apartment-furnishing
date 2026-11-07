@@ -19,18 +19,18 @@ export type Carpet = {
 	brand: string | null;
 	currency: string;
 	summary: string;
-	// Every size the listing sells, smallest first; `size` is the one shown in the room.
+	// Every size the listing sells, smallest first; `size` is the one the listing had selected, which a layout starts
+	// from.
 	sizes: CarpetSize[];
 	size: CarpetSize;
 	image: string | null;
 	// The whole rug seen straight down, image width along the rug's width and height along its length, stretched over
 	// whichever size is picked.
 	texture: { map: string; note: string } | null;
-	// Null while the carpet is out of the room.
-	placement: CarpetPose | null;
 };
 
-export type CarpetEntry = Carpet & { textureJob: Job | null };
+// What GET /api/carpets returns: the size the layout shows it at, and where it lies, null while out of the room.
+export type CarpetEntry = Carpet & { placement: CarpetPose | null; textureJob: Job | null };
 
 export const sizeLabel = ({ widthIn, lengthIn }: Pick<CarpetSize, 'widthIn' | 'lengthIn'>) => {
 	const feet = (n: number) => {

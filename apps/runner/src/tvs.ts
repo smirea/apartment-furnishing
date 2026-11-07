@@ -1,6 +1,7 @@
 // TV candidates: a pasted product link only yields the TV's name and screen size, which the TV panel can switch to.
+import { productKey } from '@repo/shared/layouts';
 import { tvSize, type TvModel } from '@repo/shared/items';
-import { fetchPages, grokStructured, pageContext, productKey, slug } from './catalog';
+import { fetchPages, grokStructured, pageContext, slug } from './catalog';
 import { db } from './remote';
 
 const { tvs } = db;

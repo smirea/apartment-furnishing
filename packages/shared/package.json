@@ -8,6 +8,7 @@
 		"./items": "./src/items.ts",
 		"./fixtures": "./src/fixtures.ts",
 		"./carpets": "./src/carpets.ts",
+		"./layouts": "./src/layouts.ts",
 		"./floorplan": "./src/floorplan.ts",
 		"./plan": "./src/plan.ts",
 		"./obstacles": "./src/obstacles.ts",

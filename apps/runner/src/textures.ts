@@ -1,10 +1,11 @@
 // Wall textures: wall-panel products imported like furniture (page capture, grok, photos), then turned into a
 // seamless tile by Codex instead of a 3D model. The wallTexture fixture (fixtures.ts) picks which one the living room wears.
+import { productKey } from '@repo/shared/layouts';
 import type { WallTexture } from '@repo/shared/items';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { downloadPhotos, fetchPages, grokStructured, readDocuments, pageContext, productKey, slug } from './catalog';
+import { downloadPhotos, fetchPages, grokStructured, readDocuments, pageContext, slug } from './catalog';
 import { collectPhotos, runCodex } from './generate-model';
 import { assets, db } from './remote';
 

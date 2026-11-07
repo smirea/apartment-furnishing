@@ -7,7 +7,17 @@ import { run } from './lib';
 
 const SERVER = join(import.meta.dir, '../apps/server');
 const PERSIST = ['--persist-to', '../../.wrangler/state'];
-const TABLES = ['catalog_items', 'placements', 'wall_textures', 'carpets', 'tv_models', 'settings'];
+const TABLES = [
+	'catalog_items',
+	'placements',
+	'wall_textures',
+	'carpets',
+	'tv_models',
+	'settings',
+	'layouts',
+	'layout_carpets',
+	'layout_hidden',
+];
 
 const wrangler = (args: string[]) => run(['bunx', 'wrangler', ...args], { cwd: SERVER });
 const query = (where: '--local' | '--remote', sql: string) => {

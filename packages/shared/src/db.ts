@@ -40,6 +40,8 @@ function table<T extends object>(sql: Sql, name: string, key: keyof T & string, 
 
 	return {
 		all: async () => (await one(statement(`SELECT * FROM ${name} ORDER BY ${order}`))).map(decode),
+		where: async (column: keyof T & string, value: SqlValue) =>
+			(await one(statement(`SELECT * FROM ${name} WHERE "${column}" = ?1 ORDER BY ${order}`, value))).map(decode),
 		get,
 		read: async (id: string) => {
 			const row = await get(id);
@@ -220,11 +222,11 @@ export function createDb(sql: Sql) {
 			},
 			'importedAt DESC',
 		),
-		placements: table<Placement>(
+		placements: table<Placement & { layoutId: string }>(
 			sql,
 			'placements',
 			'key',
-			{ key: 'value', itemId: 'value', position: 'json', rotation: 'json' },
+			{ key: 'value', layoutId: 'value', itemId: 'value', position: 'json', rotation: 'json' },
 			'rowid',
 		),
 		textures: table<WallTexture>(
@@ -264,7 +266,6 @@ export function createDb(sql: Sql) {
 				size: 'json',
 				image: 'value',
 				texture: 'json',
-				placement: 'json',
 			},
 			'importedAt',
 		),

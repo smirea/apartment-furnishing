@@ -1,18 +1,16 @@
 // Carpets: rug products imported from a link (page capture, grok, photos), then turned into one top-down image of the
-// whole rug by Codex. Each lies in the room at most once, and every saved pose clears the floor-plan walls.
-import { carpetHitsWalls, carpetSpawn, sizeLabel, type Carpet, type CarpetSize } from '@repo/shared/carpets';
-import { planGeometry } from '@repo/shared/plan';
+// whole rug by Codex. Where each lies is the Worker's, per layout.
+import { sizeLabel, type Carpet, type CarpetSize } from '@repo/shared/carpets';
+import { productKey } from '@repo/shared/layouts';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { downloadPhotos, fetchPages, grokStructured, pageContext, productKey, slug } from './catalog';
+import { downloadPhotos, fetchPages, grokStructured, pageContext, slug } from './catalog';
 import { collectPhotos, runCodex } from './generate-model';
 import { assets, db } from './remote';
 
 const PROMPT_FILE = Bun.file(join(import.meta.dir, 'carpet-prompt.md'));
 if (!(await PROMPT_FILE.exists())) throw new Error(`missing ${PROMPT_FILE.name}`);
-
-const plan = planGeometry();
 
 const { carpets } = db;
 
@@ -92,7 +90,6 @@ export async function importCarpet(url: string, log: (line: string) => void = ()
 	for (let n = 2; !existing && ((await carpets.get(id)) || (await assets.list(`${id}/`)).length); n++)
 		id = `${slug(brandPrefix + parsed.name)}-${n}`;
 	const size = (existing && sizes.find(s => sameSize(s, existing.size))) ?? selected;
-	const kept = existing?.placement;
 	const carpet: Carpet = {
 		id,
 		url: page!.url.split('?')[0]!,
@@ -105,7 +102,6 @@ export async function importCarpet(url: string, log: (line: string) => void = ()
 		size,
 		image: await downloadPhotos(id, parsed.imageUrl, page!.images),
 		texture: existing?.texture ?? null,
-		placement: kept && !carpetHitsWalls(kept, size, plan) ? kept : carpetSpawn(size, plan),
 	};
 	await carpets.put(carpet);
 	log(`  saved carpet ${id}: ${sizes.map(sizeLabel).join(', ')}, showing ${sizeLabel(size)}`);
