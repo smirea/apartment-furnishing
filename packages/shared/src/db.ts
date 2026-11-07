@@ -1,7 +1,7 @@
 // The tables in D1. The Worker runs these against its D1 binding, the laptop runner over the Worker's /api/runner/sql,
 // so both share one definition of every table and of the job queue between them.
 import type { Carpet } from './carpets';
-import type { CatalogItem, Job, Placement, TvModel, WallTexture } from './items';
+import type { CatalogItem, Job, Mount, Placement, TvModel, WallTexture } from './items';
 
 export type SqlValue = string | number | null;
 export type Statement = { sql: string; params: SqlValue[] };
@@ -96,8 +96,9 @@ export const JOB_KINDS = [
 export type JobKind = (typeof JOB_KINDS)[number];
 
 // `target` is the product URL of an import and the item id of a build. `category` limits an item import to one kind
-// of product, so a link pasted in the Bed panel can't add a lamp nobody sees.
-export type QueuedJob = { id: number; kind: JobKind; target: string; category: string | null };
+// of product, so a link pasted in the Bed panel can't add a lamp nobody sees. `mount` sets how an imported item is
+// placed, so one pasted in the Wall panel hangs on a wall.
+export type QueuedJob = { id: number; kind: JobKind; target: string; category: string | null; mount: Mount | null };
 
 type JobRow = QueuedJob & {
 	state: 'queued' | 'running' | 'failed' | 'done';
@@ -113,12 +114,17 @@ const now = () => new Date().toISOString();
 function jobQueue(sql: Sql) {
 	return {
 		// A build already queued or running for the target is left alone; a failed one is replaced.
-		async enqueue(kind: JobKind, target: string, category: string | null = null): Promise<number | null> {
+		async enqueue(
+			kind: JobKind,
+			target: string,
+			category: string | null = null,
+			mount: Mount | null = null,
+		): Promise<number | null> {
 			const [, inserted] = await sql([
 				statement("DELETE FROM jobs WHERE kind = ?1 AND target = ?2 AND state = 'failed'", kind, target),
 				statement(
-					`INSERT INTO jobs (kind, target, category, state, updatedAt)
-					SELECT ?1, ?2, ?3, 'queued', ?4
+					`INSERT INTO jobs (kind, target, category, mount, state, updatedAt)
+					SELECT ?1, ?2, ?3, ?5, 'queued', ?4
 					WHERE ?1 LIKE 'import%' OR NOT EXISTS (
 						SELECT 1 FROM jobs WHERE kind = ?1 AND target = ?2 AND state IN ('queued', 'running')
 					)
@@ -127,6 +133,7 @@ function jobQueue(sql: Sql) {
 					target,
 					category,
 					now(),
+					mount,
 				),
 			]);
 			return (inserted![0]?.id as number | undefined) ?? null;
@@ -162,7 +169,7 @@ function jobQueue(sql: Sql) {
 				`UPDATE jobs SET state = 'running', updatedAt = ?1 WHERE id IN (
 					SELECT id FROM jobs WHERE state = 'queued' AND kind IN (${kinds.map(k => `'${k}'`).join(', ')})
 					ORDER BY id LIMIT ?2
-				) RETURNING id, kind, target, category`,
+				) RETURNING id, kind, target, category, mount`,
 				now(),
 				limit,
 			),

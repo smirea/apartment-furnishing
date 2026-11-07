@@ -17,7 +17,8 @@ const log = console.log;
 
 // What each job does; an import answers the id it saved.
 const RUN: Record<JobKind, (job: QueuedJob) => Promise<string | null>> = {
-	importItem: async job => (await importProducts([job.target], log, job.category ?? undefined))[0]!.id,
+	importItem: async job =>
+		(await importProducts([job.target], log, job.category ?? undefined, job.mount ?? undefined))[0]!.id,
 	importTexture: async job => (await importTexture(job.target, log)).id,
 	importCarpet: async job => (await importCarpet(job.target, log)).id,
 	importTv: async job => (await importTv(job.target)).id,

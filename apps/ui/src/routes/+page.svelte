@@ -47,8 +47,9 @@
 	const saved = JSON.parse(localStorage.getItem(OPTIONS_KEY) ?? '{}');
 	let cutaway = $state<boolean>(saved.cutaway ?? true);
 	let labels = $state<boolean>(saved.labels ?? false);
-	let open = $state<Record<FixtureKey | 'furniture' | 'carpets' | 'ideas', boolean>>({
+	let open = $state<Record<FixtureKey | 'furniture' | 'wall' | 'carpets' | 'ideas', boolean>>({
 		furniture: true,
+		wall: true,
 		carpets: true,
 		...(Object.fromEntries(FIXTURE_KEYS.map(key => [key, true])) as Record<FixtureKey, boolean>),
 		ideas: false,
@@ -117,12 +118,14 @@
 	const fixtureCategories = $derived(
 		new Map(fixtureList.flatMap(f => (f.kind === 'item' ? [[f.category, f.key] as const] : []))),
 	);
-	const furnitureList = $derived(catalogList.filter(item => !fixtureCategories.has(item.category)));
-	const furnitureGroups = $derived(
-		Object.entries(Object.groupBy(furnitureList, item => item.group ?? 'Other')).toSorted(([a], [b]) =>
+	const placeable = $derived(catalogList.filter(item => !fixtureCategories.has(item.category)));
+	// Wall pieces (art, mirrors, shelves) have a list of their own and only ever hang on a wall.
+	const furnitureList = $derived(placeable.filter(item => item.mount !== 'wall'));
+	const wallList = $derived(placeable.filter(item => item.mount === 'wall'));
+	const grouped = (items: CatalogEntry[]) =>
+		Object.entries(Object.groupBy(items, item => item.group ?? 'Other')).toSorted(([a], [b]) =>
 			a === 'Other' ? 1 : b === 'Other' ? -1 : a.localeCompare(b),
-		),
-	);
+		);
 	const toggleGroup = (group: string) =>
 		(collapsedGroups = collapsedGroups.includes(group)
 			? collapsedGroups.filter(g => g !== group)
@@ -152,9 +155,12 @@
 		void queryClient.cancelQueries({ queryKey: ['fixtures', at] });
 		queryClient.setQueryData<Fixture[]>(['fixtures', at], list => list?.map(f => (f.key === next.key ? next : f)));
 	}
-	type SectionKey = FixtureKey | 'furniture' | 'carpets';
+	type SectionKey = FixtureKey | 'furniture' | 'wall' | 'carpets';
 	const importUrls = $state(
-		Object.fromEntries([...FIXTURE_KEYS, 'furniture', 'carpets'].map(key => [key, ''])) as Record<SectionKey, string>,
+		Object.fromEntries([...FIXTURE_KEYS, 'furniture', 'wall', 'carpets'].map(key => [key, ''])) as Record<
+			SectionKey,
+			string
+		>,
 	);
 	function fixtureMutations(key: FixtureKey) {
 		return {
@@ -853,10 +859,25 @@
 			importUrls.furniture = '';
 			await queryClient.invalidateQueries({ queryKey: ['catalog'] });
 			const fixture = fixtureCategories.get(item.category);
-			if (!fixture) return addToRoom(item.id, at);
+			if (!fixture) {
+				// grok can read a product as wall-mounted, which lists it under Wall.
+				if (item.mount === 'wall') open.wall = true;
+				return addToRoom(item.id, at);
+			}
 			// The server made it the fixture's pick.
 			open[fixture] = true;
 			await queryClient.invalidateQueries({ queryKey: ['fixtures'] });
+		},
+	}));
+	// Whatever is pasted in the Wall panel hangs on a wall.
+	const wallImport = createMutation(() => ({
+		mutationFn: (url: string) =>
+			api<CatalogItem>('/api/catalog/import', { method: 'POST', body: JSON.stringify({ url, mount: 'wall' }) }),
+		onMutate: () => ({ at: layout }),
+		onSuccess: async (item: CatalogItem, _url: string, { at }: { at: string | null }) => {
+			importUrls.wall = '';
+			await queryClient.invalidateQueries({ queryKey: ['catalog'] });
+			await addToRoom(item.id, at);
 		},
 	}));
 
@@ -871,9 +892,19 @@
 			key: 'furniture',
 			title: 'Furniture',
 			summary: String(furnitureList.length),
-			groups: furnitureGroups.map(([group, items]) => [group, items!.map(itemTile)] as const),
+			groups: grouped(furnitureList).map(([group, items]) => [group, items!.map(itemTile)] as const),
 			placeholder: 'Paste an Amazon or Walmart link',
 			importer: importMutation,
+			errors: [],
+			loading: catalogQuery.isPending,
+		},
+		{
+			key: 'wall',
+			title: 'Wall',
+			summary: String(wallList.length),
+			groups: grouped(wallList).map(([group, items]) => [group, items!.map(itemTile)] as const),
+			placeholder: 'Paste a link to art, a mirror or a shelf',
+			importer: wallImport,
 			errors: [],
 			loading: catalogQuery.isPending,
 		},
@@ -1502,13 +1533,16 @@
 
 				<div class="controls">
 					{#if placement}
-						<div class="row">
-							<span>Turn</span>
-							<button type="button" onclick={() => rotate(-90)}>↺ 90°</button>
-							<button type="button" onclick={() => rotate(-15)}>−15°</button>
-							<button type="button" onclick={() => rotate(15)}>+15°</button>
-							<button type="button" onclick={() => rotate(90)}>↻ 90°</button>
-						</div>
+						<!-- A wall piece faces out of the wall it hangs on. -->
+						{#if item.mount !== 'wall'}
+							<div class="row">
+								<span>Turn</span>
+								<button type="button" onclick={() => rotate(-90)}>↺ 90°</button>
+								<button type="button" onclick={() => rotate(-15)}>−15°</button>
+								<button type="button" onclick={() => rotate(15)}>+15°</button>
+								<button type="button" onclick={() => rotate(90)}>↻ 90°</button>
+							</div>
+						{/if}
 						<label class="row">
 							<span>Height off floor</span>
 							<input

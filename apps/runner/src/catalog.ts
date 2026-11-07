@@ -1,7 +1,7 @@
 // Product import pipeline behind the importItem job (POST /api/catalog/import) and scripts/import-item.ts.
 // Captures each page with a headless Camoufox browser, has the grok CLI turn it into
 // structured product info, uploads the photos and any 3D model, and saves the item to the catalog table.
-import type { CatalogItem } from '@repo/shared/items';
+import type { CatalogItem, Mount } from '@repo/shared/items';
 import { productKey } from '@repo/shared/layouts';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -186,12 +186,12 @@ ${page.jsonLd}
 Visible page text:
 ${page.text}`;
 
-async function parseWithGrok(page: PageData): Promise<Product> {
+async function parseWithGrok(page: PageData, mount?: Mount): Promise<Product> {
 	const modelLines = await Promise.all(
 		page.models.slice(0, 3).map(async url => `${url} (nodes: ${(await glbNodeNames(url)).join(', ') || 'unknown'})`),
 	);
 	return grokStructured<Product>(
-		`Extract product information from this retailer page capture. Use only facts in the input. If width/height/depth are not all listed but can be derived (for example a TV's width from its diagonal and 16:9 aspect), derive them and explain in dimensionsNote; otherwise use null. Convert sizes to inches and weight to pounds. Pick imageUrl from the image candidates and modelUrl from the 3D model candidates exactly as written. Decide how the item mounts in a home and which model nodes to drop for that mount.
+		`Extract product information from this retailer page capture. Use only facts in the input. If width/height/depth are not all listed but can be derived (for example a TV's width from its diagonal and 16:9 aspect), derive them and explain in dimensionsNote; otherwise use null. Convert sizes to inches and weight to pounds. Pick imageUrl from the image candidates and modelUrl from the 3D model candidates exactly as written. ${mount ? `It will be mounted on a ${mount}: set mount to ${mount}, defaultElevationIn to the usual height of its bottom edge when hung there, and removeNodes to any model nodes it doesn't need there.` : 'Decide how the item mounts in a home and which model nodes to drop for that mount.'}
 
 3D model candidates:
 ${modelLines.join('\n') || 'none'}
@@ -291,16 +291,19 @@ export async function downloadPhotos(id: string, imageUrl: string | null, galler
 }
 
 // `category` limits an import to one kind of product, so a link pasted in the Bed panel can't add a lamp nobody sees.
+// `mount` sets how it is placed, so a link pasted in the Wall panel hangs on a wall.
 export async function importProducts(
 	urls: string[],
 	log: (line: string) => void = () => {},
 	category?: string,
+	mount?: Mount,
 ): Promise<CatalogItem[]> {
 	log(`capturing ${urls.length} page(s)…`);
 	const imported: CatalogItem[] = [];
 	for (const page of await fetchPages(urls)) {
 		log(`→ ${page.title.slice(0, 80)} (${page.models.length} model candidate(s))`);
-		const { imageUrl, modelUrl, ...product } = await parseWithGrok(page);
+		const { imageUrl, modelUrl, ...product } = await parseWithGrok(page, mount);
+		if (mount) product.mount = mount;
 		// TVs are built into the plan; the TV panel only needs their size.
 		if (product.category === 'tv')
 			throw new Error(`${product.name} is a TV: paste its link in the TV panel, which reads its size`);

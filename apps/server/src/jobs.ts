@@ -1,4 +1,5 @@
 import { RUNNER_STALE_MS, type JobKind } from '@repo/shared/db';
+import type { Mount } from '@repo/shared/items';
 import { db } from './db';
 
 // An import holds its request open until the laptop finishes it, about a minute, so the clients keep their
@@ -13,12 +14,17 @@ export async function runnerOnline() {
 	return !!seen && Date.now() - Date.parse(seen.at) < RUNNER_STALE_MS;
 }
 
-export async function runImport(kind: JobKind, url: string, category: string | null = null): Promise<string> {
+export async function runImport(
+	kind: JobKind,
+	url: string,
+	category: string | null = null,
+	mount: Mount | null = null,
+): Promise<string> {
 	if (!(await runnerOnline()))
 		throw new RunnerOffline(
 			"Imports run on the laptop, and its job runner isn't running. Start it with bun run runner:prod.",
 		);
-	const id = (await db.jobs.enqueue(kind, url, category))!;
+	const id = (await db.jobs.enqueue(kind, url, category, mount))!;
 	const deadline = Date.now() + IMPORT_TIMEOUT_MS;
 	while (Date.now() < deadline) {
 		await new Promise(resolve => setTimeout(resolve, POLL_MS));

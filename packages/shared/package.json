@@ -12,6 +12,7 @@
 		"./floorplan": "./src/floorplan.ts",
 		"./plan": "./src/plan.ts",
 		"./obstacles": "./src/obstacles.ts",
+		"./walls": "./src/walls.ts",
 		"./package.json": "./package.json"
 	},
 	"dependencies": {

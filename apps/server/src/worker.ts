@@ -154,15 +154,25 @@ const api = router({
 	},
 	'/api/catalog/import': {
 		POST: async request => {
-			const { url } = await body<{ url: string }>(request);
+			const { url, mount } = await body<{ url: string; mount: unknown }>(request);
 			if (!productUrl(url)) return Response.json({ error: 'Paste a product URL' }, { status: 400 });
+			// The Wall panel hangs whatever it imports on a wall.
+			if (mount !== undefined && mount !== 'wall')
+				return Response.json({ error: 'Expected mount: wall, or none' }, { status: 400 });
 			try {
 				const layout = await layoutOf(request);
-				const item = await catalog.read((await findImported('item', url)) ?? (await runImport('importItem', url)));
+				let item = await catalog.read(
+					(await findImported('item', url)) ?? (await runImport('importItem', url, null, mount ?? null)),
+				);
+				if (mount && item.mount !== mount) {
+					// Read as standing on the floor, it has no height to hang at; 48″ puts most art's center near eye level.
+					item = { ...item, mount, defaultElevationIn: item.defaultElevationIn || 48 };
+					await catalog.put(item);
+				}
 				await unhide(layout, 'item', item.id);
 				if (!item.model) await startBuild('buildModel', item.id);
 				// A product that has a fixture, like a bed, becomes that fixture's pick instead of furniture to place.
-				const fixture = itemFixtureFor(item.category);
+				const fixture = mount ? null : itemFixtureFor(item.category);
 				if (fixture) await selectOption(fixture, item.id, layout);
 				return Response.json(item);
 			} catch (error) {

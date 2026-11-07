@@ -8,6 +8,7 @@ import {
 } from '@repo/shared/items';
 import type { WallSpot } from '@repo/shared/fixtures';
 import { moveCarpet, variantOf, type CarpetEntry, type CarpetPose } from '@repo/shared/carpets';
+import { hangOnWall, indoorRooms, wallFaces, type WallFace } from '@repo/shared/walls';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {
@@ -72,7 +73,6 @@ const CUTAWAY_FT = 3.2;
 const WINDOW_BAY_IN = 48;
 const FRAME_IN = 2;
 const SNAP_FT = 0.6;
-const WALL_MOUNT_SNAP_FT = 2;
 const DEG = Math.PI / 180;
 // A rug's thickness: carpets lie this far above the floor, under the furniture standing on it.
 const CARPET_FT = 0.4 / 12;
@@ -122,6 +122,9 @@ export function createViewer(
 	const colliders: Box[] = [];
 	// Snap targets: wall faces for flush placement, fixture tops (counters, vanities) for surface items.
 	const wallBoxes: Box[] = [];
+	// The solid walls wall pieces hang on; the TV wall's box grows out to the face of any panels on it.
+	const hangBoxes: Box[] = [];
+	let hangFaces: WallFace[] | null = null;
 	const surfaces: (Box & { top: number })[] = [];
 	const cutawayWalls: {
 		mesh: Mesh;
@@ -182,7 +185,11 @@ export function createViewer(
 			if (solid) {
 				const [bx1, bz1, bx2, bz2] = rect.map(ft) as Rect;
 				colliders.push({ x1: bx1, z1: bz1, x2: bx2, z2: bz2 });
-				if (h >= 3) wallBoxes.push({ x1: bx1, z1: bz1, x2: bx2, z2: bz2 });
+				if (h >= 3) {
+					const box = { x1: bx1, z1: bz1, x2: bx2, z2: bz2 };
+					wallBoxes.push(box);
+					if (!glass) hangBoxes.push(box);
+				}
 			}
 		};
 
@@ -323,6 +330,7 @@ export function createViewer(
 			wallFinish.position.x = ft(tvWallFace.x) - depth;
 			// Wall-mounted items snap to the panels' face instead of the plaster behind them.
 			tvWallSnap.x1 = ft(tvWallFace.x) - depth;
+			hangFaces = null;
 			tvWallDepthFt = depth;
 			placeTv();
 			for (const f of tvWallFixtures) f.mesh.position.x = f.x - depth;
@@ -707,6 +715,8 @@ export function createViewer(
 				roots.set(p.key, fresh);
 				itemGroup.add(fresh);
 				void buildItem(item).then(object => {
+					// Unparented, so this is the item's own width, height and depth before it turns.
+					fresh.userData.size = new Box3().setFromObject(object).getSize(new Vector3());
 					fresh.add(object);
 					if (snapOnLoad.delete(p.key)) commit(fresh);
 					if (selectedRoot() === fresh) selection.setFromObject(fresh);
@@ -746,21 +756,43 @@ export function createViewer(
 		return best;
 	}
 
-	// Pull items flush to nearby walls (wall-mounted ones also turn to face out of the wall),
-	// then settle them onto the floor or the highest surface under their center.
+	// Wall pieces always hang on the nearest wall face they fit on, flush and facing into the room, and never leave the
+	// walls: a drag or the move arrows only slide them along a wall, up and down, or over onto another one.
+	function wallSpot(root: Group) {
+		const size = root.userData.size as Vector3 | undefined;
+		if (!size) return null;
+		hangFaces ??= wallFaces(hangBoxes, indoorRooms);
+		return { size, ...hangOnWall(hangFaces, root.position.x, root.position.z, size.x) };
+	}
+	// The one move arrow that runs along the wall.
+	function showWallArrow(root: Group, axis: WallFace['axis']) {
+		if (move.object !== root) return;
+		move.showX = axis === 'z';
+		move.showZ = axis === 'x';
+	}
+	function hang(root: Group) {
+		const spot = wallSpot(root);
+		if (!spot) return;
+		const { size, face } = spot;
+		const out = (face.normal * size.z) / 2;
+		root.rotation.set(0, spot.yaw * DEG, 0);
+		root.position.x = spot.x + (face.axis === 'x' ? out : 0);
+		root.position.z = spot.z + (face.axis === 'z' ? out : 0);
+		root.position.y = Math.min(Math.max(root.position.y, 0), CEILING_FT - size.y);
+		showWallArrow(root, face.axis);
+	}
+
+	// Pull items flush to nearby walls, then settle them onto the floor or the highest surface under their center. Wall
+	// pieces hang on a wall instead.
 	function snap(root: Group) {
 		const mount = catalogById[root.userData.itemId]?.mount ?? 'floor';
+		if (mount === 'wall') return hang(root);
 		root.updateMatrixWorld(true);
 		let box = new Box3().setFromObject(root);
 		if (box.isEmpty()) return;
 
-		const wall = nearestWall(box, mount === 'wall' ? WALL_MOUNT_SNAP_FT : SNAP_FT);
+		const wall = nearestWall(box, SNAP_FT);
 		if (wall) {
-			if (mount === 'wall') {
-				root.rotation.set(0, Math.atan2(wall.normal[0], wall.normal[1]), 0);
-				root.updateMatrixWorld(true);
-				box = new Box3().setFromObject(root);
-			}
 			root.position[wall.axis] += flushShift(box, wall.wall, wall.normal);
 			root.updateMatrixWorld(true);
 			box = new Box3().setFromObject(root);
@@ -779,9 +811,7 @@ export function createViewer(
 			if (!ob.isEmpty() && under({ x1: ob.min.x, z1: ob.min.z, x2: ob.max.x, z2: ob.max.z })) tops.push(ob.max.y);
 		}
 		const support = Math.max(0, ...tops.filter(t => t <= box.min.y + SNAP_FT));
-		// Floor and surface items always rest on what is under them; wall items keep their height
-		// unless brought close to the floor or a surface.
-		if (mount !== 'wall' || box.min.y - support < SNAP_FT) root.position.y += support - box.min.y;
+		root.position.y += support - box.min.y;
 	}
 
 	function commit(root: Group) {
@@ -847,9 +877,13 @@ export function createViewer(
 			// on the floor. Wall items keep any height, and surface ones are lifted onto the table or shelf they sit on.
 			const mount = isCarpet(root) ? null : (catalogById[root.userData.itemId]?.mount ?? 'floor');
 			move.showY = mount === 'wall' || mount === 'surface';
-			// Wall-mounted items take their facing from the wall they snap to.
-			if (mount === 'wall') turn.detach();
-			else turn.attach(root);
+			move.showX = move.showZ = true;
+			// Wall pieces take their facing from the wall they hang on, and slide only along it.
+			if (mount === 'wall') {
+				turn.detach();
+				const spot = wallSpot(root);
+				if (spot) showWallArrow(root, spot.face.axis);
+			} else turn.attach(root);
 		} else for (const g of gizmos) g.detach();
 		onSelect(selected);
 	}
