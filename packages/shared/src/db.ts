@@ -66,6 +66,17 @@ function setting<T>(sql: Sql, key: string, fallback: () => T) {
 					JSON.stringify(value),
 				),
 			])),
+		// Merges fields into the stored object in one statement, so clients changing different fields at once can't
+		// revert each other. A null field is dropped (JSON merge patch), which reads back as unset.
+		patch: async (fields: Partial<T>) =>
+			void (await sql([
+				statement(
+					'INSERT INTO settings (key, value) VALUES (?1, json_patch(?2, ?3)) ON CONFLICT(key) DO UPDATE SET value = json_patch(value, ?3)',
+					key,
+					JSON.stringify(fallback()),
+					JSON.stringify(fields),
+				),
+			])),
 	};
 }
 

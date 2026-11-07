@@ -9,7 +9,11 @@ if (!kind || !head || !event || !output) throw new Error('Missing change detecti
 const full = event === 'workflow_dispatch' || !base || /^0+$/.test(base);
 const comparison = event === 'pull_request' ? `${base}...${head}` : `${base}..${head}`;
 const paths = (full ? [] : (await $`git diff --name-only -z ${comparison}`.text()).split('\0')).filter(
-	name => name && !['.md', '.rst'].includes(extname(name).toLowerCase()) && !name.startsWith('docs/'),
+	// ideas/README.md is rendered into the deployed UI, so it counts as code.
+	name =>
+		name &&
+		(name.startsWith('ideas/') || !['.md', '.rst'].includes(extname(name).toLowerCase())) &&
+		!name.startsWith('docs/'),
 );
 const common = full || paths.some(name => name.startsWith('.github/'));
 const bun = !['swift', 'empty'].includes(kind) && (common || paths.some(name => !name.startsWith('app-ios/')));

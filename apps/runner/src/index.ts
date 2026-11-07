@@ -68,7 +68,17 @@ async function poll() {
 	});
 }
 
-await db.jobs.requeueRunning();
+// `bun run dev` starts the runner alongside the server, which applies migrations before it listens.
+for (let attempt = 1; ; attempt++) {
+	try {
+		await db.jobs.requeueRunning();
+		break;
+	} catch (error) {
+		if (attempt === 1)
+			console.log(`runner: waiting for ${env.SERVER_URL} (${error instanceof Error ? error.message : error})`);
+		await Bun.sleep(2000);
+	}
+}
 log(`runner: claiming jobs from ${env.SERVER_URL}`);
 // Items imported before groups existed get one; the list shows them under "Other" until this lands.
 groupFurniture(log).catch(error => console.error('grouping furniture failed:', error));

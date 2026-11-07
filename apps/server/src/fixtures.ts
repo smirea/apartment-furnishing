@@ -74,7 +74,7 @@ const tvSettings = db.setting<TvSettings>('tv', () => DEFAULT_TV);
 
 const stored = (key: FixtureKey) => ({
 	selected: async () => (await picks.get())[key] ?? null,
-	select: async (id: string | null) => picks.set({ ...(await picks.get()), [key]: id }),
+	select: (id: string | null) => picks.patch({ [key]: id }),
 });
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -158,12 +158,11 @@ const tvSource: Source = {
 	},
 	select: async id => {
 		const model = id ? await tvs.get(id) : null;
-		await tvSettings.set({
-			...(await tvSettings.get()),
+		await tvSettings.patch({
 			visible: id !== null,
 			...(model && { widthIn: model.widthIn, heightIn: model.heightIn }),
 		});
-		if (model) await picks.set({ ...(await picks.get()), tv: model.id });
+		if (model) await picks.patch({ tv: model.id });
 	},
 	import: url => runImport('importTv', url),
 	remove: id => tvs.remove(id),
