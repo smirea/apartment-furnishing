@@ -719,6 +719,12 @@ export function createViewer(
 					fresh.userData.size = new Box3().setFromObject(object).getSize(new Vector3());
 					fresh.add(object);
 					if (snapOnLoad.delete(p.key)) commit(fresh);
+					else if (item.mount === 'wall') {
+						// Saved while it was a placeholder box, or by the AR app: flush against its wall now that its size is known.
+						const [position, yaw] = [fresh.position.clone(), fresh.rotation.y];
+						hang(fresh);
+						if (fresh.position.distanceTo(position) > 0.01 || Math.abs(fresh.rotation.y - yaw) > 0.001) commit(fresh);
+					}
 					if (selectedRoot() === fresh) selection.setFromObject(fresh);
 				});
 				root = fresh;
