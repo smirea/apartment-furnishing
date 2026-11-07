@@ -70,3 +70,20 @@ export function worktrees(cwd: string): Worktree[] {
 			return path ? [{ path, branch }] : [];
 		});
 }
+
+/** One stored env-manager environment, read without selecting it. Needs this Mac's AWS credentials. */
+export function readEnv(env: 'dev' | 'prod'): Values {
+	// `bun run` puts the pinned `node_modules/.bin/env-manager` first, which cannot see the global one's AWS credentials.
+	const path = (process.env.PATH ?? '')
+		.split(':')
+		.filter(dir => !dir.endsWith('node_modules/.bin'))
+		.join(':');
+	const result = spawnSync('env-manager', ['print', 'apartment-furnishing', '-e', env], {
+		encoding: 'utf8',
+		env: { ...process.env, PATH: path },
+	});
+	const section = /^\.env\.local$([\s\S]*?)(?:^files$|(?![\s\S]))/m.exec(result.stdout ?? '')?.[1];
+	if (result.status !== 0 || section === undefined)
+		throw new Error(`env-manager print apartment-furnishing -e ${env} failed. It needs this Mac's AWS credentials.`);
+	return parseDotenv(section);
+}

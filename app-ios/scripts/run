@@ -308,6 +308,8 @@ first waits on agent-simulator wait for room on the Mac, exiting 3 (rerun) after
         // Only agents run headless; the owner's own runs never wait.
         if (values.headless && target.state !== "booted") await agentSimulator("wait", target.id);
     }
+    // Config/App.xcconfig includes it for the API token; without it the app stops at launch.
+    if (!existsSync(join(root, "Config/LocalSecrets.xcconfig"))) await command(["bun", "../scripts/secrets.ts", "ios"]);
     const projects = readdirSync(root).filter(file => file.endsWith(".xcodeproj"));
     if (projects.length !== 1) throw new Error("Expected one Xcode project in the repository root.");
     const project = projects[0];

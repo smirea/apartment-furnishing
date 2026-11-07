@@ -11,12 +11,11 @@ import {
 	type FixtureSpec,
 	type WallSpot,
 } from '@repo/shared/fixtures';
-import { DEFAULT_TV, tvDiagonal, type CatalogItem, type TvSettings } from '@repo/shared/items';
-import { catalog, importProducts } from './catalog';
-import { setting } from './db';
-import { modelJobs, startModelJob } from './generate-model';
-import { importTexture, startTextureJob, textureJobs, textures } from './textures';
-import { importTv, tvs } from './tvs';
+import { DEFAULT_TV, tvDiagonal, type CatalogItem, type Job, type TvSettings } from '@repo/shared/items';
+import { db } from './db';
+import { runImport, startBuild } from './jobs';
+
+const { catalog, textures, tvs } = db;
 
 // Narrow nightstands start around 18 in; less than that beside the bed is a squeeze.
 const NIGHTSTAND_MIN_IN = 18;
@@ -70,12 +69,12 @@ type Source = {
 };
 
 // The pick of every fixture but the TV, whose size and mount live in the `tv` setting.
-const picks = setting<Partial<Record<FixtureKey, string | null>>>('fixtures', () => ({}));
-const tvSettings = setting<TvSettings>('tv', () => DEFAULT_TV);
+const picks = db.setting<Partial<Record<FixtureKey, string | null>>>('fixtures', () => ({}));
+const tvSettings = db.setting<TvSettings>('tv', () => DEFAULT_TV);
 
 const stored = (key: FixtureKey) => ({
-	selected: async () => picks.get()[key] ?? null,
-	select: async (id: string | null) => picks.set({ ...picks.get(), [key]: id }),
+	selected: async () => (await picks.get())[key] ?? null,
+	select: (id: string | null) => picks.patch({ [key]: id }),
 });
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -84,7 +83,7 @@ const money = (price: number | null, currency: string) =>
 const facts = (...parts: (string | null | false)[]) => parts.filter(Boolean).join(' · ');
 
 function itemSource(key: FixtureKey, category: string, spot: WallSpot): Source {
-	const option = (item: CatalogItem): FixtureOption => {
+	const option = (item: CatalogItem, job: Job | null): FixtureOption => {
 		const d = item.dimensions;
 		const side = d && (spot.span * 12 - d.width) / 2;
 		return {
@@ -99,23 +98,22 @@ function itemSource(key: FixtureKey, category: string, spot: WallSpot): Source {
 			),
 			warning: side !== null && side < NIGHTSTAND_MIN_IN ? `Only ${round1(side)}″ each side` : null,
 			group: null,
-			job: modelJobs.get(item.id) ?? null,
+			job,
 			ready: true,
 		};
 	};
 	return {
-		options: async () =>
-			catalog
-				.all()
-				.filter(item => item.category === category)
-				.map(option),
+		options: async () => {
+			const [items, jobs] = await Promise.all([catalog.all(), db.jobs.states('buildModel')]);
+			return items.filter(item => item.category === category).map(item => option(item, jobs.get(item.id) ?? null));
+		},
 		...stored(key),
 		import: async url => {
-			const [item] = await importProducts([url], console.log, category);
-			if (!item!.model) startModelJob(item!);
-			return item!.id;
+			const item = await catalog.read(await runImport('importItem', url, category));
+			if (!item.model) await startBuild('buildModel', item.id);
+			return item.id;
 		},
-		build: async id => startModelJob(catalog.read(id)),
+		build: async id => void (await startBuild('buildModel', (await catalog.read(id)).id)),
 	};
 }
 
@@ -133,7 +131,7 @@ const tvDetail = (tv: Pick<TvSettings, 'widthIn' | 'heightIn'>) =>
 
 const tvSource: Source = {
 	options: async () => {
-		const [models, tv] = [tvs.all(), tvSettings.get()];
+		const [models, tv] = await Promise.all([tvs.all(), tvSettings.get()]);
 		const options = models.map((m): FixtureOption => ({
 			id: m.id,
 			name: m.name,
@@ -150,31 +148,31 @@ const tvSource: Source = {
 		return [{ ...custom, id: CUSTOM_TV, detail: tvDetail(tv) }, ...options];
 	},
 	selected: async options => {
-		const tv = tvSettings.get();
+		const [tv, models, picked] = await Promise.all([tvSettings.get(), tvs.all(), picks.get()]);
 		if (!tv.visible) return null;
-		const matching = tvs.all().filter(m => tvMatches(m, tv));
+		const matching = models.filter(m => tvMatches(m, tv));
 		return (
-			(matching.find(m => m.id === picks.get().tv) ?? matching[0])?.id ??
+			(matching.find(m => m.id === picked.tv) ?? matching[0])?.id ??
 			(options.some(o => o.id === CUSTOM_TV) ? CUSTOM_TV : null)
 		);
 	},
 	select: async id => {
-		const model = id ? tvs.get(id) : null;
-		tvSettings.set({
-			...tvSettings.get(),
+		const model = id ? await tvs.get(id) : null;
+		await tvSettings.patch({
 			visible: id !== null,
 			...(model && { widthIn: model.widthIn, heightIn: model.heightIn }),
 		});
-		if (model) picks.set({ ...picks.get(), tv: model.id });
+		if (model) await picks.patch({ tv: model.id });
 	},
-	import: async url => (await importTv(url)).id,
-	remove: async id => tvs.remove(id),
-	extra: async () => ({ tv: tvSettings.get() }),
+	import: url => runImport('importTv', url),
+	remove: id => tvs.remove(id),
+	extra: async () => ({ tv: await tvSettings.get() }),
 };
 
 const wallTextureSource: Source = {
-	options: async () =>
-		textures.all().map(t => ({
+	options: async () => {
+		const [all, jobs] = await Promise.all([textures.all(), db.jobs.states('buildTexture')]);
+		return all.map(t => ({
 			id: t.id,
 			name: t.name,
 			url: t.url,
@@ -187,16 +185,17 @@ const wallTextureSource: Source = {
 			),
 			warning: null,
 			group: t.group,
-			job: textureJobs.get(t.id) ?? null,
+			job: jobs.get(t.id) ?? null,
 			ready: !!t.texture,
-		})),
+		}));
+	},
 	...stored('wallTexture'),
 	import: async url => {
-		const texture = await importTexture(url, console.log);
-		if (!texture.texture) startTextureJob(texture);
+		const texture = await textures.read(await runImport('importTexture', url));
+		if (!texture.texture) await startBuild('buildTexture', texture.id);
 		return texture.id;
 	},
-	build: async id => startTextureJob(textures.read(id)),
+	build: async id => void (await startBuild('buildTexture', (await textures.read(id)).id)),
 };
 
 const SOURCES: Record<FixtureKey, Source> = Object.fromEntries(
@@ -232,11 +231,7 @@ export const listFixtures = () => Promise.all(FIXTURE_KEYS.map(readFixture));
 
 export class FixtureError extends Error {}
 
-// Bumped by every pick, so an import that finishes a minute later doesn't overwrite a pick made meanwhile.
-const pickCount: Partial<Record<FixtureKey, number>> = {};
-
 export async function selectOption(key: FixtureKey, id: string | null) {
-	pickCount[key] = (pickCount[key] ?? 0) + 1;
 	if (id !== null) {
 		const option = (await SOURCES[key].options()).find(o => o.id === id);
 		if (!option) throw new FixtureError(`${FIXTURES[key].title} has no option ${id}`);
@@ -245,12 +240,15 @@ export async function selectOption(key: FixtureKey, id: string | null) {
 	await SOURCES[key].select(id);
 }
 
-// The new option becomes the pick when it can be shown right away, since that is why its link was pasted.
+// The new option becomes the pick when it can be shown right away, since that is why its link was pasted. A pick made
+// during the minute the import took wins over it.
 export async function importOption(key: FixtureKey, url: string) {
-	const picks = pickCount[key];
-	const id = await SOURCES[key].import(url);
-	const option = (await SOURCES[key].options()).find(o => o.id === id);
-	if (option?.ready && pickCount[key] === picks) await SOURCES[key].select(id);
+	const source = SOURCES[key];
+	const before = await source.selected(await source.options());
+	const id = await source.import(url);
+	const options = await source.options();
+	const option = options.find(o => o.id === id);
+	if (option?.ready && (await source.selected(options)) === before) await source.select(id);
 }
 
 export async function buildOption(key: FixtureKey, id: string) {

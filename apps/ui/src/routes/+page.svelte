@@ -180,7 +180,7 @@
 	const ideasQuery = createQuery(() => ({
 		queryKey: ['ideas'],
 		queryFn: async () => {
-			const res = await fetch('/api/ideas');
+			const res = await fetch('/ideas/readme.html');
 			if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
 			return res.text();
 		},

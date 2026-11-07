@@ -3,9 +3,9 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
-		"build": "bun --env-file=../../.env --env-file=../../.env.local --bun vite build",
+		"build": "bun ../../scripts/build-ideas.ts && bun --env-file=../../.env --env-file=../../.env.local --bun vite build",
 		"check": "bun --env-file=../../.env --env-file=../../.env.local svelte-kit sync && bun --env-file=../../.env --env-file=../../.env.local svelte-check --tsgo --tsconfig ./tsconfig.json",
-		"dev": "bun --env-file=../../.env --env-file=../../.env.local --bun vite",
+		"dev": "bun ../../scripts/build-ideas.ts && bun --env-file=../../.env --env-file=../../.env.local --bun vite",
 		"preview": "bun --env-file=../../.env --env-file=../../.env.local --bun vite preview"
 	},
 	"dependencies": {

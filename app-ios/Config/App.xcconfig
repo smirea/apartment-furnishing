@@ -1,0 +1,5 @@
+// The app talks to production. `bun run env:ios` writes the token (and can repoint the URL) into the git-ignored
+// LocalSecrets.xcconfig; a build without it fails at launch, naming that command.
+API_URL = https:/$()/apartment.stf.lol
+API_TOKEN =
+#include? "LocalSecrets.xcconfig"

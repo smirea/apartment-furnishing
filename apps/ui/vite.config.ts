@@ -31,6 +31,8 @@ export default defineConfig({
 				target: env.SERVER_URL,
 				changeOrigin: true,
 				secure: false,
+				// The browser signs in on the Worker's own pages; through Vite the proxy signs for it.
+				headers: env.API_TOKEN ? { authorization: `Bearer ${env.API_TOKEN}` } : {},
 			},
 		},
 	},
