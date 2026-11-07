@@ -843,10 +843,12 @@ export function createViewer(
 			measurer.setTool(null);
 			selection.setFromObject(root);
 			move.attach(root);
-			// Carpets only slide across the floor.
-			move.showY = !isCarpet(root);
+			// The up arrow only where height sticks: snap() sets floor and ceiling items back down or up, and carpets lie
+			// on the floor. Wall items keep any height, and surface ones are lifted onto the table or shelf they sit on.
+			const mount = isCarpet(root) ? null : (catalogById[root.userData.itemId]?.mount ?? 'floor');
+			move.showY = mount === 'wall' || mount === 'surface';
 			// Wall-mounted items take their facing from the wall they snap to.
-			if (catalogById[root.userData.itemId]?.mount === 'wall') turn.detach();
+			if (mount === 'wall') turn.detach();
 			else turn.attach(root);
 		} else for (const g of gizmos) g.detach();
 		onSelect(selected);
