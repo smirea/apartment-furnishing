@@ -1,4 +1,4 @@
-import { carpetSpawn, textureTarget, variantOf, type Carpet, type CarpetEntry } from '@repo/shared/carpets';
+import { carpetSpawn, savedLook, textureTarget, type Carpet, type CarpetEntry } from '@repo/shared/carpets';
 import type { Statement } from '@repo/shared/db';
 import {
 	isTvPlacement,
@@ -430,7 +430,7 @@ async function carpetEntries(layout: string): Promise<CarpetEntry[]> {
 			const state = states.get(c.id);
 			return {
 				...c,
-				variant: state ? variantOf({ variants: c.variants, variant: state.variant }).id : c.variant,
+				variant: savedLook(c, state?.variant ?? c.variant).id,
 				size: state?.size ?? c.size,
 				placement: state?.placement ?? null,
 				textureJobs: Object.fromEntries(

@@ -3,7 +3,7 @@ import {
 	closestSize,
 	sameSize,
 	sizeLabel,
-	variantOf,
+	savedLook,
 	type CarpetPose,
 	type CarpetSize,
 } from '@repo/shared/carpets';
@@ -34,7 +34,7 @@ export async function updateCarpet(
 		size: carpet.size,
 		placement: null,
 	};
-	let variant = variantOf({ variants: carpet.variants, variant: current.variant });
+	let variant = savedLook(carpet, current.variant);
 	if (body.variant !== undefined) {
 		const asked = carpet.variants.find(v => v.id === body.variant);
 		if (!asked) throw new CarpetError(`${carpet.name} has no look ${JSON.stringify(body.variant)}`);

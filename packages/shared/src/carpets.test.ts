@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { CARPET_SPAWN, carpetHitsWalls, carpetSpawn, closestSize, moveCarpet, sizeLabel } from './carpets';
+import { CARPET_SPAWN, carpetHitsWalls, carpetSpawn, closestSize, moveCarpet, savedLook, sizeLabel } from './carpets';
 import { planGeometry } from './plan';
 
 const plan = planGeometry();
@@ -78,4 +78,11 @@ test('another look keeps the size when it comes in it, else takes the closest by
 	expect(closestSize(sizes, { widthIn: 96.2, lengthIn: 120 })).toEqual(sizes[1]!);
 	expect(closestSize(sizes, { widthIn: 108, lengthIn: 144 })).toEqual(sizes[1]!);
 	expect(closestSize(sizes, { widthIn: 24, lengthIn: 72 })).toEqual(sizes[0]!);
+});
+
+test('a layout whose saved look is gone shows the listing’s own look', () => {
+	const look = (id: string) => ({ id, name: id, url: '', image: null, sizes: [], texture: null });
+	const carpet = { variants: [look('black'), look('brown'), look('grey')], variant: 'brown' };
+	expect(savedLook(carpet, 'grey').id).toBe('grey');
+	expect(savedLook(carpet, 'default').id).toBe('brown');
 });

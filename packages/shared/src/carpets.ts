@@ -47,6 +47,10 @@ export type CarpetEntry = Carpet & { placement: CarpetPose | null; textureJobs: 
 export const variantOf = (carpet: Pick<Carpet, 'variants' | 'variant'>) =>
 	carpet.variants.find(v => v.id === carpet.variant) ?? carpet.variants[0]!;
 
+// The look a layout saved, or the listing's own when a reimport dropped it (or it predates looks).
+export const savedLook = (carpet: Pick<Carpet, 'variants' | 'variant'>, id: string) =>
+	carpet.variants.find(v => v.id === id) ?? variantOf(carpet);
+
 // A texture build's job target: one look of one carpet.
 export const textureTarget = (carpetId: string, variantId: string) => `${carpetId}/${variantId}`;
 
