@@ -428,6 +428,14 @@ export default {
 		const url = new URL(request.url);
 		const path = url.pathname;
 
+		// The sign-in cookie is Secure, so a browser on plain http drops it and lands back on the sign-in form. The edge
+		// names the scheme the visitor used; `wrangler dev` rewrites request.url to the production host and sends no such
+		// header, so local http keeps working.
+		if (request.headers.get('x-forwarded-proto') === 'http') {
+			url.protocol = 'https:';
+			return Response.redirect(url.toString(), 308);
+		}
+
 		if (path === '/login' && request.method === 'POST') return signIn(request, env.API_TOKEN);
 		if (!authorized(request, env.API_TOKEN))
 			return path.startsWith('/api/') ? Response.json({ error: 'Sign in first' }, { status: 401 }) : loginPage();

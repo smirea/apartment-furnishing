@@ -1177,26 +1177,36 @@
 						</p>
 						{#if tvError}<p class="error">{tvError}</p>{/if}
 					{/if}
-					{#each s.groups as [group, tiles] (group)}
-						{@const groupKey = `${s.key}/${group}`}
-						{@const expanded = !collapsedGroups.includes(groupKey)}
-						{#if group}
-							<button
-								type="button"
-								class="section-toggle group-toggle"
-								aria-expanded={expanded}
-								onclick={() => toggleGroup(groupKey)}
-							>
-								{group} <span>{tiles.length}</span>
-							</button>
-						{/if}
-						{#if !group || expanded}
-							<div class="tiles">
-								{#each tiles as t (t.id)}{@render tile(t)}{/each}
+					{#if s.key === 'wallTexture'}
+						{#each s.groups as [group, tiles] (group)}
+							<h3 class="group">{group} <span class="muted">{tiles.length}</span></h3>
+							<div class="swatches">
+								{#each tiles as t (t.id)}{@render swatch(t)}{/each}
 							</div>
-						{/if}
-					{/each}
-					{#if s.importer.isPending}
+						{/each}
+						{#if s.importer.isPending}<div class="swatches">
+								<span class="swatch busy" aria-label="Importing"></span>
+							</div>{/if}
+					{:else}{#each s.groups as [group, tiles] (group)}
+							{@const groupKey = `${s.key}/${group}`}
+							{@const expanded = !collapsedGroups.includes(groupKey)}
+							{#if group}
+								<button
+									type="button"
+									class="section-toggle group-toggle"
+									aria-expanded={expanded}
+									onclick={() => toggleGroup(groupKey)}
+								>
+									{group} <span>{tiles.length}</span>
+								</button>
+							{/if}
+							{#if !group || expanded}
+								<div class="tiles">
+									{#each tiles as t (t.id)}{@render tile(t)}{/each}
+								</div>
+							{/if}
+						{/each}{/if}
+					{#if s.importer.isPending && s.key !== 'wallTexture'}
 						<div class="tiles">
 							<div class="tile busy">
 								<span class="face"><span class="name">{host(s.importer.variables!)}</span></span>
@@ -1229,6 +1239,27 @@
 		{/each}
 	{/if}
 </div>
+
+<!-- Wall textures stay a dense grid of pattern swatches at one scale, so slat widths compare at a glance. A click puts
+	the texture on the walls (or builds it) and opens its card. -->
+{#snippet swatch(t: Tile)}
+	<button
+		type="button"
+		class="swatch"
+		class:on-target={t.on}
+		class:open={t.id === cardId}
+		class:busy={building(t.job)}
+		class:failed={t.job?.state === 'failed'}
+		style:background-image="url({t.image})"
+		style:background-size={t.swatchSize ?? 'cover'}
+		aria-label={t.name}
+		onclick={() => {
+			if (!t.on) t.action?.run();
+			t.open();
+		}}
+		{@attach peekOn(() => t.peek())}
+	></button>
+{/snippet}
 
 {#snippet tile(t: Tile)}
 	<div
@@ -1714,6 +1745,63 @@
 		font-weight: 600;
 		letter-spacing: 0.04em;
 		text-transform: uppercase;
+	}
+
+	.left h3.group {
+		margin: 0.2rem 0 -0.2rem;
+		font-size: 0.75rem;
+		font-weight: 600;
+	}
+
+	.swatches {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(2.6rem, 1fr));
+		gap: 0.35rem;
+	}
+
+	.swatch {
+		position: relative;
+		aspect-ratio: 1;
+		padding: 0;
+		border: 2px solid transparent;
+		border-radius: 0.3rem;
+		background-color: #fff;
+		background-position: center;
+		background-repeat: repeat;
+		box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.25);
+	}
+
+	.swatch.on-target {
+		border-color: var(--app-accent);
+	}
+
+	.swatch.open {
+		outline: 2px solid var(--app-panel-text);
+		outline-offset: 1px;
+	}
+
+	.swatch.busy::after,
+	.swatch.failed::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: 0.2rem;
+		background: rgb(0 0 0 / 0.45);
+	}
+
+	.swatch.busy::before {
+		content: '';
+		position: absolute;
+		z-index: 1;
+		inset: 30%;
+		border: 2px solid #fff;
+		border-right-color: transparent;
+		border-radius: 50%;
+		animation: spin 0.8s linear infinite;
+	}
+
+	.swatch.failed::after {
+		background: color-mix(in srgb, var(--app-error) 55%, transparent);
 	}
 
 	.tiles {
