@@ -70,12 +70,10 @@
 		if (!res.ok) throw new Error(body.error ?? `${res.status} ${res.statusText}`);
 		return body;
 	}
-	// Queries are keyed [name, layout] and keep showing the last layout's data until the new layout's arrives.
 	const inLayout = <T>(name: string, path: string) => ({
 		queryKey: [name, layout],
 		queryFn: ({ queryKey }: { queryKey: readonly unknown[] }) => api<T>(path, undefined, queryKey[1] as string),
 		enabled: !!layout,
-		placeholderData: keepPreviousData,
 	});
 
 	const queryClient = useQueryClient();
@@ -88,6 +86,10 @@
 	});
 	const catalogQuery = createQuery(() => ({
 		...inLayout<CatalogEntry[]>('catalog', '/api/catalog'),
+		// Only the products deleted from a layout differ between layouts, and nothing here edits a layout through them,
+		// so the old list stands in while the new one loads. Fixtures and carpets show nothing until theirs arrive:
+		// editing the last layout's copy would save it over the new one.
+		placeholderData: keepPreviousData,
 		refetchInterval: query =>
 			query.state.data?.some(item => item.modelJob?.state === 'running' || item.grouping) ? 3000 : false,
 	}));
@@ -215,6 +217,7 @@
 
 	const texturesQuery = createQuery(() => ({
 		...inLayout<WallTextureEntry[]>('textures', '/api/textures'),
+		placeholderData: keepPreviousData,
 		refetchInterval: query =>
 			query.state.data?.some(t => t.textureJob && t.textureJob.state !== 'failed') ? 3000 : false,
 	}));
@@ -645,11 +648,18 @@
 	const money = (item: CatalogItem) =>
 		item.price === null ? null : item.price.toLocaleString('en-US', { style: 'currency', currency: item.currency });
 
-	async function addToRoom(itemId: string) {
+	// An import that finishes after the plan switched layouts lands in the layout it was pasted in, saved straight away
+	// since that room isn't on screen.
+	async function addToRoom(itemId: string, at = layout) {
 		const key = crypto.randomUUID();
 		const elevation = (catalog[itemId]?.defaultElevationIn ?? 0) / 12;
+		const placement: Placement = { key, itemId, position: [SPAWN.x, elevation, SPAWN.z], rotation: [0, 0, 0] };
+		if (at !== layout) {
+			await api(`/api/placements/${key}`, { method: 'PUT', body: JSON.stringify(placement) }, at);
+			return;
+		}
 		viewer?.snapWhenLoaded(key);
-		updatePlacements([...placements, { key, itemId, position: [SPAWN.x, elevation, SPAWN.z], rotation: [0, 0, 0] }]);
+		updatePlacements([...placements, placement]);
 		await tick();
 		viewer?.select({ kind: 'item', key });
 	}
@@ -754,10 +764,13 @@
 	const carpetImport = createMutation(() => ({
 		mutationFn: (url: string) =>
 			api<CarpetEntry>('/api/carpets/import', { method: 'POST', body: JSON.stringify({ url }) }),
-		onSuccess: async (carpet: CarpetEntry) => {
+		onMutate: () => ({ at: layout }),
+		onSuccess: async (carpet: CarpetEntry, _url: string, { at }: { at: string | null }) => {
 			importUrls.carpets = '';
 			carpetError = null;
 			await queryClient.invalidateQueries({ queryKey: ['carpets'] });
+			// The server laid it on the floor of the layout it was pasted in.
+			if (at !== layout) return;
 			if (!carpet.placement) {
 				carpetError = `At ${sizeLabel(carpet.size)} it doesn't fit in the middle of the living room`;
 				return;
@@ -774,11 +787,12 @@
 	const importMutation = createMutation(() => ({
 		mutationFn: (url: string) =>
 			api<CatalogItem>('/api/catalog/import', { method: 'POST', body: JSON.stringify({ url }) }),
-		onSuccess: async (item: CatalogItem) => {
+		onMutate: () => ({ at: layout }),
+		onSuccess: async (item: CatalogItem, _url: string, { at }: { at: string | null }) => {
 			importUrls.furniture = '';
 			await queryClient.invalidateQueries({ queryKey: ['catalog'] });
 			const fixture = fixtureCategories.get(item.category);
-			if (!fixture) return addToRoom(item.id);
+			if (!fixture) return addToRoom(item.id, at);
 			// The server made it the fixture's pick.
 			open[fixture] = true;
 			await queryClient.invalidateQueries({ queryKey: ['fixtures'] });
