@@ -17,6 +17,7 @@ const UV_CACHE = join(ROOT, '.cache/uv');
 if (!Bun.which('codex')) throw new Error('codex CLI not found on PATH');
 // Pinned so the builds don't follow whatever model the laptop's own Codex config picks.
 const CODEX_MODEL = 'gpt-6.1-terra';
+const CODEX_EFFORT = 'medium';
 
 async function prompt(item: CatalogItem, photos: string[]) {
 	const d = item.dimensions;
@@ -69,6 +70,8 @@ export async function runCodex(work: string, photos: string[], prompt: string, e
 			'exec',
 			'-m',
 			CODEX_MODEL,
+			'-c',
+			`model_reasoning_effort="${CODEX_EFFORT}"`,
 			'--skip-git-repo-check',
 			'--ephemeral',
 			'-s',
