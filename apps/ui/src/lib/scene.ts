@@ -77,6 +77,10 @@ const DEG = Math.PI / 180;
 // A rug's thickness: carpets lie this far above the floor, under the furniture standing on it.
 const CARPET_FT = 0.4 / 12;
 const round1 = (n: number) => Math.round(n * 10) / 10;
+// Floor-plan pieces overlap where they meet, and the cutaway cuts them all to one height, so pieces that share a face
+// z-fight there. Pushing a piece back in depth lets the other win the shared face: walls and window frames stay in
+// front, then fixtures and doors, then glass.
+const recessed = (rank: number) => ({ polygonOffset: true, polygonOffsetFactor: rank, polygonOffsetUnits: rank });
 
 const floorColors: Record<FloorKind, number> = { wood: 0xc9a672, tile: 0xe6e6e2, concrete: 0x9a9a98 };
 
@@ -154,6 +158,7 @@ export function createViewer(
 		opacity: 0.35,
 		roughness: 0.1,
 		depthWrite: false,
+		...recessed(2),
 	});
 	const frameMat = new MeshStandardMaterial({ color: 0x2f3438, roughness: 0.5 });
 	const inchPx = PX_PER_FT / 12;
@@ -221,7 +226,13 @@ export function createViewer(
 	const tvWallFixtures: { mesh: Mesh; x: number }[] = [];
 	for (const f of fixtures) {
 		const y = f.y ?? 0;
-		const mesh = addBox(wallGroup, f.rect, y, f.height, new MeshStandardMaterial({ color: f.color, roughness: 0.6 }));
+		const mesh = addBox(
+			wallGroup,
+			f.rect,
+			y,
+			f.height,
+			new MeshStandardMaterial({ color: f.color, roughness: 0.6, ...recessed(1) }),
+		);
 		cutawayWalls.push({ mesh, fullHeight: f.height, y, glass: false });
 		if (f.tvWall) tvWallFixtures.push({ mesh, x: mesh.position.x });
 		if (f.solid || (y === 0 && f.height > 1)) {
@@ -234,7 +245,7 @@ export function createViewer(
 		}
 	}
 
-	const doorMat = new MeshStandardMaterial({ color: 0x9a9ea3, roughness: 0.7 });
+	const doorMat = new MeshStandardMaterial({ color: 0x9a9ea3, roughness: 0.7, ...recessed(1) });
 	const doorLeaves = doors.map(door => door.map(ft) as Segment);
 	// Measuring reads this list on every step, so hidden doors stop blocking a measurement too.
 	const doorObstacles = [...doorLeaves];
