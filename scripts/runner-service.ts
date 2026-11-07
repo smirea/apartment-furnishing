@@ -44,13 +44,23 @@ function install() {
 </plist>
 `,
 	);
-	run(['launchctl', 'bootout', `${domain}/${LABEL}`], { allowFail: true });
+	stop();
 	run(['launchctl', 'bootstrap', domain, PLIST]);
 	console.log(`Started ${LABEL} from ${ROOT}; logs in ${LOG}`);
 }
 
-function uninstall() {
+// bootout returns before the agent is gone, and bootstrapping it again meanwhile fails with an I/O error.
+function stop() {
 	run(['launchctl', 'bootout', `${domain}/${LABEL}`], { allowFail: true });
+	const deadline = Date.now() + 10_000;
+	while (run(['launchctl', 'print', `${domain}/${LABEL}`], { allowFail: true })) {
+		if (Date.now() > deadline) throw new Error(`${LABEL} is still loaded 10 s after bootout`);
+		Bun.sleepSync(200);
+	}
+}
+
+function uninstall() {
+	stop();
 	if (existsSync(PLIST)) rmSync(PLIST);
 	console.log(`Removed ${LABEL}`);
 }
