@@ -101,13 +101,13 @@
 		(collapsedGroups = collapsedGroups.includes(group)
 			? collapsedGroups.filter(g => g !== group)
 			: [...collapsedGroups, group]);
+	const building = (job: Job | null | undefined) => job?.state === 'queued' || job?.state === 'running';
 	let picksSaving = 0;
 	// The newest pick per fixture; replies to older picks that land after it are dropped.
 	const latestPick: Partial<Record<FixtureKey, number>> = {};
 	// The plan draws picks from the catalog and texture lists, which only refresh on their own while a build they know
 	// about runs. A pick or build started elsewhere, like the AR app importing a bed, has to refresh them from here.
 	$effect(() => {
-		const building = (job: Job | null | undefined) => job?.state === 'queued' || job?.state === 'running';
 		for (const f of fixtureList) {
 			const textures = f.kind === 'wallTexture';
 			if (!textures && f.kind !== 'item') continue;
@@ -126,7 +126,10 @@
 		void queryClient.cancelQueries({ queryKey: ['fixtures'] });
 		queryClient.setQueryData<Fixture[]>(['fixtures'], list => list?.map(f => (f.key === next.key ? next : f)));
 	}
-	const fixtureUrls = $state(Object.fromEntries(FIXTURE_KEYS.map(key => [key, ''])) as Record<FixtureKey, string>);
+	type SectionKey = FixtureKey | 'furniture' | 'carpets';
+	const importUrls = $state(
+		Object.fromEntries([...FIXTURE_KEYS, 'furniture', 'carpets'].map(key => [key, ''])) as Record<SectionKey, string>,
+	);
 	function fixtureMutations(key: FixtureKey) {
 		return {
 			select: createMutation(() => ({
@@ -153,7 +156,7 @@
 				mutationFn: (url: string) =>
 					api<Fixture>(`/api/fixtures/${key}/import`, { method: 'POST', body: JSON.stringify({ url }) }),
 				onSuccess: async (next: Fixture) => {
-					fixtureUrls[key] = '';
+					importUrls[key] = '';
 					if (key === 'tv') dropTvDraft();
 					storeFixture(next);
 					await queryClient.invalidateQueries({ queryKey: [next.kind === 'wallTexture' ? 'textures' : 'catalog'] });
@@ -198,23 +201,11 @@
 			.toSorted(([a], [b]) => a.localeCompare(b)),
 	);
 	const applied = (t: WallTexture) => fixtures.wallTexture?.selected === t.id;
-	function clickSwatch(t: WallTextureEntry) {
-		if (t.texture && t.textureJob?.state !== 'failed') {
-			if (!applied(t)) fixtureActions.wallTexture.select.mutate(t.id);
-		} else if (!t.textureJob || t.textureJob.state === 'failed') fixtureActions.wallTexture.build.mutate(t.id);
-		openCard({ kind: 'option', key: 'wallTexture', id: t.id });
-	}
-	// Clicking the current pick only opens its card, which has the button to take it out.
-	function clickOption(f: Fixture, option: FixtureOption) {
-		if (option.ready && option.id !== f.selected) fixtureActions[f.key].select.mutate(option.id);
-		openCard({ kind: 'option', key: f.key, id: option.id });
-	}
 	type Product = {
 		name: string;
 		image: string | null;
 		url: string;
 		facts: string[];
-		summary: string | null;
 		warning: string | null;
 	};
 	type PeekContent = { kind: 'texture'; texture: WallTextureEntry } | { kind: 'product'; product: Product };
@@ -228,8 +219,21 @@
 				? `${inches(item.dimensions.width)} W × ${inches(item.dimensions.height)} H × ${inches(item.dimensions.depth)} D` +
 					(item.weightLb ? ` · ${item.weightLb} lb` : '')
 				: '',
+			[
+				building(item.modelJob)
+					? 'Building 3D model'
+					: item.modelJob?.state === 'failed'
+						? '3D model failed'
+						: item.modelSource === 'generated'
+							? 'AI 3D model'
+							: item.model
+								? '3D model'
+								: 'No 3D model',
+				placedCount(item.id) ? `${placedCount(item.id)} in the room` : null,
+			]
+				.filter(Boolean)
+				.join(' · '),
 		].filter(Boolean),
-		summary: item.summary,
 		warning,
 	});
 	function optionProduct(f: Fixture, option: FixtureOption): Product | null {
@@ -238,9 +242,146 @@
 		// The hand-sized TV has no listing to show.
 		if (!option.url) return null;
 		const { name, image, url, warning } = option;
-		return { name, image, url, facts: [option.detail], summary: null, warning };
+		return { name, image, url, facts: [option.detail], warning };
 	}
+	const carpetProduct = (c: CarpetEntry): Product => ({
+		name: c.name,
+		image: c.texture?.map ?? c.image,
+		url: c.url,
+		facts: [carpetFacts(c), c.brand ?? ''].filter(Boolean),
+		warning: null,
+	});
 	const host = (url: string) => new URL(url).hostname.replace('www.', '');
+
+	// Every list in the side panel is a grid of these: click opens the card, hover peeks, the corner button adds it.
+	type Tile = {
+		id: string;
+		name: string;
+		image: string | null;
+		// Wall textures tile their pattern at a fixed scale instead of fitting a photo.
+		swatchSize: string | null;
+		on: boolean;
+		count: number;
+		job: Job | null | undefined;
+		warning: boolean;
+		peek: () => PeekContent | null;
+		open: () => void;
+		action: { label: string; icon: '+' | '✓' | '↻'; run: () => void } | null;
+	};
+	function toggleAction(on: boolean, add: string, remove: string, run: (on: boolean) => void): Tile['action'] {
+		return { label: on ? remove : add, icon: on ? '✓' : '+', run: () => run(on) };
+	}
+	function textureTile(t: WallTextureEntry): Tile {
+		const select = fixtureActions.wallTexture.select;
+		const built = t.texture && t.textureJob?.state !== 'failed';
+		return {
+			id: t.id,
+			name: t.name,
+			image: t.texture?.map ?? t.image,
+			swatchSize: t.texture ? `${(t.texture.repeat.width / 12) * SWATCH_PX_PER_FT}px auto` : null,
+			on: applied(t),
+			count: 0,
+			job: t.textureJob,
+			warning: false,
+			peek: () => ({ kind: 'texture', texture: t }),
+			open: () => openCard({ kind: 'option', key: 'wallTexture', id: t.id }),
+			action: building(t.textureJob)
+				? null
+				: built
+					? toggleAction(applied(t), 'Put on the walls', 'Take off the walls', on => select.mutate(on ? null : t.id))
+					: {
+							label: t.textureJob ? 'Retry texture' : 'Build texture',
+							icon: '↻',
+							run: () => fixtureActions.wallTexture.build.mutate(t.id),
+						},
+		};
+	}
+	function optionTile(f: Fixture, option: FixtureOption): Tile {
+		const actions = fixtureActions[f.key];
+		return {
+			id: option.id,
+			name: option.name,
+			image: option.image,
+			swatchSize: null,
+			on: option.id === f.selected,
+			count: 0,
+			job: option.job,
+			warning: !!option.warning,
+			peek: () => {
+				const product = optionProduct(f, option);
+				return product && { kind: 'product', product };
+			},
+			open: () => openCard({ kind: 'option', key: f.key, id: option.id }),
+			action:
+				option.job?.state === 'failed'
+					? { label: 'Retry build', icon: '↻', run: () => actions.build.mutate(option.id) }
+					: option.ready
+						? toggleAction(option.id === f.selected, 'Put in the room', 'Take out of the room', on =>
+								actions.select.mutate(on ? null : option.id),
+							)
+						: null,
+		};
+	}
+	const itemTile = (item: CatalogEntry): Tile => ({
+		id: item.id,
+		name: item.name,
+		image: item.image,
+		swatchSize: null,
+		on: placedCount(item.id) > 0,
+		count: placedCount(item.id),
+		job: item.modelJob,
+		warning: false,
+		peek: () => ({ kind: 'product', product: itemProduct(item) }),
+		open: () => openCard({ kind: 'item', id: item.id }),
+		action: { label: 'Add to room', icon: '+', run: () => void addToRoom(item.id) },
+	});
+	const carpetTile = (c: CarpetEntry): Tile => ({
+		id: c.id,
+		name: c.name,
+		image: c.texture?.map ?? c.image,
+		swatchSize: null,
+		on: !!c.placement,
+		count: 0,
+		job: c.textureJob,
+		warning: false,
+		peek: () => ({ kind: 'product', product: carpetProduct(c) }),
+		open: () => (c.placement ? viewer?.select({ kind: 'carpet', id: c.id }) : openCard({ kind: 'carpet', id: c.id })),
+		action: toggleAction(!!c.placement, 'Add to room', 'Remove from room', on =>
+			on ? removeCarpet(c) : void addCarpet(c),
+		),
+	});
+
+	type Section = {
+		key: SectionKey;
+		title: string;
+		summary: string;
+		groups: (readonly [string | null, Tile[]])[];
+		placeholder: string;
+		importer: {
+			mutate: (url: string) => void;
+			isPending: boolean;
+			isError: boolean;
+			error: Error | null;
+			variables: string | undefined;
+		};
+		errors: string[];
+		loading: boolean;
+	};
+	const fixtureSection = (f: Fixture): Section => ({
+		key: f.key,
+		title: f.kind === 'wallTexture' ? `${f.room} wall texture` : f.title,
+		summary: fixtureSummary(f),
+		groups:
+			f.kind === 'wallTexture'
+				? textureGroups.map(([group, items]) => [group, items.map(textureTile)] as const)
+				: [[null, f.options.map(o => optionTile(f, o))]],
+		placeholder: f.importLabel,
+		importer: fixtureActions[f.key].import,
+		errors: [fixtureActions[f.key].select.error, fixtureActions[f.key].build.error].flatMap(e =>
+			e ? [e.message] : [],
+		),
+		loading: f.kind === 'wallTexture' && texturesQuery.isPending,
+	});
 
 	// The card takes the pointer so its link can be clicked, so leaving the row hides it only after long enough to
 	// cross into it. It sits beside the row's panel rather than the row so it never covers the neighboring rows.
@@ -467,14 +608,6 @@
 	const inches = (n: number) => `${Math.round(n * 10) / 10}"`;
 	const money = (item: CatalogItem) =>
 		item.price === null ? null : item.price.toLocaleString('en-US', { style: 'currency', currency: item.currency });
-	const furnitureFacts = (item: CatalogEntry) =>
-		[
-			money(item),
-			item.modelSource === 'generated' ? 'AI 3D' : item.model ? '3D' : item.modelJob ? null : 'no 3D',
-			placedCount(item.id) ? `${placedCount(item.id)} placed` : null,
-		]
-			.filter(Boolean)
-			.join(' · ');
 
 	async function addToRoom(itemId: string) {
 		const key = crypto.randomUUID();
@@ -585,12 +718,11 @@
 			.filter(Boolean)
 			.join(' · ');
 
-	let carpetUrl = $state('');
 	const carpetImport = createMutation(() => ({
 		mutationFn: (url: string) =>
 			api<CarpetEntry>('/api/carpets/import', { method: 'POST', body: JSON.stringify({ url }) }),
 		onSuccess: async (carpet: CarpetEntry) => {
-			carpetUrl = '';
+			importUrls.carpets = '';
 			carpetError = null;
 			await queryClient.invalidateQueries({ queryKey: ['carpets'] });
 			if (!carpet.placement) {
@@ -606,12 +738,11 @@
 		onSuccess: () => queryClient.invalidateQueries({ queryKey: ['carpets'] }),
 	}));
 
-	let importUrl = $state('');
 	const importMutation = createMutation(() => ({
 		mutationFn: (url: string) =>
 			api<CatalogItem>('/api/catalog/import', { method: 'POST', body: JSON.stringify({ url }) }),
 		onSuccess: async (item: CatalogItem) => {
-			importUrl = '';
+			importUrls.furniture = '';
 			await queryClient.invalidateQueries({ queryKey: ['catalog'] });
 			const fixture = fixtureCategories.get(item.category);
 			if (!fixture) return addToRoom(item.id);
@@ -625,6 +756,30 @@
 		mutationFn: (id: string) => api(`/api/catalog/${id}/model`, { method: 'POST' }),
 		onSuccess: () => queryClient.invalidateQueries({ queryKey: ['catalog'] }),
 	}));
+
+	const sections = $derived<Section[]>([
+		...fixtureList.map(fixtureSection),
+		{
+			key: 'furniture',
+			title: 'Furniture',
+			summary: String(furnitureList.length),
+			groups: furnitureGroups.map(([group, items]) => [group, items!.map(itemTile)] as const),
+			placeholder: 'Paste an Amazon or Walmart link',
+			importer: importMutation,
+			errors: [],
+			loading: catalogQuery.isPending,
+		},
+		{
+			key: 'carpets',
+			title: 'Carpets',
+			summary: String(carpetList.length),
+			groups: [[null, carpetList.map(carpetTile)]],
+			placeholder: 'Paste a rug link',
+			importer: carpetImport,
+			errors: carpetError && !selectedCarpet ? [carpetError] : [],
+			loading: carpetsQuery.isPending,
+		},
+	]);
 
 	// Hand edits stay local until their save lands, so a fixtures poll can't snap the inputs back mid-drag.
 	let tvDraft = $state<TvSettings | null>(null);
@@ -665,12 +820,7 @@
 		tv ? TV_RATIOS.findIndex(([w, h]) => Math.abs(tv!.widthIn / tv!.heightIn - w / h) < 0.01) : -1,
 	);
 	// The corner TV's back edge clears both walls by the mount's standoff, so it reaches (mount + width) / √2 along each.
-	const tvWhere = (tv: TvSettings) =>
-		({
-			backWall: 'centered on the back wall',
-			pillarWall: 'centered between the column and the back wall',
-			corner: `across the corner, reaching ${round1((TV_MOUNT_IN + tv.widthIn) / Math.SQRT2)}″ along each wall`,
-		})[tv.placement];
+	const tvReach = (tv: TvSettings) => round1((TV_MOUNT_IN + tv.widthIn) / Math.SQRT2);
 	function setDiagonal(value: string) {
 		const diagonal = positive(value);
 		if (!tv || !diagonal) return;
@@ -742,38 +892,37 @@
 
 <div class="viewer" bind:this={container}></div>
 
-<div class="left">
-	<header class="panel hud">
-		<h1>Apartment <span>2 bed · 2 bath · 1,176 sqft</span></h1>
-		<div class="actions">
-			<button type="button" class="primary" onclick={() => viewer?.setMode(mode === 'orbit' ? 'walk' : 'orbit')}>
-				{mode === 'orbit' ? 'Walk inside' : 'Back to overview'}
-			</button>
-			{#if mode === 'orbit'}
+<div class="left panel">
+	<header class="hud">
+		<button type="button" class="primary" onclick={() => viewer?.setMode(mode === 'orbit' ? 'walk' : 'orbit')}>
+			{mode === 'orbit' ? 'Walk inside' : 'Back to overview'}
+		</button>
+		{#if mode === 'orbit'}
+			<div class="toggles">
 				<label><input type="checkbox" bind:checked={cutaway} /> Cutaway walls</label>
 				<label><input type="checkbox" bind:checked={labels} /> Room labels</label>
-			{/if}
-		</div>
-		{#if mode === 'walk'}
+			</div>
+		{:else}
 			<p class="help">WASD or arrows to move, mouse to look, click to inspect, Shift to run, Esc to exit.</p>
 		{/if}
 	</header>
 
 	{#if mode === 'orbit'}
-		{#each fixtureList as f (f.key)}
-			{@const actions = fixtureActions[f.key]}
-			<section class="panel items fixture">
+		{#if !fixtureList.length}
+			<p class="muted">{fixturesQuery.isError ? fixturesQuery.error.message : 'Loading…'}</p>
+		{/if}
+		{#each sections as s (s.key)}
+			<section>
 				<button
 					type="button"
 					class="section-toggle"
-					aria-expanded={open[f.key]}
-					onclick={() => (open[f.key] = !open[f.key])}
+					aria-expanded={open[s.key]}
+					onclick={() => (open[s.key] = !open[s.key])}
 				>
-					{f.kind === 'wallTexture' ? `${f.room} wall texture` : f.title}
-					<span class="muted">{fixtureSummary(f)}</span>
+					{s.title} <span class="muted">{s.summary}</span>
 				</button>
-				{#if open[f.key]}
-					{#if f.kind === 'tv' && tv}
+				{#if open[s.key]}
+					{#if s.key === 'tv' && tv}
 						<label class="check"
 							><input
 								type="checkbox"
@@ -863,288 +1012,102 @@
 							</label>
 						</div>
 						<p class="muted">
-							Inches. Bottom edge {round1(tv.centerIn - tv.heightIn / 2)}″ off the floor, top {round1(
+							Bottom {round1(tv.centerIn - tv.heightIn / 2)}″ · top {round1(
 								tv.centerIn + tv.heightIn / 2,
-							)}″, {tvWhere(tv)}.
+							)}″{#if tv.placement === 'corner'}
+								· {tvReach(tv)}″ along each wall{/if}
 						</p>
 						{#if tvError}<p class="error">{tvError}</p>{/if}
 					{/if}
-					{#if actions.select.isError}<p class="error">{actions.select.error.message}</p>{/if}
-					{#if actions.build.isError}<p class="error">{actions.build.error.message}</p>{/if}
-					{#if f.kind === 'wallTexture'}
-						{#each textureGroups as [group, items] (group)}
-							<h3 class="group">{group} <span class="muted">{items.length}</span></h3>
-							<div class="swatches">
-								{#each items as t (t.id)}
-									<button
-										type="button"
-										class="swatch"
-										class:on-target={applied(t)}
-										class:open={t.id === cardId}
-										class:busy={t.textureJob?.state === 'queued' || t.textureJob?.state === 'running'}
-										class:failed={t.textureJob?.state === 'failed'}
-										style:background-image="url({t.texture?.map ?? t.image})"
-										style:background-size={t.texture
-											? `${(t.texture.repeat.width / 12) * SWATCH_PX_PER_FT}px auto`
-											: 'cover'}
-										aria-label={t.name}
-										onclick={() => clickSwatch(t)}
-										{@attach peekOn(() => ({ kind: 'texture', texture: t }))}
-									>
-									</button>
-								{/each}
+					{#each s.groups as [group, tiles] (group)}
+						{@const groupKey = `${s.key}/${group}`}
+						{@const expanded = !collapsedGroups.includes(groupKey)}
+						{#if group}
+							<button
+								type="button"
+								class="section-toggle group-toggle"
+								aria-expanded={expanded}
+								onclick={() => toggleGroup(groupKey)}
+							>
+								{group} <span>{tiles.length}</span>
+							</button>
+						{/if}
+						{#if !group || expanded}
+							<div class="tiles">
+								{#each tiles as t (t.id)}{@render tile(t)}{/each}
 							</div>
-						{/each}
-						{#if actions.import.isPending}<div class="swatches">
-								<span class="swatch busy" aria-label="Importing"></span>
-							</div>{/if}
-					{:else}
-						<ul>
-							{#if actions.import.isPending}
-								<li class="product-row">
-									<span class="pick">
-										<span class="thumb"></span>
-										<span class="text">
-											<strong>{host(actions.import.variables)} link</strong>
-											<span class="status busy">Importing · reading the page (about a minute)</span>
-										</span>
-									</span>
-								</li>
-							{/if}
-							{#each f.options as option (option.id)}
-								<li
-									class="product-row"
-									class:current={option.id === f.selected}
-									class:open={option.id === cardId}
-									{@attach peekOn(() => {
-										const product = optionProduct(f, option);
-										return product && { kind: 'product', product };
-									})}
-								>
-									<button
-										type="button"
-										class="pick"
-										aria-pressed={option.id === f.selected}
-										onclick={() => clickOption(f, option)}
-									>
-										{#if option.image}<img src={option.image} alt="" />{:else}<span class="thumb"></span>{/if}
-										<span class="text">
-											<strong>{option.name}</strong>
-											<span class="muted">{option.detail}</span>
-											{#if option.warning}<span class="error">{option.warning}</span>{/if}
-											{#if option.job?.state === 'queued' || option.job?.state === 'running'}
-												<span class="status busy">Building · 2–5 min</span>
-											{:else if option.job?.state === 'failed'}
-												<span class="status failed" title={option.job.error}>Build failed</span>
-											{/if}
-										</span>
-									</button>
-									{#if option.job?.state === 'failed'}
-										<button type="button" onclick={() => actions.build.mutate(option.id)}>Retry</button>
-									{:else if option.url}
-										<a href={option.url} target="_blank" rel="noreferrer" aria-label="Open {option.name} listing">↗</a>
-									{/if}
-								</li>
-							{:else}
-								{#if !actions.import.isPending}
-									<li class="muted">Nothing yet. Paste a link below.</li>
-								{/if}
-							{/each}
-						</ul>
+						{/if}
+					{/each}
+					{#if s.importer.isPending}
+						<div class="tiles">
+							<div class="tile busy">
+								<span class="face"><span class="name">{host(s.importer.variables!)}</span></span>
+							</div>
+						</div>
+					{:else if s.loading}
+						<p class="muted">Loading…</p>
 					{/if}
-					{#if f.kind === 'item'}
-						<p class="muted">
-							Back flush to the wall, centered on its {round1(f.spot.span * 12)}″. Click one to switch to it and open
-							its details.
-						</p>
-					{/if}
+					{#each s.errors as error (error)}<p class="error">{error}</p>{/each}
 					<form
 						class="import"
 						onsubmit={e => {
 							e.preventDefault();
-							if (fixtureUrls[f.key].trim()) actions.import.mutate(fixtureUrls[f.key].trim());
+							if (importUrls[s.key].trim()) s.importer.mutate(importUrls[s.key].trim());
 						}}
 					>
 						<input
 							type="url"
-							placeholder={f.importLabel}
-							bind:value={fixtureUrls[f.key]}
-							disabled={actions.import.isPending}
+							placeholder={s.placeholder}
+							bind:value={importUrls[s.key]}
+							disabled={s.importer.isPending}
 						/>
-						<button type="submit" class="primary" disabled={actions.import.isPending || !fixtureUrls[f.key].trim()}>
-							{actions.import.isPending ? 'Importing…' : 'Import'}
+						<button type="submit" class="primary" disabled={s.importer.isPending || !importUrls[s.key].trim()}>
+							{s.importer.isPending ? 'Importing…' : 'Import'}
 						</button>
 					</form>
-					{#if actions.import.isError}<p class="error">{actions.import.error.message}</p>{/if}
+					{#if s.importer.isError}<p class="error">{s.importer.error?.message}</p>{/if}
 				{/if}
-			</section>
-		{:else}
-			<section class="panel items">
-				<p class="muted">{fixturesQuery.isError ? fixturesQuery.error.message : 'Loading…'}</p>
 			</section>
 		{/each}
-
-		<section class="panel items">
-			<button
-				type="button"
-				class="section-toggle"
-				aria-expanded={open.furniture}
-				onclick={() => (open.furniture = !open.furniture)}
-			>
-				Furniture <span class="muted">{furnitureList.length}</span>
-			</button>
-			{#if open.furniture}
-				<form
-					class="import"
-					onsubmit={e => {
-						e.preventDefault();
-						if (importUrl.trim()) importMutation.mutate(importUrl.trim());
-					}}
-				>
-					<input
-						type="url"
-						placeholder="Paste an Amazon or Walmart link"
-						bind:value={importUrl}
-						disabled={importMutation.isPending}
-					/>
-					<button type="submit" class="primary" disabled={importMutation.isPending || !importUrl.trim()}>
-						{importMutation.isPending ? 'Importing…' : 'Import'}
-					</button>
-				</form>
-				{#if importMutation.isError}
-					<p class="error">{importMutation.error.message}</p>
-				{/if}
-
-				<div class="furniture-groups">
-					{#if importMutation.isPending}
-						<ul>
-							<li>
-								<span class="thumb"></span>
-								<div>
-									<strong>{host(importMutation.variables)} link</strong>
-									<span class="status busy">Importing · reading the page (about a minute)</span>
-								</div>
-							</li>
-						</ul>
-					{/if}
-					{#each furnitureGroups as [group, items] (group)}
-						{@const expanded = !collapsedGroups.includes(group)}
-						<button
-							type="button"
-							class="section-toggle group-toggle"
-							aria-expanded={expanded}
-							onclick={() => toggleGroup(group)}
-						>
-							{group} <span class="muted">{items!.length}</span>
-						</button>
-						{#if expanded}
-							<ul>
-								{#each items! as item (item.id)}
-									<li
-										class="product-row"
-										class:open={item.id === cardId}
-										{@attach peekOn(() => ({ kind: 'product', product: itemProduct(item) }))}
-									>
-										<button type="button" class="pick" onclick={() => openCard({ kind: 'item', id: item.id })}>
-											{#if item.image}<img src={item.image} alt="" />{:else}<span class="thumb"></span>{/if}
-											<span class="text">
-												<strong>{item.name}</strong>
-												{#if item.modelJob?.state === 'queued' || item.modelJob?.state === 'running'}
-													<span class="status busy">Building 3D model · 2–5 min</span>
-												{:else if item.modelJob?.state === 'failed'}
-													<span class="status failed" title={item.modelJob.error}
-														>3D model failed · open it to retry</span
-													>
-												{/if}
-												<span class="muted">{furnitureFacts(item)}</span>
-											</span>
-										</button>
-										<button type="button" onclick={() => addToRoom(item.id)}>Add</button>
-									</li>
-								{/each}
-							</ul>
-						{/if}
-					{:else}
-						{#if !importMutation.isPending}
-							<p class="muted">{catalogQuery.isPending ? 'Loading…' : 'No items yet. Paste a link above.'}</p>
-						{/if}
-					{/each}
-				</div>
-			{/if}
-		</section>
-
-		<section class="panel items">
-			<button
-				type="button"
-				class="section-toggle"
-				aria-expanded={open.carpets}
-				onclick={() => (open.carpets = !open.carpets)}
-			>
-				Carpets <span class="muted">{carpetList.length}</span>
-			</button>
-			{#if open.carpets}
-				<form
-					class="import"
-					onsubmit={e => {
-						e.preventDefault();
-						if (carpetUrl.trim()) carpetImport.mutate(carpetUrl.trim());
-					}}
-				>
-					<input type="url" placeholder="Paste a rug link" bind:value={carpetUrl} disabled={carpetImport.isPending} />
-					<button type="submit" class="primary" disabled={carpetImport.isPending || !carpetUrl.trim()}>
-						{carpetImport.isPending ? 'Importing…' : 'Import'}
-					</button>
-				</form>
-				{#if carpetImport.isError}<p class="error">{carpetImport.error.message}</p>{/if}
-				{#if carpetError && !selectedCarpet}<p class="error">{carpetError}</p>{/if}
-				<ul>
-					{#if carpetImport.isPending}
-						<li>
-							<span class="thumb"></span>
-							<div>
-								<strong>{host(carpetImport.variables)} link</strong>
-								<span class="status busy">Importing · reading the page (about a minute)</span>
-							</div>
-						</li>
-					{/if}
-					{#each carpetList as carpet (carpet.id)}
-						{@const thumb = carpet.texture?.map ?? carpet.image}
-						<li class="product-row" class:open={carpet.id === cardId}>
-							<button
-								type="button"
-								class="pick"
-								onclick={() =>
-									carpet.placement
-										? viewer?.select({ kind: 'carpet', id: carpet.id })
-										: openCard({ kind: 'carpet', id: carpet.id })}
-							>
-								{#if thumb}<img src={thumb} alt="" />{:else}<span class="thumb"></span>{/if}
-								<span class="text">
-									<strong>{carpet.name}</strong>
-									{#if carpet.textureJob?.state === 'queued' || carpet.textureJob?.state === 'running'}
-										<span class="status busy">Drawing the rug · 2–5 min</span>
-									{:else if carpet.textureJob?.state === 'failed'}
-										<span class="status failed" title={carpet.textureJob.error}>Image failed · open it to retry</span>
-									{/if}
-									<span class="muted">{carpetFacts(carpet)}</span>
-								</span>
-							</button>
-							{#if carpet.placement}
-								<button type="button" onclick={() => removeCarpet(carpet)}>Remove</button>
-							{:else}
-								<button type="button" onclick={() => addCarpet(carpet)}>Add</button>
-							{/if}
-						</li>
-					{:else}
-						{#if !carpetImport.isPending}
-							<p class="muted">{carpetsQuery.isPending ? 'Loading…' : 'No carpets yet. Paste a rug link above.'}</p>
-						{/if}
-					{/each}
-				</ul>
-			{/if}
-		</section>
 	{/if}
 </div>
+
+{#snippet tile(t: Tile)}
+	<div
+		class="tile"
+		class:on={t.on}
+		class:open={t.id === cardId}
+		class:busy={building(t.job)}
+		class:failed={t.job?.state === 'failed'}
+		{@attach peekOn(() => t.peek())}
+	>
+		<button
+			type="button"
+			class="face"
+			aria-label={t.name}
+			onclick={t.open}
+			style:background-image={t.swatchSize ? `url(${t.image})` : null}
+			style:background-size={t.swatchSize}
+		>
+			{#if t.swatchSize}{:else if t.image}<img src={t.image} alt="" loading="lazy" />{:else}<span class="name"
+					>{t.name}</span
+				>{/if}
+		</button>
+		{#if t.count > 1}<span class="badge count">{t.count}</span>{/if}
+		{#if t.warning}<span class="badge warning" aria-hidden="true">!</span>{/if}
+		{#if t.action}
+			{@const action = t.action}
+			<button
+				type="button"
+				class="add"
+				class:on={action.icon === '✓'}
+				aria-label={action.label}
+				title={action.label}
+				onclick={action.run}>{action.icon}</button
+			>
+		{/if}
+	</div>
+{/snippet}
 
 <div class="right">
 	{#if mode === 'orbit'}
@@ -1237,7 +1200,6 @@
 						{inches(item.dimensions.width)} W × {inches(item.dimensions.height)} H × {inches(item.dimensions.depth)} D{#if item.weightLb}
 							· {item.weightLb} lb{/if}
 					</p>
-					{#if item.dimensionsNote}<p class="note">{item.dimensionsNote}</p>{/if}
 				{/if}
 
 				<div class="controls">
@@ -1289,16 +1251,12 @@
 
 				<p class="model-status">
 					{#if cardJob?.state === 'queued' || cardJob?.state === 'running'}
-						<span class="status busy"
-							>Codex is building a 3D model from the listing photos (2–5 min). Shown as a box until then.</span
-						>
+						<span class="status busy">Building 3D model · 2–5 min</span>
 					{:else}
-						{#if cardJob?.state === 'failed'}<span class="error">Model generation failed: {cardJob.error}</span>
-						{:else if item.modelSource === 'listing'}<span class="muted">3D model from the listing.</span>
-						{:else if item.modelSource === 'generated'}<span class="muted"
-								>3D model approximated by Codex from the listing photos.</span
-							>
-						{:else}<span class="muted">The listing has no 3D model.</span>{/if}
+						{#if cardJob?.state === 'failed'}<span class="error">3D model failed: {cardJob.error}</span>
+						{:else if item.modelSource === 'listing'}<span class="muted">3D model from the listing</span>
+						{:else if item.modelSource === 'generated'}<span class="muted">AI 3D model</span>
+						{:else}<span class="muted">No 3D model</span>{/if}
 						{#if item.modelSource !== 'listing'}
 							<button type="button" onclick={() => generateMutation.mutate(item.id)}>
 								{item.modelSource === 'generated' ? 'Regenerate' : 'Generate'} 3D model
@@ -1307,12 +1265,6 @@
 					{/if}
 				</p>
 
-				<p>{item.summary}</p>
-				{#if item.highlights.length}
-					<ul>
-						{#each item.highlights as h (h)}<li>{h}</li>{/each}
-					</ul>
-				{/if}
 				<a href={item.url} target="_blank" rel="noreferrer">View on {host(item.url)} ↗</a>
 			{:else if card.kind === 'carpet'}
 				{@const c = card.carpet}
@@ -1350,20 +1302,16 @@
 
 				<p class="model-status">
 					{#if cardJob?.state === 'queued' || cardJob?.state === 'running'}
-						<span class="status busy"
-							>Codex is drawing the rug from the listing photos (2–5 min). Shown as a plain rug until then.</span
-						>
+						<span class="status busy">Drawing the rug · 2–5 min</span>
 					{:else}
 						{#if cardJob?.state === 'failed'}<span class="error">Drawing the rug failed: {cardJob.error}</span>
-						{:else if c.texture}<span class="muted">{c.texture.note}</span>
-						{:else}<span class="muted">No image of the rug yet.</span>{/if}
+						{:else if !c.texture}<span class="muted">No rug image yet</span>{/if}
 						<button type="button" onclick={() => carpetBuild.mutate(c.id)}>
 							{c.texture ? 'Redraw' : 'Draw'} the rug
 						</button>
 					{/if}
 				</p>
 
-				<p>{c.summary}</p>
 				<a href={c.url} target="_blank" rel="noreferrer">View on {host(c.url)} ↗</a>
 			{:else if card.kind === 'texture'}
 				{@const t = card.texture}
@@ -1418,7 +1366,6 @@
 					<button type="button" class="danger" disabled={deleteMutation.isPending} onclick={() => deleteCard(card)}>
 						{deleteMutation.isPending ? 'Deleting…' : 'Delete'}
 					</button>
-					<span class="muted">From the catalog and the room, for good.</span>
 				</div>
 				{#if deleteMutation.isError}<p class="error">{deleteMutation.error.message}</p>{/if}
 			{/if}
@@ -1437,8 +1384,6 @@
 		<span>TV wall: {estimate(t, 'tvWall')}</span>
 		<span>Column: {estimate(t, 'column')}</span>
 	{/if}
-	<p class="muted">{t.summary}</p>
-	{#if t.texture}<p class="note">{t.texture.note}</p>{/if}
 	{#if applied(t)}<span class="applied">On the TV wall and column</span>{/if}
 	<a href={t.url} target="_blank" rel="noreferrer">View on {host(t.url)} ↗</a>
 {/snippet}
@@ -1479,9 +1424,9 @@
 			{:else if t.textureJob?.state === 'running'}
 				<span class="status busy">Building texture · 2–5 min</span>
 			{:else if t.textureJob?.state === 'failed'}
-				<span class="error">Texture failed: {t.textureJob.error.slice(0, 160)} · click to retry</span>
+				<span class="error">Texture failed: {t.textureJob.error.slice(0, 160)}</span>
 			{:else if !t.texture}
-				<span class="muted">No texture yet · click to build it</span>
+				<span class="muted">No texture yet</span>
 			{/if}
 			{@render textureFacts(t)}
 		{:else}
@@ -1490,7 +1435,6 @@
 			<strong>{p.name}</strong>
 			{#each p.facts as fact (fact)}<span>{fact}</span>{/each}
 			{#if p.warning}<span class="error">{p.warning}</span>{/if}
-			{#if p.summary}<p class="muted summary">{p.summary}</p>{/if}
 			<a href={p.url} target="_blank" rel="noreferrer">View on {host(p.url)} ↗</a>
 		{/if}
 	</div>
@@ -1503,25 +1447,6 @@
 		background: var(--app-bg);
 	}
 
-	/* Sized to its panels and scrolled as a whole, so no panel gets squeezed and the plan stays clickable below. */
-	.left {
-		position: fixed;
-		top: 1rem;
-		left: 1rem;
-		display: flex;
-		flex-direction: column;
-		gap: 0.75rem;
-		width: 22rem;
-		max-height: calc(100vh - 2rem);
-		overflow-y: auto;
-		overscroll-behavior: contain;
-		scrollbar-width: thin;
-	}
-
-	.left > * {
-		flex-shrink: 0;
-	}
-
 	.panel {
 		padding: 1rem;
 		border: 1px solid var(--app-border);
@@ -1531,17 +1456,190 @@
 		pointer-events: auto;
 	}
 
-	.hud {
-		display: grid;
-		gap: 0.75rem;
-	}
-
-	.items {
+	/* One panel scrolled as a whole, so the plan stays clickable below it. */
+	.left {
+		position: fixed;
+		top: 1rem;
+		left: 1rem;
 		display: flex;
 		flex-direction: column;
-		gap: 0.6rem;
-		min-height: 0;
+		width: 20rem;
+		max-height: calc(100vh - 2rem);
+		overflow-y: auto;
+		overscroll-behavior: contain;
+		padding: 0;
 		font-size: 0.85rem;
+		scrollbar-width: thin;
+	}
+
+	.left > * {
+		flex-shrink: 0;
+	}
+
+	.hud {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.5rem 0.75rem;
+		align-items: center;
+		padding: 0.75rem;
+	}
+
+	.toggles {
+		display: grid;
+		gap: 0.2rem;
+	}
+
+	.left > p {
+		padding: 0 0.75rem 0.75rem;
+	}
+
+	.left section {
+		display: grid;
+		gap: 0.5rem;
+		padding: 0.6rem 0.75rem 0.75rem;
+		border-top: 1px solid var(--app-border);
+	}
+
+	.left section:has(> .section-toggle[aria-expanded='false']) {
+		padding-bottom: 0.6rem;
+	}
+
+	.section-toggle.group-toggle {
+		margin-top: 0.15rem;
+		color: var(--app-muted);
+		font-size: 0.7rem;
+		font-weight: 600;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+	}
+
+	.tiles {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 0.4rem;
+	}
+
+	.tile {
+		position: relative;
+		aspect-ratio: 1;
+	}
+
+	.tile .face {
+		display: grid;
+		place-items: center;
+		width: 100%;
+		height: 100%;
+		overflow: hidden;
+		padding: 0.3rem;
+		border: 2px solid transparent;
+		border-radius: 0.4rem;
+		background-color: #fff;
+		background-position: center;
+		background-repeat: repeat;
+	}
+
+	.tile img {
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
+	}
+
+	.tile .name {
+		overflow: hidden;
+		color: #1c1f24;
+		font-size: 0.7rem;
+		font-weight: 600;
+		line-height: 1.2;
+		text-align: center;
+		overflow-wrap: anywhere;
+	}
+
+	.tile.on .face {
+		border-color: var(--app-accent);
+	}
+
+	.tile.open .face {
+		outline: 2px solid var(--app-panel-text);
+		outline-offset: 1px;
+	}
+
+	.tile.busy .face::after,
+	.tile.failed .face::after {
+		content: '';
+		position: absolute;
+		inset: 0;
+		border-radius: 0.4rem;
+		background: rgb(0 0 0 / 0.45);
+	}
+
+	.tile.failed .face::after {
+		background: color-mix(in srgb, var(--app-error) 45%, transparent);
+	}
+
+	.tile.busy .face::before {
+		content: '';
+		position: absolute;
+		z-index: 1;
+		inset: 35%;
+		border: 2px solid #fff;
+		border-right-color: transparent;
+		border-radius: 50%;
+		animation: spin 0.8s linear infinite;
+	}
+
+	.tile .add {
+		position: absolute;
+		right: 0.25rem;
+		bottom: 0.25rem;
+		z-index: 2;
+		display: grid;
+		place-items: center;
+		width: 1.6rem;
+		height: 1.6rem;
+		padding: 0;
+		border: none;
+		border-radius: 50%;
+		background: rgb(28 31 36 / 0.8);
+		color: #fff;
+		font-size: 1rem;
+		line-height: 1;
+	}
+
+	.tile .add:hover {
+		background: rgb(28 31 36);
+	}
+
+	.tile .add.on {
+		background: var(--app-accent);
+		color: var(--app-accent-ink);
+		font-size: 0.8rem;
+	}
+
+	.tile .badge {
+		position: absolute;
+		top: 0.25rem;
+		z-index: 2;
+		display: grid;
+		place-items: center;
+		min-width: 1.2rem;
+		height: 1.2rem;
+		padding: 0 0.3rem;
+		border-radius: 0.6rem;
+		font-size: 0.7rem;
+		font-weight: 700;
+		pointer-events: none;
+	}
+
+	.tile .count {
+		left: 0.25rem;
+		background: var(--app-accent);
+		color: var(--app-accent-ink);
+	}
+
+	.tile .warning {
+		right: 0.25rem;
+		background: var(--app-error);
+		color: #fff;
 	}
 
 	.tv-fields {
@@ -1603,133 +1701,6 @@
 		transform: rotate(-90deg);
 	}
 
-	.furniture-groups {
-		display: grid;
-		align-content: start;
-		gap: 0.5rem;
-		min-height: 0;
-		overflow-y: auto;
-	}
-
-	.furniture-groups ul {
-		overflow: visible;
-	}
-
-	.group-toggle {
-		margin-top: 0.15rem;
-		padding-bottom: 0.15rem;
-		border-bottom: 1px solid var(--app-border);
-		border-radius: 0;
-		background: none;
-		color: var(--app-muted);
-		font-size: 0.7rem;
-		font-weight: 600;
-		letter-spacing: 0.04em;
-		text-transform: uppercase;
-	}
-
-	.items h3.group {
-		margin: 0.2rem 0 -0.2rem;
-		font-size: 0.75rem;
-		font-weight: 600;
-	}
-
-	.swatches {
-		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(2.6rem, 1fr));
-		gap: 0.35rem;
-		min-height: 0;
-		overflow-y: auto;
-	}
-
-	.swatch {
-		position: relative;
-		aspect-ratio: 1;
-		padding: 0;
-		border: 2px solid transparent;
-		border-radius: 0.3rem;
-		background-color: #fff;
-		background-position: center;
-		background-repeat: repeat;
-		box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.25);
-	}
-
-	.swatch.on-target {
-		border-color: var(--app-accent);
-	}
-
-	.swatch.open {
-		outline: 2px solid var(--app-panel-text);
-		outline-offset: 1px;
-	}
-
-	.swatch.busy::after,
-	.swatch.failed::after {
-		content: '';
-		position: absolute;
-		inset: 0;
-		border-radius: 0.2rem;
-		background: rgb(0 0 0 / 0.45);
-	}
-
-	.swatch.busy::before {
-		content: '';
-		position: absolute;
-		z-index: 1;
-		inset: 30%;
-		border: 2px solid #fff;
-		border-right-color: transparent;
-		border-radius: 50%;
-		animation: spin 0.8s linear infinite;
-	}
-
-	.swatch.failed::after {
-		background: color-mix(in srgb, var(--app-error) 55%, transparent);
-	}
-
-	.items li.product-row {
-		grid-template-columns: 1fr;
-		grid-auto-columns: auto;
-		grid-auto-flow: column;
-	}
-
-	.product-row .pick {
-		display: grid;
-		grid-template-columns: 3rem 1fr;
-		gap: 0.6rem;
-		align-items: center;
-		min-width: 0;
-		padding: 0.3rem;
-		border: 1px solid transparent;
-		font-weight: inherit;
-		text-align: left;
-	}
-
-	.product-row.current .pick {
-		border-color: var(--app-accent);
-	}
-
-	.product-row.open .pick {
-		background: color-mix(in srgb, var(--app-accent) 14%, transparent);
-	}
-
-	.product-row .text {
-		display: grid;
-		min-width: 0;
-	}
-
-	.product-row .text strong {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.product-row a {
-		padding: 0 0.4rem;
-		color: var(--app-muted);
-		text-decoration: none;
-	}
-
 	.peek {
 		position: fixed;
 		z-index: 10;
@@ -1742,10 +1713,6 @@
 		font-size: 0.8rem;
 	}
 
-	.peek p {
-		margin: 0;
-	}
-
 	.peek img {
 		width: 100%;
 		height: 14rem;
@@ -1755,24 +1722,11 @@
 		object-fit: contain;
 	}
 
-	.peek .summary {
-		display: -webkit-box;
-		overflow: hidden;
-		-webkit-box-orient: vertical;
-		-webkit-line-clamp: 5;
-		line-clamp: 5;
-	}
-
 	.peek a {
 		justify-self: start;
 		margin-top: 0.2rem;
 		color: var(--app-accent);
 		font-weight: 600;
-	}
-
-	.peek .note {
-		font-size: 0.72rem;
-		color: var(--app-muted);
 	}
 
 	.tip-swatch {
@@ -1805,46 +1759,6 @@
 		width: 4.5rem;
 	}
 
-	.items ul {
-		display: grid;
-		gap: 0.5rem;
-		margin: 0;
-		padding: 0;
-		overflow-y: auto;
-		list-style: none;
-	}
-
-	.items li {
-		display: grid;
-		grid-template-columns: 3rem 1fr auto;
-		gap: 0.6rem;
-		align-items: center;
-	}
-
-	.items li img,
-	.items .thumb {
-		width: 3rem;
-		height: 3rem;
-		border-radius: 0.25rem;
-		background: #fff;
-		object-fit: contain;
-	}
-
-	.items li div {
-		display: grid;
-		min-width: 0;
-	}
-
-	.items li strong {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.items li button {
-		padding: 0.3rem 0.7rem;
-	}
-
 	.card .model-status {
 		display: flex;
 		flex-wrap: wrap;
@@ -1872,10 +1786,6 @@
 		border-right-color: transparent;
 		border-radius: 50%;
 		animation: spin 0.8s linear infinite;
-	}
-
-	.status.failed {
-		color: var(--app-error);
 	}
 
 	@keyframes spin {
@@ -1925,27 +1835,6 @@
 	button:disabled {
 		opacity: 0.5;
 		cursor: default;
-	}
-
-	h1 {
-		margin: 0;
-		font-size: 1.05rem;
-		font-weight: 650;
-	}
-
-	h1 span {
-		display: block;
-		color: var(--app-muted);
-		font-size: 0.8rem;
-		font-weight: 500;
-	}
-
-	.actions {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 0.75rem;
-		font-size: 0.875rem;
 	}
 
 	.help {
@@ -2211,14 +2100,8 @@
 		font-size: 1rem;
 	}
 
-	.card p,
-	.card ul {
+	.card p {
 		margin: 0;
-	}
-
-	.card ul {
-		padding-left: 1.1rem;
-		color: var(--app-muted);
 	}
 
 	.card .meta {
@@ -2227,13 +2110,8 @@
 		align-items: baseline;
 	}
 
-	.card .meta span,
-	.card .note {
+	.card .meta span {
 		color: var(--app-muted);
-	}
-
-	.card .note {
-		font-size: 0.75rem;
 	}
 
 	.card .delete {
