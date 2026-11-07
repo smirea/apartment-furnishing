@@ -2,6 +2,7 @@
 // Captures each page with a headless Camoufox browser, has the grok CLI turn it into
 // structured product info, uploads the photos and any 3D model, and saves the item to the catalog table.
 import type { CatalogItem } from '@repo/shared/items';
+import { productKey } from '@repo/shared/layouts';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { assets, db } from './remote';
@@ -262,15 +263,6 @@ export const slug = (s: string) =>
 		.replace(/^-|-$/g, '')
 		.slice(0, 60);
 
-// Same product, same entry: re-importing a link updates it instead of adding a near-duplicate
-// under whatever name the LLM picks this time.
-export function productKey(url: string) {
-	const u = new URL(url);
-	const id =
-		u.pathname.match(/\/(?:dp|gp\/product)\/([A-Z0-9]{10})/)?.[1] ?? u.pathname.match(/\/ip\/(?:[^/]+\/)?(\d+)/)?.[1];
-	return `${u.hostname.replace(/^www\./, '')}:${id ?? u.pathname}`;
-}
-
 // Main photo as image.<ext> plus the listing gallery, under <id>/ in the bucket. Returns the main photo's asset URL,
 // versioned because a reimport overwrites the file and the iOS app keeps every asset URL on disk for good.
 export async function downloadPhotos(id: string, imageUrl: string | null, gallery: string[]): Promise<string | null> {
@@ -304,6 +296,8 @@ export async function importProducts(
 			throw new Error(`${product.name} is not a ${category} (read as ${product.category})`);
 		const brandPrefix =
 			product.brand && !product.name.toLowerCase().startsWith(product.brand.toLowerCase()) ? `${product.brand} ` : '';
+		// Same product, same entry: re-importing a link updates it instead of adding a near-duplicate under whatever name
+		// the LLM picks this time.
 		const existing = (await catalog.all()).find(item => productKey(item.url) === productKey(page.url));
 		const id = existing?.id ?? slug(brandPrefix + product.name);
 

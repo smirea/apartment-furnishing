@@ -26,7 +26,8 @@
 		type WallTexture,
 		type WallTextureEntry,
 	} from '@repo/shared/items';
-	import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
+	import { LAYOUT_HEADER, type LayoutList } from '@repo/shared/layouts';
+	import { createMutation, createQuery, keepPreviousData, useQueryClient } from '@tanstack/svelte-query';
 	import { onMount, tick } from 'svelte';
 	import type { Attachment } from 'svelte/attachments';
 	import type { MeasureState, MeasureTool } from '../lib/measure';
@@ -57,28 +58,47 @@
 		area: 'Click the corners on the floor. Click the first corner again or press Enter to close the shape.',
 	};
 
-	async function api<T>(path: string, init?: RequestInit): Promise<T> {
-		const res = await fetch(path, { ...init, headers: { 'content-type': 'application/json' } });
+	// Everything the plan shows and changes belongs to this layout. Each request names the layout it was made for, so a
+	// save still in flight when the layout switches lands where it was made.
+	let layout = $state<string | null>(null);
+	async function api<T>(path: string, init?: RequestInit, at = layout): Promise<T> {
+		const res = await fetch(path, {
+			...init,
+			headers: { 'content-type': 'application/json', ...(at && { [LAYOUT_HEADER]: at }) },
+		});
 		const body = await res.json();
 		if (!res.ok) throw new Error(body.error ?? `${res.status} ${res.statusText}`);
 		return body;
 	}
+	// Queries are keyed [name, layout] and keep showing the last layout's data until the new layout's arrives.
+	const inLayout = <T>(name: string, path: string) => ({
+		queryKey: [name, layout],
+		queryFn: ({ queryKey }: { queryKey: readonly unknown[] }) => api<T>(path, undefined, queryKey[1] as string),
+		enabled: !!layout,
+		placeholderData: keepPreviousData,
+	});
 
 	const queryClient = useQueryClient();
+	const layoutsQuery = createQuery(() => ({
+		queryKey: ['layouts'],
+		queryFn: () => api<LayoutList>('/api/layouts', undefined, null),
+	}));
+	$effect(() => {
+		if (!layout && layoutsQuery.data) layout = layoutsQuery.data.active;
+	});
 	const catalogQuery = createQuery(() => ({
-		queryKey: ['catalog'],
-		queryFn: () => api<CatalogEntry[]>('/api/catalog'),
+		...inLayout<CatalogEntry[]>('catalog', '/api/catalog'),
 		refetchInterval: query =>
 			query.state.data?.some(item => item.modelJob?.state === 'running' || item.grouping) ? 3000 : false,
 	}));
 	const catalogList = $derived(catalogQuery.data ?? []);
 	const catalog = $derived(Object.fromEntries(catalogList.map(item => [item.id, item])));
 	const fixturesQuery = createQuery(() => ({
-		queryKey: ['fixtures'],
+		...inLayout<Fixture[]>('fixtures', '/api/fixtures'),
 		// A poll answered while a pick is saving would show the old pick for a cycle.
-		queryFn: async () => {
-			const data = await api<Fixture[]>('/api/fixtures');
-			return picksSaving ? (queryClient.getQueryData<Fixture[]>(['fixtures']) ?? data) : data;
+		queryFn: async ({ queryKey }: { queryKey: readonly unknown[] }) => {
+			const data = await api<Fixture[]>('/api/fixtures', undefined, queryKey[1] as string);
+			return picksSaving ? (queryClient.getQueryData<Fixture[]>(queryKey) ?? data) : data;
 		},
 		// The AR app switches fixtures too, and model and texture builds report progress through it.
 		refetchInterval: 3000,
@@ -122,9 +142,9 @@
 		}
 	});
 
-	function storeFixture(next: Fixture) {
-		void queryClient.cancelQueries({ queryKey: ['fixtures'] });
-		queryClient.setQueryData<Fixture[]>(['fixtures'], list => list?.map(f => (f.key === next.key ? next : f)));
+	function storeFixture(next: Fixture, at: string | null) {
+		void queryClient.cancelQueries({ queryKey: ['fixtures', at] });
+		queryClient.setQueryData<Fixture[]>(['fixtures', at], list => list?.map(f => (f.key === next.key ? next : f)));
 	}
 	type SectionKey = FixtureKey | 'furniture' | 'carpets';
 	const importUrls = $state(
@@ -139,15 +159,20 @@
 					picksSaving++;
 					const pick = (latestPick[key] ?? 0) + 1;
 					latestPick[key] = pick;
+					const at = layout;
 					if (key === 'tv') dropTvDraft();
-					await queryClient.cancelQueries({ queryKey: ['fixtures'] });
-					queryClient.setQueryData<Fixture[]>(['fixtures'], list =>
+					await queryClient.cancelQueries({ queryKey: ['fixtures', at] });
+					queryClient.setQueryData<Fixture[]>(['fixtures', at], list =>
 						list?.map(f => (f.key === key ? { ...f, selected } : f)),
 					);
-					return { pick };
+					return { pick, at };
 				},
-				onSuccess: (next: Fixture, _selected: string | null, context: { pick: number } | undefined) => {
-					if (context?.pick === latestPick[key]) storeFixture(next);
+				onSuccess: (
+					next: Fixture,
+					_selected: string | null,
+					context: { pick: number; at: string | null } | undefined,
+				) => {
+					if (context && context.pick === latestPick[key]) storeFixture(next, context.at);
 				},
 				onError: () => queryClient.invalidateQueries({ queryKey: ['fixtures'] }),
 				onSettled: () => picksSaving--,
@@ -155,17 +180,19 @@
 			import: createMutation(() => ({
 				mutationFn: (url: string) =>
 					api<Fixture>(`/api/fixtures/${key}/import`, { method: 'POST', body: JSON.stringify({ url }) }),
-				onSuccess: async (next: Fixture) => {
+				onMutate: () => ({ at: layout }),
+				onSuccess: async (next: Fixture, _url: string, { at }: { at: string | null }) => {
 					importUrls[key] = '';
-					if (key === 'tv') dropTvDraft();
-					storeFixture(next);
+					if (key === 'tv' && at === layout) dropTvDraft();
+					storeFixture(next, at);
 					await queryClient.invalidateQueries({ queryKey: [next.kind === 'wallTexture' ? 'textures' : 'catalog'] });
 				},
 			})),
 			build: createMutation(() => ({
 				mutationFn: (id: string) => api<Fixture>(`/api/fixtures/${key}/options/${id}/build`, { method: 'POST' }),
-				onSuccess: async (next: Fixture) => {
-					storeFixture(next);
+				onMutate: () => ({ at: layout }),
+				onSuccess: async (next: Fixture, _id: string, { at }: { at: string | null }) => {
+					storeFixture(next, at);
 					await queryClient.invalidateQueries({ queryKey: [next.kind === 'wallTexture' ? 'textures' : 'catalog'] });
 				},
 			})),
@@ -187,8 +214,7 @@
 	}));
 
 	const texturesQuery = createQuery(() => ({
-		queryKey: ['textures'],
-		queryFn: () => api<WallTextureEntry[]>('/api/textures'),
+		...inLayout<WallTextureEntry[]>('textures', '/api/textures'),
 		refetchInterval: query =>
 			query.state.data?.some(t => t.textureJob && t.textureJob.state !== 'failed') ? 3000 : false,
 	}));
@@ -461,26 +487,39 @@
 		for (const p of placements) if (!next.some(n => n.key === p.key)) unsaved.add(p.key);
 		placements = next;
 		clearTimeout(saveTimer);
-		saveTimer = setTimeout(() => {
-			saveTimer = undefined;
-			const keys = [...unsaved];
-			unsaved.clear();
-			const byKey = new Map($state.snapshot(placements).map(p => [p.key, p]));
-			saving = Promise.all(
-				keys.map(key => {
-					const placement = byKey.get(key);
-					return placement
-						? api(`/api/placements/${key}`, { method: 'PUT', body: JSON.stringify(placement) })
-						: api(`/api/placements/${key}`, { method: 'DELETE' });
-				}),
-			);
-		}, SAVE_DELAY_MS);
+		saveTimer = setTimeout(savePlacements, SAVE_DELAY_MS);
+	}
+	function savePlacements() {
+		clearTimeout(saveTimer);
+		saveTimer = undefined;
+		const keys = [...unsaved];
+		unsaved.clear();
+		const byKey = new Map($state.snapshot(placements).map(p => [p.key, p]));
+		saving = Promise.all(
+			keys.map(key => {
+				const placement = byKey.get(key);
+				return placement
+					? api(`/api/placements/${key}`, { method: 'PUT', body: JSON.stringify(placement) })
+					: api(`/api/placements/${key}`, { method: 'DELETE' });
+			}),
+		);
 	}
 	async function pollPlacements() {
+		const at = layout;
+		if (!at) return;
 		await saving.catch(() => {});
-		const data = await api<Placement[]>('/api/placements');
-		if (!saveTimer && !unsaved.size) placements = data;
+		const data = await api<Placement[]>('/api/placements', undefined, at);
+		if (layout === at && !saveTimer && !unsaved.size) placements = data;
 	}
+	$effect(() => {
+		const at = layout;
+		if (!at) return;
+		void api<Placement[]>('/api/placements', undefined, at).then(data => {
+			if (layout !== at) return;
+			placements = data;
+			placementsLoaded = true;
+		});
+	});
 	function patchPlacement(key: string, patch: Partial<Placement>) {
 		updatePlacements(placements.map(p => (p.key === key ? { ...p, ...patch } : p)));
 	}
@@ -599,10 +638,7 @@
 	}));
 	function deleteCard(c: Card) {
 		const { name, path, also } = deletion(c);
-		if (
-			!confirm(`Delete ${name} for good?${also ? ` ${also}` : ''} Its photos and generated files are deleted with it.`)
-		)
-			return;
+		if (!confirm(`Delete ${name}?${also ? ` ${also}` : ''} Layouts that still have it in the room keep it.`)) return;
 		deleteMutation.mutate({ path, itemId: c.kind === 'item' ? c.item.id : null });
 	}
 	const inches = (n: number) => `${Math.round(n * 10) / 10}"`;
@@ -642,11 +678,11 @@
 	let carpetSavesPending = 0;
 	let carpetSaves = 0;
 	const carpetsQuery = createQuery(() => ({
-		queryKey: ['carpets'],
+		...inLayout<CarpetEntry[]>('carpets', '/api/carpets'),
 		// A poll answered while a move is saving would put the carpet back for a cycle.
-		queryFn: async () => {
-			const data = await api<CarpetEntry[]>('/api/carpets');
-			return carpetSavesPending ? (queryClient.getQueryData<CarpetEntry[]>(['carpets']) ?? data) : data;
+		queryFn: async ({ queryKey }: { queryKey: readonly unknown[] }) => {
+			const data = await api<CarpetEntry[]>('/api/carpets', undefined, queryKey[1] as string);
+			return carpetSavesPending ? (queryClient.getQueryData<CarpetEntry[]>(queryKey) ?? data) : data;
 		},
 		refetchInterval: query =>
 			query.state.data?.some(c => c.textureJob && c.textureJob.state !== 'failed') ? 3000 : false,
@@ -656,24 +692,21 @@
 		selection?.kind === 'carpet' ? (carpetList.find(c => c.id === (selection as { id: string }).id) ?? null) : null,
 	);
 	let carpetError = $state<string | null>(null);
-	const storeCarpet = (next: CarpetEntry) =>
-		queryClient.setQueryData<CarpetEntry[]>(['carpets'], list => list?.map(c => (c.id === next.id ? next : c)));
-
 	// Saved optimistically; a reply to an older save that lands after a newer one is dropped.
-	async function saveCarpet(id: string, patch: Partial<Pick<Carpet, 'size' | 'placement'>>) {
+	async function saveCarpet(id: string, patch: Partial<Pick<CarpetEntry, 'size' | 'placement'>>) {
 		const n = ++carpetSaves;
+		const key = ['carpets', layout];
 		carpetError = null;
 		carpetSavesPending++;
-		void queryClient.cancelQueries({ queryKey: ['carpets'] });
-		queryClient.setQueryData<CarpetEntry[]>(['carpets'], list =>
-			list?.map(c => (c.id === id ? { ...c, ...patch } : c)),
-		);
+		void queryClient.cancelQueries({ queryKey: key });
+		queryClient.setQueryData<CarpetEntry[]>(key, list => list?.map(c => (c.id === id ? { ...c, ...patch } : c)));
 		try {
 			const next = await api<CarpetEntry>(`/api/carpets/${id}`, { method: 'PUT', body: JSON.stringify(patch) });
-			if (n === carpetSaves) storeCarpet(next);
+			if (n === carpetSaves)
+				queryClient.setQueryData<CarpetEntry[]>(key, list => list?.map(c => (c.id === next.id ? next : c)));
 		} catch (error) {
 			carpetError = (error as Error).message;
-			if (n === carpetSaves) void queryClient.invalidateQueries({ queryKey: ['carpets'] });
+			if (n === carpetSaves) void queryClient.invalidateQueries({ queryKey: key });
 		} finally {
 			carpetSavesPending--;
 		}
@@ -790,24 +823,86 @@
 		if (!tv) return;
 		tvDraft = { ...tv, ...patch };
 		clearTimeout(tvSaveTimer);
-		tvSaveTimer = setTimeout(() => void saveTv(), SAVE_DELAY_MS);
+		tvSaveTimer = setTimeout(saveTv, SAVE_DELAY_MS);
 	}
-	async function saveTv() {
+	let tvSaving: Promise<unknown> = Promise.resolve();
+	function saveTv() {
+		clearTimeout(tvSaveTimer);
 		tvSaveTimer = undefined;
 		const sent = $state.snapshot(tvDraft);
-		try {
-			storeFixture(await api<Fixture>('/api/tv', { method: 'PUT', body: JSON.stringify(sent) }));
-			tvError = null;
-			if (!tvSaveTimer && JSON.stringify($state.snapshot(tvDraft)) === JSON.stringify(sent)) tvDraft = null;
-		} catch (error) {
-			tvError = (error as Error).message;
-		}
+		const at = layout;
+		const request = api<Fixture>('/api/tv', { method: 'PUT', body: JSON.stringify(sent) });
+		tvSaving = request.then(
+			saved => {
+				storeFixture(saved, at);
+				if (layout !== at) return;
+				tvError = null;
+				if (!tvSaveTimer && JSON.stringify($state.snapshot(tvDraft)) === JSON.stringify(sent)) tvDraft = null;
+			},
+			error => {
+				if (layout === at) tvError = (error as Error).message;
+			},
+		);
 	}
 	function dropTvDraft() {
 		clearTimeout(tvSaveTimer);
 		tvSaveTimer = undefined;
 		tvDraft = null;
 	}
+	// Edits still waiting out their debounce are sent now, to the layout they were made in.
+	function flushEdits() {
+		if (saveTimer) savePlacements();
+		if (tvSaveTimer) saveTv();
+		return Promise.all([saving.catch(() => {}), tvSaving]);
+	}
+	function switchLayout(id: string) {
+		if (id === layout) return;
+		void flushEdits();
+		closeCard();
+		peek = null;
+		tvDraft = null;
+		carpetError = null;
+		placements = [];
+		placementsLoaded = false;
+		layout = id;
+	}
+	const layoutList = $derived(layoutsQuery.data?.layouts ?? []);
+	const activateLayout = createMutation(() => ({
+		mutationFn: (id: string) =>
+			api<LayoutList>('/api/layouts/active', { method: 'PUT', body: JSON.stringify({ id }) }, null),
+		onMutate: switchLayout,
+		onSuccess: (list: LayoutList) => queryClient.setQueryData(['layouts'], list),
+	}));
+	// Duplicate and new name the layout in a field that stands in for the dropdown until Enter or Escape.
+	let naming = $state<'duplicate' | 'new' | null>(null);
+	let layoutName = $state('');
+	function startNaming(kind: 'duplicate' | 'new') {
+		createLayout.reset();
+		if (naming === kind) {
+			naming = null;
+			return;
+		}
+		naming = kind;
+		const current = layoutList.find(l => l.id === layout)?.name;
+		layoutName = kind === 'duplicate' && current ? `${current} copy` : '';
+	}
+	const createLayout = createMutation(() => ({
+		mutationFn: async ({ name, from }: { name: string; from: string | null }) => {
+			// A copy is made on the server, from what it has saved.
+			if (from) await flushEdits();
+			return api<LayoutList>('/api/layouts', { method: 'POST', body: JSON.stringify({ name, from }) }, null);
+		},
+		onSuccess: (list: LayoutList) => {
+			queryClient.setQueryData(['layouts'], list);
+			naming = null;
+			switchLayout(list.active);
+		},
+	}));
+	const focusAndSelect: Attachment<HTMLInputElement> = el => {
+		el.focus();
+		el.select();
+	};
+
 	const round1 = (n: number) => Math.round(n * 10) / 10;
 	function fixtureSummary(f: Fixture) {
 		if (f.kind === 'tv') return tv?.visible ? `${round1(tvDiagonal(tv))}″` : 'off';
@@ -850,10 +945,6 @@
 			state => (measure = state),
 		);
 		viewer = v;
-		void api<Placement[]>('/api/placements').then(data => {
-			placements = data;
-			placementsLoaded = true;
-		});
 		const poll = setInterval(() => void pollPlacements().catch(() => {}), 2000);
 		return () => {
 			clearInterval(poll);
@@ -894,6 +985,59 @@
 
 <div class="left panel">
 	<header class="hud">
+		<div class="layouts">
+			{#if naming}
+				<input
+					type="text"
+					aria-label={naming === 'duplicate' ? 'Name of the copy' : 'Name of the new layout'}
+					placeholder={naming === 'duplicate' ? 'Name of the copy' : 'New layout name'}
+					bind:value={layoutName}
+					disabled={createLayout.isPending}
+					{@attach focusAndSelect}
+					onkeydown={e => {
+						if (e.key === 'Escape') naming = null;
+						else if (e.key === 'Enter' && layoutName.trim())
+							createLayout.mutate({ name: layoutName.trim(), from: naming === 'duplicate' ? layout : null });
+					}}
+				/>
+			{:else}
+				<select
+					aria-label="Layout"
+					value={layout}
+					disabled={!layoutList.length}
+					onchange={e => activateLayout.mutate(e.currentTarget.value)}
+				>
+					{#each layoutList as l (l.id)}<option value={l.id}>{l.name}</option>{/each}
+				</select>
+			{/if}
+			<button
+				type="button"
+				class="icon"
+				aria-label="Duplicate layout"
+				title="Duplicate layout"
+				aria-pressed={naming === 'duplicate'}
+				onclick={() => startNaming('duplicate')}
+			>
+				<svg viewBox="0 0 16 16" aria-hidden="true"
+					><rect x="5" y="5" width="9" height="9" rx="1.5" /><path
+						d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5"
+					/></svg
+				>
+			</button>
+			<button
+				type="button"
+				class="icon"
+				aria-label="New layout"
+				title="New layout"
+				aria-pressed={naming === 'new'}
+				onclick={() => startNaming('new')}
+			>
+				<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" /></svg>
+			</button>
+		</div>
+		{#if createLayout.isError}<p class="error">{createLayout.error.message}</p>{/if}
+		{#if activateLayout.isError}<p class="error">{activateLayout.error.message}</p>{/if}
+		{#if layoutsQuery.isError}<p class="error">{layoutsQuery.error.message}</p>{/if}
 		<button type="button" class="primary" onclick={() => viewer?.setMode(mode === 'orbit' ? 'walk' : 'orbit')}>
 			{mode === 'orbit' ? 'Walk inside' : 'Back to overview'}
 		</button>
@@ -1487,6 +1631,51 @@
 	.toggles {
 		display: grid;
 		gap: 0.2rem;
+	}
+
+	.layouts {
+		display: flex;
+		flex-basis: 100%;
+		gap: 0.4rem;
+	}
+
+	.layouts select,
+	.layouts input {
+		flex: 1;
+		min-width: 0;
+		border: 1px solid var(--app-border);
+		border-radius: 0.375rem;
+		padding: 0.4rem 0.5rem;
+		background: var(--app-bg);
+		color: var(--app-text);
+		font: inherit;
+	}
+
+	.hud .error {
+		flex-basis: 100%;
+	}
+
+	button.icon {
+		display: grid;
+		place-items: center;
+		flex: none;
+		width: 2.1rem;
+		padding: 0;
+	}
+
+	button.icon svg {
+		width: 1rem;
+		height: 1rem;
+		fill: none;
+		stroke: currentColor;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		stroke-width: 1.5;
+	}
+
+	button.icon[aria-pressed='true'] {
+		border-color: var(--app-accent);
+		color: var(--app-accent);
 	}
 
 	.left > p {

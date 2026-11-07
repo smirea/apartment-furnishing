@@ -11,10 +11,11 @@ import {
 	type FixtureSpec,
 	type WallSpot,
 } from '@repo/shared/fixtures';
-import { DEFAULT_TV, tvDiagonal, type CatalogItem, type Job, type TvSettings } from '@repo/shared/items';
+import { tvDiagonal, type CatalogItem, type Job, type TvSettings } from '@repo/shared/items';
 import { db } from './db';
 import { runImport, startBuild } from './jobs';
-import { deleteProduct } from './products';
+import { hiddenIn, picksOf, tvOf, unhide, type ProductKind } from './layouts';
+import { findImported, removeProduct } from './products';
 
 const { catalog, textures, tvs } = db;
 
@@ -56,27 +57,26 @@ export const itemFixtureFor = (category: string) =>
 		return spec.kind === 'item' && spec.category === category;
 	}) ?? null;
 
+// Every method that reads or changes the room takes the layout it acts on; options leave out the layout's deleted
+// products.
 type Source = {
-	options(): Promise<FixtureOption[]>;
-	selected(options: FixtureOption[]): Promise<string | null>;
+	kind: ProductKind;
+	options(layout: string): Promise<FixtureOption[]>;
+	selected(options: FixtureOption[], layout: string): Promise<string | null>;
 	// `id` is a ready option of this fixture, or null.
-	select(id: string | null): Promise<void>;
+	select(id: string | null, layout: string): Promise<void>;
 	// Imports a product link as an option and returns its id.
 	import(url: string): Promise<string>;
+	// Whether an already imported product of this kind is one of this fixture's options, like a bed for the bed.
+	owns?(id: string): Promise<boolean>;
 	// Restarts a failed or missing model or texture build.
 	build?(id: string): Promise<void>;
-	// Deletes the option everywhere: see deleteProduct.
-	remove(id: string): Promise<void>;
-	extra?(): Promise<Pick<Fixture, 'tv'>>;
+	extra?(layout: string): Promise<Pick<Fixture, 'tv'>>;
 };
 
-// The pick of every fixture but the TV, whose size and mount live in the `tv` setting.
-const picks = db.setting<Partial<Record<FixtureKey, string | null>>>('fixtures', () => ({}));
-const tvSettings = db.setting<TvSettings>('tv', () => DEFAULT_TV);
-
 const stored = (key: FixtureKey) => ({
-	selected: async () => (await picks.get())[key] ?? null,
-	select: (id: string | null) => picks.patch({ [key]: id }),
+	selected: async (_: FixtureOption[], layout: string) => (await picksOf(layout).get())[key] ?? null,
+	select: (id: string | null, layout: string) => picksOf(layout).patch({ [key]: id }),
 });
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -105,9 +105,16 @@ function itemSource(key: FixtureKey, category: string, spot: WallSpot): Source {
 		};
 	};
 	return {
-		options: async () => {
-			const [items, jobs] = await Promise.all([catalog.all(), db.jobs.states('buildModel')]);
-			return items.filter(item => item.category === category).map(item => option(item, jobs.get(item.id) ?? null));
+		kind: 'item',
+		options: async layout => {
+			const [items, jobs, hidden] = await Promise.all([
+				catalog.all(),
+				db.jobs.states('buildModel'),
+				hiddenIn(layout, 'item'),
+			]);
+			return items
+				.filter(item => item.category === category && !hidden.has(item.id))
+				.map(item => option(item, jobs.get(item.id) ?? null));
 		},
 		...stored(key),
 		import: async url => {
@@ -115,15 +122,15 @@ function itemSource(key: FixtureKey, category: string, spot: WallSpot): Source {
 			if (!item.model) await startBuild('buildModel', item.id);
 			return item.id;
 		},
+		owns: async id => (await catalog.get(id))?.category === category,
 		build: async id => void (await startBuild('buildModel', (await catalog.read(id)).id)),
-		remove: id => deleteProduct('item', id),
 	};
 }
 
 const tvMatches = (a: Pick<TvSettings, 'widthIn' | 'heightIn'>, b: Pick<TvSettings, 'widthIn' | 'heightIn'>) =>
 	Math.abs(a.widthIn - b.widthIn) < 0.05 && Math.abs(a.heightIn - b.heightIn) < 0.05;
 
-export const saveTv = (tv: TvSettings) => tvSettings.set(tv);
+export const saveTv = (tv: TvSettings, layout: string) => tvOf(layout).set(tv);
 
 // The web plan can also size the TV by hand, so the selection is the picked TV while the size still matches it, else
 // another imported TV of that size, else a `custom` option standing for the hand-entered one.
@@ -133,8 +140,10 @@ const tvDetail = (tv: Pick<TvSettings, 'widthIn' | 'heightIn'>) =>
 	`${round1(tvDiagonal(tv))}″ · ${round1(tv.widthIn)} × ${round1(tv.heightIn)}″`;
 
 const tvSource: Source = {
-	options: async () => {
-		const [models, tv] = await Promise.all([tvs.all(), tvSettings.get()]);
+	kind: 'tv',
+	options: async layout => {
+		const [all, tv, hidden] = await Promise.all([tvs.all(), tvOf(layout).get(), hiddenIn(layout, 'tv')]);
+		const models = all.filter(m => !hidden.has(m.id));
 		const options = models.map((m): FixtureOption => ({
 			id: m.id,
 			name: m.name,
@@ -150,47 +159,53 @@ const tvSource: Source = {
 		const custom = { name: 'Custom size', url: '', image: null, warning: null, group: null, job: null, ready: true };
 		return [{ ...custom, id: CUSTOM_TV, detail: tvDetail(tv) }, ...options];
 	},
-	selected: async options => {
-		const [tv, models, picked] = await Promise.all([tvSettings.get(), tvs.all(), picks.get()]);
+	selected: async (options, layout) => {
+		const [tv, models, picked] = await Promise.all([tvOf(layout).get(), tvs.all(), picksOf(layout).get()]);
 		if (!tv.visible) return null;
-		const matching = models.filter(m => tvMatches(m, tv));
+		const matching = models.filter(m => tvMatches(m, tv) && options.some(o => o.id === m.id));
 		return (
 			(matching.find(m => m.id === picked.tv) ?? matching[0])?.id ??
 			(options.some(o => o.id === CUSTOM_TV) ? CUSTOM_TV : null)
 		);
 	},
-	select: async id => {
+	select: async (id, layout) => {
 		const model = id ? await tvs.get(id) : null;
-		await tvSettings.patch({
+		await tvOf(layout).patch({
 			visible: id !== null,
 			...(model && { widthIn: model.widthIn, heightIn: model.heightIn }),
 		});
-		if (model) await picks.patch({ tv: model.id });
+		if (model) await picksOf(layout).patch({ tv: model.id });
 	},
 	import: url => runImport('importTv', url),
-	remove: id => deleteProduct('tv', id),
-	extra: async () => ({ tv: await tvSettings.get() }),
+	extra: async layout => ({ tv: await tvOf(layout).get() }),
 };
 
 const wallTextureSource: Source = {
-	options: async () => {
-		const [all, jobs] = await Promise.all([textures.all(), db.jobs.states('buildTexture')]);
-		return all.map(t => ({
-			id: t.id,
-			name: t.name,
-			url: t.url,
-			image: t.image ?? t.texture?.map ?? null,
-			detail: facts(
-				t.brand,
-				money(t.price, t.currency) &&
-					`${money(t.price, t.currency)}${t.panelsPerPack > 1 ? ` per ${t.panelsPerPack}` : ''}`,
-				t.panel && `${round1(t.panel.width)} × ${round1(t.panel.height)}″ panels`,
-			),
-			warning: null,
-			group: t.group,
-			job: jobs.get(t.id) ?? null,
-			ready: !!t.texture,
-		}));
+	kind: 'texture',
+	options: async layout => {
+		const [all, jobs, hidden] = await Promise.all([
+			textures.all(),
+			db.jobs.states('buildTexture'),
+			hiddenIn(layout, 'texture'),
+		]);
+		return all
+			.filter(t => !hidden.has(t.id))
+			.map(t => ({
+				id: t.id,
+				name: t.name,
+				url: t.url,
+				image: t.image ?? t.texture?.map ?? null,
+				detail: facts(
+					t.brand,
+					money(t.price, t.currency) &&
+						`${money(t.price, t.currency)}${t.panelsPerPack > 1 ? ` per ${t.panelsPerPack}` : ''}`,
+					t.panel && `${round1(t.panel.width)} × ${round1(t.panel.height)}″ panels`,
+				),
+				warning: null,
+				group: t.group,
+				job: jobs.get(t.id) ?? null,
+				ready: !!t.texture,
+			}));
 	},
 	...stored('wallTexture'),
 	import: async url => {
@@ -199,7 +214,6 @@ const wallTextureSource: Source = {
 		return texture.id;
 	},
 	build: async id => void (await startBuild('buildTexture', (await textures.read(id)).id)),
-	remove: id => deleteProduct('texture', id),
 };
 
 const SOURCES: Record<FixtureKey, Source> = Object.fromEntries(
@@ -216,10 +230,10 @@ const SOURCES: Record<FixtureKey, Source> = Object.fromEntries(
 	}),
 ) as Record<FixtureKey, Source>;
 
-export async function readFixture(key: FixtureKey): Promise<Fixture> {
+export async function readFixture(key: FixtureKey, layout: string): Promise<Fixture> {
 	const source = SOURCES[key];
-	const options = await source.options();
-	const selected = await source.selected(options);
+	const options = await source.options(layout);
+	const selected = await source.selected(options, layout);
 	return {
 		...FIXTURES[key],
 		key,
@@ -227,54 +241,50 @@ export async function readFixture(key: FixtureKey): Promise<Fixture> {
 		selected: options.some(o => o.id === selected) ? selected : null,
 		removable: true,
 		options,
-		...(await source.extra?.()),
+		...(await source.extra?.(layout)),
 	};
 }
 
-export const listFixtures = () => Promise.all(FIXTURE_KEYS.map(readFixture));
+export const listFixtures = (layout: string) => Promise.all(FIXTURE_KEYS.map(key => readFixture(key, layout)));
 
 export class FixtureError extends Error {}
 
-export async function selectOption(key: FixtureKey, id: string | null) {
+export async function selectOption(key: FixtureKey, id: string | null, layout: string) {
 	if (id !== null) {
-		const option = (await SOURCES[key].options()).find(o => o.id === id);
+		const option = (await SOURCES[key].options(layout)).find(o => o.id === id);
 		if (!option) throw new FixtureError(`${FIXTURES[key].title} has no option ${id}`);
 		if (!option.ready) throw new FixtureError(`${option.name} isn't ready yet`);
 	}
-	await SOURCES[key].select(id);
+	await SOURCES[key].select(id, layout);
 }
 
-// The new option becomes the pick when it can be shown right away, since that is why its link was pasted. A pick made
-// during the minute the import took wins over it.
-export async function importOption(key: FixtureKey, url: string) {
+// A link imported before is reused, and comes back to this layout if it was deleted here. The new option becomes the
+// pick when it can be shown right away, since that is why its link was pasted. A pick made during the minute the
+// import took wins over it.
+export async function importOption(key: FixtureKey, url: string, layout: string) {
 	const source = SOURCES[key];
-	const before = await source.selected(await source.options());
-	const id = await source.import(url);
-	const options = await source.options();
+	const before = await source.selected(await source.options(layout), layout);
+	const existing = await findImported(source.kind, url);
+	if (existing && source.owns && !(await source.owns(existing)))
+		throw new FixtureError(`That link is already imported, and it isn't a ${FIXTURES[key].title.toLowerCase()}`);
+	const id = existing ?? (await source.import(url));
+	await unhide(layout, source.kind, id);
+	const options = await source.options(layout);
 	const option = options.find(o => o.id === id);
-	if (option?.ready && (await source.selected(options)) === before) await source.select(id);
+	if (option?.ready && (await source.selected(options, layout)) === before) await source.select(id, layout);
 }
 
-export async function buildOption(key: FixtureKey, id: string) {
+export async function buildOption(key: FixtureKey, id: string, layout: string) {
 	const { build } = SOURCES[key];
 	if (!build) throw new FixtureError(`${FIXTURES[key].title} options have nothing to build`);
-	if (!(await SOURCES[key].options()).some(o => o.id === id))
+	if (!(await SOURCES[key].options(layout)).some(o => o.id === id))
 		throw new FixtureError(`${FIXTURES[key].title} has no option ${id}`);
 	await build(id);
 }
 
-export async function removeOption(key: FixtureKey, id: string) {
-	const option = (await SOURCES[key].options()).find(o => o.id === id);
+export async function removeOption(key: FixtureKey, id: string, layout: string) {
+	const option = (await SOURCES[key].options(layout)).find(o => o.id === id);
 	if (!option) throw new FixtureError(`${FIXTURES[key].title} has no option ${id}`);
 	if (!option.url) throw new FixtureError(`${option.name} isn't an imported product`);
-	await SOURCES[key].remove(id);
-	await dropPicks(id);
-}
-
-// A pick naming a deleted product already reads as nothing picked, but would come back if the same link were imported
-// again under the same id.
-export async function dropPicks(id: string) {
-	const current = await picks.get();
-	const stale = FIXTURE_KEYS.filter(key => current[key] === id);
-	if (stale.length) await picks.patch(Object.fromEntries(stale.map(key => [key, null])));
+	return removeProduct(SOURCES[key].kind, id, layout);
 }

@@ -1,4 +1,4 @@
-import type { CarpetEntry } from '@repo/shared/carpets';
+import { carpetSpawn, type CarpetEntry } from '@repo/shared/carpets';
 import type { Statement } from '@repo/shared/db';
 import {
 	isTvPlacement,
@@ -15,7 +15,6 @@ import { CarpetError, updateCarpet } from './carpets';
 import { db } from './db';
 import {
 	buildOption,
-	dropPicks,
 	FixtureError,
 	importOption,
 	isFixtureKey,
@@ -27,17 +26,37 @@ import {
 	selectOption,
 } from './fixtures';
 import { RunnerOffline, runImport, startBuild } from './jobs';
-import { clearAssets, deleteProduct } from './products';
+import {
+	carpetStates,
+	createLayout,
+	hiddenIn,
+	layoutOf,
+	LayoutError,
+	listLayouts,
+	putCarpetState,
+	setActive,
+	unhide,
+} from './layouts';
+import { clearAssets, findImported, removeProduct } from './products';
 import { router } from './router';
 
 const { catalog, placements, textures, carpets } = db;
+const plan = planGeometry();
+
+// The stored row without its layout, the shape clients know.
+const placementOf = ({ key, itemId, position, rotation }: Placement): Placement => ({
+	key,
+	itemId,
+	position,
+	rotation,
+});
 
 const isVec3 = (v: unknown): v is [number, number, number] =>
 	Array.isArray(v) && v.length === 3 && v.every(Number.isFinite);
 
 const productUrl = (url: unknown): url is string => typeof url === 'string' && /^https?:\/\//.test(url);
 const failure = (error: unknown) => {
-	const fixable = error instanceof FixtureError || error instanceof CarpetError;
+	const fixable = error instanceof FixtureError || error instanceof CarpetError || error instanceof LayoutError;
 	if (!fixable) console.error(error);
 	return Response.json(
 		{ error: error instanceof Error ? error.message : String(error) },
@@ -79,19 +98,41 @@ async function serveAsset(request: Request, key: string) {
 
 const api = router({
 	'/api/status': () => Response.json({ ok: true, now: new Date().toISOString() }),
+	'/api/layouts': {
+		GET: async () => Response.json(await listLayouts()),
+		// `from` copies that layout; without it the new layout starts empty.
+		POST: async request => {
+			const { name, from } = await body<{ name: unknown; from: unknown }>(request);
+			if (typeof name !== 'string' || !name.trim() || (from != null && typeof from !== 'string'))
+				return Response.json({ error: 'Expected a name and an optional layout id to copy' }, { status: 400 });
+			await createLayout(name.trim(), from ?? null);
+			return Response.json(await listLayouts());
+		},
+	},
+	'/api/layouts/active': {
+		PUT: async request => {
+			const { id } = await body<{ id: unknown }>(request);
+			if (typeof id !== 'string') return Response.json({ error: 'Expected a layout id' }, { status: 400 });
+			await setActive(id);
+			return Response.json(await listLayouts());
+		},
+	},
 	'/api/catalog': {
-		GET: async () => {
-			const [items, jobs, importing] = await Promise.all([
+		GET: async request => {
+			const [items, jobs, importing, hidden] = await Promise.all([
 				catalog.all(),
 				db.jobs.states('buildModel'),
 				db.jobs.active('importItem'),
+				hiddenIn(await layoutOf(request), 'item'),
 			]);
 			return Response.json(
-				items.map((item): CatalogEntry => ({
-					...item,
-					modelJob: jobs.get(item.id) ?? null,
-					grouping: !item.group && importing,
-				})),
+				items
+					.filter(item => !hidden.has(item.id))
+					.map((item): CatalogEntry => ({
+						...item,
+						modelJob: jobs.get(item.id) ?? null,
+						grouping: !item.group && importing,
+					})),
 			);
 		},
 	},
@@ -108,11 +149,13 @@ const api = router({
 			const { url } = await body<{ url: string }>(request);
 			if (!productUrl(url)) return Response.json({ error: 'Paste a product URL' }, { status: 400 });
 			try {
-				const item = await catalog.read(await runImport('importItem', url));
+				const layout = await layoutOf(request);
+				const item = await catalog.read((await findImported('item', url)) ?? (await runImport('importItem', url)));
+				await unhide(layout, 'item', item.id);
 				if (!item.model) await startBuild('buildModel', item.id);
 				// A product that has a fixture, like a bed, becomes that fixture's pick instead of furniture to place.
 				const fixture = itemFixtureFor(item.category);
-				if (fixture) await selectOption(fixture, item.id);
+				if (fixture) await selectOption(fixture, item.id, layout);
 				return Response.json(item);
 			} catch (error) {
 				return failure(error);
@@ -124,32 +167,41 @@ const api = router({
 		DELETE: async request => {
 			const { id } = request.params as { id: string };
 			if (!(await catalog.get(id))) return Response.json({ error: `No catalog item ${id}` }, { status: 404 });
-			await deleteProduct('item', id);
-			await dropPicks(id);
-			return Response.json({ ok: true });
+			return Response.json({ deleted: await removeProduct('item', id, await layoutOf(request)) });
 		},
 	},
 	'/api/catalog/:id/model.usdz': async request => serveAsset(request, `items/${request.params.id}/model.usdz`),
 	'/api/textures': {
-		GET: async () => {
-			const [all, jobs] = await Promise.all([textures.all(), db.jobs.states('buildTexture')]);
-			return Response.json(all.map((t): WallTextureEntry => ({ ...t, textureJob: jobs.get(t.id) ?? null })));
+		GET: async request => {
+			const [all, jobs, hidden] = await Promise.all([
+				textures.all(),
+				db.jobs.states('buildTexture'),
+				hiddenIn(await layoutOf(request), 'texture'),
+			]);
+			return Response.json(
+				all.filter(t => !hidden.has(t.id)).map((t): WallTextureEntry => ({ ...t, textureJob: jobs.get(t.id) ?? null })),
+			);
 		},
 	},
-	'/api/carpets': {
-		GET: async () => {
-			const [all, jobs] = await Promise.all([carpets.all(), db.jobs.states('buildCarpet')]);
-			return Response.json(all.map((c): CarpetEntry => ({ ...c, textureJob: jobs.get(c.id) ?? null })));
-		},
-	},
+	'/api/carpets': { GET: async request => Response.json(await carpetEntries(await layoutOf(request))) },
 	'/api/carpets/import': {
 		POST: async request => {
 			const { url } = await body<{ url: unknown }>(request);
 			if (!productUrl(url)) return Response.json({ error: 'Paste a rug product URL' }, { status: 400 });
 			try {
-				const carpet = await carpets.read(await runImport('importCarpet', url));
+				const layout = await layoutOf(request);
+				const carpet = await carpets.read(
+					(await findImported('carpet', url)) ?? (await runImport('importCarpet', url)),
+				);
+				await unhide(layout, 'carpet', carpet.id);
 				if (!carpet.texture) await startBuild('buildCarpet', carpet.id);
-				return Response.json(await carpetEntry(carpet.id));
+				// Pasting a rug lays it in the middle of the living room, unless it is on this layout's floor already.
+				const state = (await carpetStates(layout)).get(carpet.id);
+				if (!state?.placement) {
+					const size = state?.size ?? carpet.size;
+					await putCarpetState(layout, carpet.id, { size, placement: carpetSpawn(size, plan) });
+				}
+				return Response.json(await carpetEntry(carpet.id, layout));
 			} catch (error) {
 				return failure(error);
 			}
@@ -160,8 +212,9 @@ const api = router({
 			const { id } = request.params as { id: string };
 			if (!(await carpets.get(id))) return Response.json({ error: `No carpet ${id}` }, { status: 404 });
 			try {
-				await updateCarpet(id, await body<{ size: unknown; placement: unknown }>(request));
-				return Response.json(await carpetEntry(id));
+				const layout = await layoutOf(request);
+				await updateCarpet(id, await body<{ size: unknown; placement: unknown }>(request), layout);
+				return Response.json(await carpetEntry(id, layout));
 			} catch (error) {
 				return failure(error);
 			}
@@ -169,8 +222,7 @@ const api = router({
 		DELETE: async request => {
 			const { id } = request.params as { id: string };
 			if (!(await carpets.get(id))) return Response.json({ error: `No carpet ${id}` }, { status: 404 });
-			await deleteProduct('carpet', id);
-			return Response.json({ ok: true });
+			return Response.json({ deleted: await removeProduct('carpet', id, await layoutOf(request)) });
 		},
 	},
 	'/api/carpets/:id/build': {
@@ -178,14 +230,14 @@ const api = router({
 			const { id } = request.params as { id: string };
 			if (!(await carpets.get(id))) return Response.json({ error: `No carpet ${id}` }, { status: 404 });
 			await startBuild('buildCarpet', id);
-			return Response.json(await carpetEntry(id));
+			return Response.json(await carpetEntry(id, await layoutOf(request)));
 		},
 	},
-	'/api/fixtures': { GET: async () => Response.json(await listFixtures()) },
+	'/api/fixtures': { GET: async request => Response.json(await listFixtures(await layoutOf(request))) },
 	'/api/fixtures/:key': {
 		GET: async request => {
 			const { key } = request.params as { key: string };
-			return isFixtureKey(key) ? Response.json(await readFixture(key)) : unknownFixture(key);
+			return isFixtureKey(key) ? Response.json(await readFixture(key, await layoutOf(request))) : unknownFixture(key);
 		},
 		PUT: async request => {
 			const { key } = request.params as { key: string };
@@ -194,8 +246,9 @@ const api = router({
 			if (selected !== null && typeof selected !== 'string')
 				return Response.json({ error: 'Expected selected: an option id or null' }, { status: 400 });
 			try {
-				await selectOption(key, selected);
-				return Response.json(await readFixture(key));
+				const layout = await layoutOf(request);
+				await selectOption(key, selected, layout);
+				return Response.json(await readFixture(key, layout));
 			} catch (error) {
 				return failure(error);
 			}
@@ -208,8 +261,9 @@ const api = router({
 			const { url } = await body<{ url: unknown }>(request);
 			if (!productUrl(url)) return Response.json({ error: 'Paste a product URL' }, { status: 400 });
 			try {
-				await importOption(key, url);
-				return Response.json(await readFixture(key));
+				const layout = await layoutOf(request);
+				await importOption(key, url, layout);
+				return Response.json(await readFixture(key, layout));
 			} catch (error) {
 				return failure(error);
 			}
@@ -220,8 +274,9 @@ const api = router({
 			const { key, id } = request.params as { key: string; id: string };
 			if (!isFixtureKey(key)) return unknownFixture(key);
 			try {
-				await buildOption(key, id);
-				return Response.json(await readFixture(key));
+				const layout = await layoutOf(request);
+				await buildOption(key, id, layout);
+				return Response.json(await readFixture(key, layout));
 			} catch (error) {
 				return failure(error);
 			}
@@ -232,8 +287,9 @@ const api = router({
 			const { key, id } = request.params as { key: string; id: string };
 			if (!isFixtureKey(key)) return unknownFixture(key);
 			try {
-				await removeOption(key, id);
-				return Response.json(await readFixture(key));
+				const layout = await layoutOf(request);
+				await removeOption(key, id, layout);
+				return Response.json(await readFixture(key, layout));
 			} catch (error) {
 				return failure(error);
 			}
@@ -258,19 +314,25 @@ const api = router({
 					},
 					{ status: 400 },
 				);
-			await saveTv({
-				visible: tv.visible,
-				placement: tv.placement,
-				widthIn: tv.widthIn!,
-				heightIn: tv.heightIn!,
-				centerIn: tv.centerIn!,
-				tiltDeg: tv.tiltDeg,
-			});
-			return Response.json(await readFixture('tv'));
+			const layout = await layoutOf(request);
+			await saveTv(
+				{
+					visible: tv.visible,
+					placement: tv.placement,
+					widthIn: tv.widthIn!,
+					heightIn: tv.heightIn!,
+					centerIn: tv.centerIn!,
+					tiltDeg: tv.tiltDeg,
+				},
+				layout,
+			);
+			return Response.json(await readFixture('tv', layout));
 		},
 	},
-	'/api/plan': () => Response.json(planGeometry()),
-	'/api/placements': { GET: async () => Response.json(await placements.all()) },
+	'/api/plan': () => Response.json(plan),
+	'/api/placements': {
+		GET: async request => Response.json((await placements.where('layoutId', await layoutOf(request))).map(placementOf)),
+	},
 	// Clients save only the items they changed, so a client holding an older copy of the rest can't revert edits
 	// another client (the web plan or the AR app) made meanwhile.
 	'/api/placements/:key': {
@@ -280,14 +342,14 @@ const api = router({
 			if (!isVec3(position) || !isVec3(rotation))
 				return Response.json({ error: 'Expected a finite position and rotation' }, { status: 400 });
 			const existing = await placements.get(key);
-			let saved: Placement;
+			let saved: Placement & { layoutId: string };
 			if (existing) saved = { ...existing, position, rotation };
 			else if (!itemId) return Response.json({ error: 'Unknown placement' }, { status: 404 });
 			else if (!(await catalog.get(itemId)))
 				return Response.json({ error: `No catalog item ${itemId}` }, { status: 400 });
-			else saved = { key, itemId, position, rotation };
+			else saved = { key, layoutId: await layoutOf(request), itemId, position, rotation };
 			await placements.put(saved);
-			return Response.json(saved);
+			return Response.json(placementOf(saved));
 		},
 		DELETE: async request => {
 			await placements.remove(request.params.key!);
@@ -338,10 +400,27 @@ const api = router({
 	},
 });
 
-async function carpetEntry(id: string): Promise<CarpetEntry> {
-	const [carpet, jobs] = await Promise.all([carpets.read(id), db.jobs.states('buildCarpet')]);
-	return { ...carpet, textureJob: jobs.get(id) ?? null };
+async function carpetEntries(layout: string): Promise<CarpetEntry[]> {
+	const [all, jobs, states, hidden] = await Promise.all([
+		carpets.all(),
+		db.jobs.states('buildCarpet'),
+		carpetStates(layout),
+		hiddenIn(layout, 'carpet'),
+	]);
+	return all
+		.filter(c => !hidden.has(c.id))
+		.map(c => {
+			const state = states.get(c.id);
+			return {
+				...c,
+				size: state?.size ?? c.size,
+				placement: state?.placement ?? null,
+				textureJob: jobs.get(c.id) ?? null,
+			};
+		});
 }
+
+const carpetEntry = async (id: string, layout: string) => (await carpetEntries(layout)).find(c => c.id === id)!;
 
 export default {
 	async fetch(request) {
@@ -354,7 +433,11 @@ export default {
 			return path.startsWith('/api/') ? Response.json({ error: 'Sign in first' }, { status: 401 }) : loginPage();
 
 		if (path.startsWith('/api/'))
-			return (await api(request)) ?? Response.json({ ok: false, error: 'Not found' }, { status: 404 });
+			try {
+				return (await api(request)) ?? Response.json({ ok: false, error: 'Not found' }, { status: 404 });
+			} catch (error) {
+				return failure(error);
+			}
 		return env.ASSETS.fetch(request);
 	},
 } satisfies ExportedHandler<Env>;

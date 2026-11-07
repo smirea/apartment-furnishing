@@ -7,7 +7,7 @@ import {
 	type WallTexture,
 } from '@repo/shared/items';
 import type { WallSpot } from '@repo/shared/fixtures';
-import { moveCarpet, type Carpet, type CarpetPose } from '@repo/shared/carpets';
+import { moveCarpet, type CarpetEntry, type CarpetPose } from '@repo/shared/carpets';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {
@@ -455,7 +455,7 @@ export function createViewer(
 	type CarpetView = {
 		root: Group;
 		mesh: Mesh<PlaneGeometry, MeshStandardMaterial>;
-		carpet: Carpet;
+		carpet: CarpetEntry;
 		// The last pose that cleared the walls, which a drag or a turn falls back to.
 		pose: CarpetPose;
 		map: string | null;
@@ -467,7 +467,7 @@ export function createViewer(
 		root.rotation.set(0, pose.yaw * DEG, 0);
 	};
 
-	function setCarpets(list: Carpet[]) {
+	function setCarpets(list: CarpetEntry[]) {
 		const placed = list.filter(c => c.placement);
 		for (const [id, view] of carpetViews) {
 			if (placed.some(c => c.id === id)) continue;
