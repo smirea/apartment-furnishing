@@ -1,6 +1,6 @@
-// Carpets and rugs: imported from a product link like wall textures, drawn as one top-down image of the whole rug on
-// a layer of their own just above the floor and under everything else. They are moved by hand like furniture, but no
-// part of a carpet may cross a floor-plan wall or the column.
+// Carpets and rugs: imported from a product link with every look and size the listing sells, each look drawn as one
+// top-down image of the whole rug on a layer of its own just above the floor and under everything else. They are moved
+// by hand like furniture, but no part of a carpet may cross a floor-plan wall or the column.
 import { ft, rooms } from './floorplan';
 import type { Job } from './items';
 import type { PlanGeometry } from './plan';
@@ -11,6 +11,19 @@ export type CarpetPose = { x: number; z: number; yaw: number };
 
 export type CarpetSize = { widthIn: number; lengthIn: number; price: number | null };
 
+// One look the listing sells: a color, pattern or style, with its own photos, the sizes it comes in, and its top-down
+// image (width along the rug's width, height along its length, stretched over whichever size is picked).
+export type CarpetVariant = {
+	id: string;
+	// Empty when the listing sells a single look.
+	name: string;
+	url: string;
+	image: string | null;
+	// Smallest first.
+	sizes: CarpetSize[];
+	texture: { map: string; note: string } | null;
+};
+
 export type Carpet = {
 	id: string;
 	url: string;
@@ -19,18 +32,35 @@ export type Carpet = {
 	brand: string | null;
 	currency: string;
 	summary: string;
-	// Every size the listing sells, smallest first; `size` is the one the listing had selected, which a layout starts
-	// from.
-	sizes: CarpetSize[];
+	// What the store calls the looks: Color, Pattern, Style.
+	variantLabel: string;
+	variants: CarpetVariant[];
+	// The look and size the listing had selected, which a layout starts from.
+	variant: string;
 	size: CarpetSize;
-	image: string | null;
-	// The whole rug seen straight down, image width along the rug's width and height along its length, stretched over
-	// whichever size is picked.
-	texture: { map: string; note: string } | null;
 };
 
-// What GET /api/carpets returns: the size the layout shows it at, and where it lies, null while out of the room.
-export type CarpetEntry = Carpet & { placement: CarpetPose | null; textureJob: Job | null };
+// What GET /api/carpets returns: the look and size the layout shows, where it lies (null while out of the room), and
+// each look's texture build.
+export type CarpetEntry = Carpet & { placement: CarpetPose | null; textureJobs: Record<string, Job> };
+
+export const variantOf = (carpet: Pick<Carpet, 'variants' | 'variant'>) =>
+	carpet.variants.find(v => v.id === carpet.variant) ?? carpet.variants[0]!;
+
+// A texture build's job target: one look of one carpet.
+export const textureTarget = (carpetId: string, variantId: string) => `${carpetId}/${variantId}`;
+
+export const sameSize = (a: Pick<CarpetSize, 'widthIn' | 'lengthIn'>, b: Pick<CarpetSize, 'widthIn' | 'lengthIn'>) =>
+	Math.abs(a.widthIn - b.widthIn) < 0.5 && Math.abs(a.lengthIn - b.lengthIn) < 0.5;
+
+// The size a carpet keeps when it switches to a look: the same one when that look comes in it, else the closest.
+export function closestSize(sizes: CarpetSize[], size: Pick<CarpetSize, 'widthIn' | 'lengthIn'>) {
+	const area = (s: Pick<CarpetSize, 'widthIn' | 'lengthIn'>) => s.widthIn * s.lengthIn;
+	return (
+		sizes.find(s => sameSize(s, size)) ??
+		sizes.toSorted((a, b) => Math.abs(area(a) - area(size)) - Math.abs(area(b) - area(size)))[0]!
+	);
+}
 
 export const sizeLabel = ({ widthIn, lengthIn }: Pick<CarpetSize, 'widthIn' | 'lengthIn'>) => {
 	const feet = (n: number) => {

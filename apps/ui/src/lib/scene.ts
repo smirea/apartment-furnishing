@@ -7,7 +7,7 @@ import {
 	type WallTexture,
 } from '@repo/shared/items';
 import type { WallSpot } from '@repo/shared/fixtures';
-import { moveCarpet, type CarpetEntry, type CarpetPose } from '@repo/shared/carpets';
+import { moveCarpet, variantOf, type CarpetEntry, type CarpetPose } from '@repo/shared/carpets';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import {
@@ -503,7 +503,7 @@ export function createViewer(
 				view.pose = carpet.placement!;
 				placeCarpet(view.root, view.pose);
 			}
-			const map = carpet.texture?.map ?? null;
+			const map = variantOf(carpet).texture?.map ?? null;
 			if (map !== view.map) {
 				view.map = map;
 				const target = view;
@@ -1041,6 +1041,44 @@ export function createViewer(
 	resize();
 	applyHeights();
 
+	// The page's element that floats just above the selected thing, kept on screen: its configuration choices.
+	let overlay: HTMLElement | null = null;
+	const overlayBox = new Box3();
+	const corner = new Vector3();
+	function placeOverlay() {
+		if (!overlay) return;
+		const root = selectedRoot();
+		if (!root || mode !== 'orbit' || !overlay.offsetWidth) {
+			overlay.style.visibility = 'hidden';
+			return;
+		}
+		overlayBox.setFromObject(root);
+		const { clientWidth: w, clientHeight: h } = container;
+		let top = Infinity;
+		let left = Infinity;
+		let right = -Infinity;
+		for (let i = 0; i < 8; i++) {
+			corner
+				.set(
+					i & 1 ? overlayBox.max.x : overlayBox.min.x,
+					i & 2 ? overlayBox.max.y : overlayBox.min.y,
+					i & 4 ? overlayBox.max.z : overlayBox.min.z,
+				)
+				.project(camera);
+			top = Math.min(top, ((1 - corner.y) / 2) * h);
+			left = Math.min(left, ((corner.x + 1) / 2) * w);
+			right = Math.max(right, ((corner.x + 1) / 2) * w);
+		}
+		const margin = 8;
+		const x = Math.min(
+			Math.max((left + right) / 2 - overlay.offsetWidth / 2, margin),
+			w - overlay.offsetWidth - margin,
+		);
+		const y = Math.min(Math.max(top - overlay.offsetHeight - 12, margin), h - overlay.offsetHeight - margin);
+		overlay.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+		overlay.style.visibility = 'visible';
+	}
+
 	let last = performance.now();
 	renderer.setAnimationLoop(now => {
 		const dt = Math.min((now - last) / 1000, 0.1);
@@ -1051,6 +1089,7 @@ export function createViewer(
 		if (root) selection.setFromObject(root);
 		renderer.render(scene, camera);
 		labelRenderer.render(scene, camera);
+		placeOverlay();
 	});
 
 	return {
@@ -1068,6 +1107,7 @@ export function createViewer(
 			void setFinish('column', texture);
 		},
 		select,
+		setOverlay: (el: HTMLElement) => (overlay = el),
 		setMeasureTool,
 		finishMeasurement: () => measurer.finish(),
 		removeMeasurement: (id: number) => measurer.remove(id),
@@ -1082,7 +1122,9 @@ export function createViewer(
 			look.dispose();
 			orbit.dispose();
 			renderer.dispose();
-			container.replaceChildren();
+			// The container also holds the page's overlay, which outlives this viewer.
+			renderer.domElement.remove();
+			labelRenderer.domElement.remove();
 		},
 	};
 }

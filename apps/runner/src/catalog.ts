@@ -103,7 +103,17 @@ type Product = {
 	removeNodes: string[];
 };
 
-type PageData = {
+// Every combination of looks and sizes a listing sells, each with its own link; `values` follow `dimensions`.
+// `perLook` says whether each look's photos are only on its own page. A swatch's price is known only when that
+// swatch shows on the captured page.
+export type Variations = {
+	dimensions: string[];
+	combos: { url: string; values: string[]; price: number | null }[];
+	current: string | null;
+	perLook: boolean;
+};
+
+export type PageData = {
 	url: string;
 	title: string;
 	ogImage: string | null;
@@ -113,6 +123,8 @@ type PageData = {
 	// Linked PDFs, spec sheets first.
 	documents: string[];
 	specs: string[];
+	variations: Variations | null;
+	variationsError: string | null;
 	jsonLd: string;
 	text: string;
 };

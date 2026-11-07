@@ -79,6 +79,90 @@ EXTRACT = r"""async () => {
 	const documents = uniq(pdfs.filter((u) => /^https?:/.test(u) && /\/[^/]+\.pdf$/i.test(new URL(u).pathname)))
 		.sort((x, y) => Number(/spec|dimension|guide|sheet/i.test(y)) - Number(/spec|dimension|guide|sheet/i.test(x)))
 		.slice(0, 3);
+	// Every combination of colors, patterns and sizes the listing sells, each with its own link: `values` follow
+	// `dimensions`. `perLook` says whether each look's photos are only on its own page.
+	const amazonVariations = () => {
+		const base = html.indexOf('"dimensionValuesDisplayData"');
+		if (base === -1) return null;
+		const jsonAt = (at) => {
+			let i = html.indexOf(':', at) + 1;
+			while (/\s/.test(html[i])) i++;
+			const open = html[i];
+			const close = { '{': '}', '[': ']' }[open];
+			let depth = 0;
+			let quoted = false;
+			for (let j = i; j < html.length; j++) {
+				const c = html[j];
+				if (quoted) {
+					if (c === '\\') j++;
+					else if (c === '"') quoted = false;
+				} else if (c === '"') quoted = true;
+				else if (c === open) depth++;
+				else if (c === close && --depth === 0) return JSON.parse(html.slice(i, j + 1));
+			}
+			return null;
+		};
+		const display = jsonAt(base);
+		const keys = jsonAt(html.lastIndexOf('"dimensions"', base));
+		const labelsAt = html.indexOf('"variationDisplayLabels"', base);
+		const labels = labelsAt === -1 ? {} : jsonAt(labelsAt);
+		// A swatch shows the price of the combination it links to, which is only known for the swatches on this page.
+		const prices = {};
+		for (const li of document.querySelectorAll('[id^="inline-twister-row-"] li[data-asin], #twister li[data-defaultasin]')) {
+			const price = li.innerText.match(/\$\s?([\d,]+\.\d{2})/);
+			if (price) prices[li.dataset.asin ?? li.dataset.defaultasin] = Number(price[1].replace(/,/g, ''));
+		}
+		const current = location.pathname.match(/\/dp\/([A-Z0-9]{10})/)?.[1];
+		return {
+			dimensions: keys.map((k) => labels[k] ?? k),
+			combos: Object.entries(display).map(([asin, values]) => ({
+				url: `${location.origin}/dp/${asin}`,
+				values,
+				price: prices[asin] ?? null,
+			})),
+			current: current ? `${location.origin}/dp/${current}` : null,
+			perLook: true,
+		};
+	};
+	const walmartVariations = () => {
+		const next = document.getElementById('__NEXT_DATA__');
+		const product = next && JSON.parse(next.textContent).props?.pageProps?.initialData?.data?.product;
+		if (!product?.variantCriteria?.length || !product.variantsMap) return null;
+		const criteria = product.variantCriteria;
+		return {
+			dimensions: criteria.map((c) => c.name),
+			combos: Object.values(product.variantsMap).map((v) => ({
+				url: `${location.origin}/ip/${v.usItemId}`,
+				values: criteria.map((c) => c.variantList.find((x) => v.variants.includes(x.id))?.name ?? ''),
+				price: v.priceInfo?.currentPrice?.price ?? null,
+			})),
+			current: `${location.origin}/ip/${product.usItemId}`,
+			perLook: true,
+		};
+	};
+	const shopifyVariations = (product) => {
+		if (!product?.variants?.length) return null;
+		const url = (v) => `${location.origin}${location.pathname}?variant=${v.id}`;
+		const current = new URLSearchParams(location.search).get('variant');
+		return {
+			dimensions: product.options.map((o) => (typeof o === 'string' ? o : o.name)),
+			combos: product.variants.map((v) => ({ url: url(v), values: v.options, price: v.price / 100 })),
+			current: url(product.variants.find((v) => String(v.id) === current) ?? product.variants[0]),
+			perLook: false,
+		};
+	};
+	// Furniture imports share this capture, so a store that changed its markup costs only the other looks.
+	let variations = null;
+	let variationsError = null;
+	try {
+		const shopifyProduct = html.includes('cdn.shopify.com') && location.pathname.includes('/products/')
+			? await (await fetch(`${location.pathname}.js`)).json()
+			: null;
+		variations = amazonVariations() ?? walmartVariations() ?? shopifyVariations(shopifyProduct);
+		if (variations && variations.combos.length < 2) variations = null;
+	} catch (error) {
+		variationsError = String(error);
+	}
 	const jsonLd = [...document.querySelectorAll('script[type="application/ld+json"]')].map((s) => s.textContent).join('\n').slice(0, 15000);
 	return {
 		url: location.href,
@@ -89,6 +173,8 @@ EXTRACT = r"""async () => {
 		images: images.slice(0, 12),
 		documents,
 		specs,
+		variations,
+		variationsError,
 		jsonLd,
 		text: document.body.innerText.replace(/\n{3,}/g, '\n\n').slice(0, 40000),
 	};

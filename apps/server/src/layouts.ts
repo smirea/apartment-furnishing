@@ -49,8 +49,8 @@ export async function createLayout(name: string, from: string | null) {
 						from,
 					),
 					statement(
-						`INSERT INTO layout_carpets (layoutId, carpetId, size, placement)
-						SELECT ?1, carpetId, size, placement FROM layout_carpets WHERE layoutId = ?2`,
+						`INSERT INTO layout_carpets (layoutId, carpetId, variant, size, placement)
+						SELECT ?1, carpetId, variant, size, placement FROM layout_carpets WHERE layoutId = ?2`,
 						id,
 						from,
 					),
@@ -115,16 +115,20 @@ export async function dropPicks(id: string, layouts: string[]) {
 	);
 }
 
-export type CarpetState = { size: CarpetSize; placement: CarpetPose | null };
+export type CarpetState = { variant: string; size: CarpetSize; placement: CarpetPose | null };
 
 export async function carpetStates(layout: string) {
 	const [rows] = await db.sql([
-		statement('SELECT carpetId, size, placement FROM layout_carpets WHERE layoutId = ?1', layout),
+		statement('SELECT carpetId, variant, size, placement FROM layout_carpets WHERE layoutId = ?1', layout),
 	]);
 	return new Map(
 		rows!.map((r: Row): [string, CarpetState] => [
 			r.carpetId as string,
-			{ size: JSON.parse(r.size as string), placement: r.placement ? JSON.parse(r.placement as string) : null },
+			{
+				variant: r.variant as string,
+				size: JSON.parse(r.size as string),
+				placement: r.placement ? JSON.parse(r.placement as string) : null,
+			},
 		]),
 	);
 }
@@ -132,10 +136,11 @@ export async function carpetStates(layout: string) {
 export async function putCarpetState(layout: string, carpetId: string, state: CarpetState) {
 	await db.sql([
 		statement(
-			`INSERT INTO layout_carpets (layoutId, carpetId, size, placement) VALUES (?1, ?2, ?3, ?4)
-			ON CONFLICT (layoutId, carpetId) DO UPDATE SET size = ?3, placement = ?4`,
+			`INSERT INTO layout_carpets (layoutId, carpetId, variant, size, placement) VALUES (?1, ?2, ?3, ?4, ?5)
+			ON CONFLICT (layoutId, carpetId) DO UPDATE SET variant = ?3, size = ?4, placement = ?5`,
 			layout,
 			carpetId,
+			state.variant,
 			JSON.stringify(state.size),
 			state.placement && JSON.stringify(state.placement),
 		),

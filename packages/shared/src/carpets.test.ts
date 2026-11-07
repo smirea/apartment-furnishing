@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { CARPET_SPAWN, carpetHitsWalls, carpetSpawn, moveCarpet, sizeLabel } from './carpets';
+import { CARPET_SPAWN, carpetHitsWalls, carpetSpawn, closestSize, moveCarpet, sizeLabel } from './carpets';
 import { planGeometry } from './plan';
 
 const plan = planGeometry();
@@ -67,4 +67,15 @@ test('a drag that jumps a small rug clean past the TV wall stops it flush on thi
 test('a big turn that would sweep a corner through a wall is refused even if it ends clear', () => {
 	const flush = { x: 24.388 - 4, z: 30, yaw: 0 };
 	expect(moveCarpet(flush, { ...flush, yaw: 180 }, rug(8, 10), plan)).toEqual(flush);
+});
+
+test('another look keeps the size when it comes in it, else takes the closest by area', () => {
+	const sizes = [
+		{ widthIn: 60, lengthIn: 84, price: 50 },
+		{ widthIn: 96, lengthIn: 120, price: 110 },
+		{ widthIn: 120, lengthIn: 168, price: 200 },
+	];
+	expect(closestSize(sizes, { widthIn: 96.2, lengthIn: 120 })).toEqual(sizes[1]!);
+	expect(closestSize(sizes, { widthIn: 108, lengthIn: 144 })).toEqual(sizes[1]!);
+	expect(closestSize(sizes, { widthIn: 24, lengthIn: 72 })).toEqual(sizes[0]!);
 });

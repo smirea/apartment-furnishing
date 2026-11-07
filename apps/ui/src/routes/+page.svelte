@@ -5,8 +5,10 @@
 	import {
 		carpetHitsWalls,
 		carpetSpawn,
+		closestSize,
+		sameSize,
 		sizeLabel,
-		type Carpet,
+		variantOf,
 		type CarpetEntry,
 		type CarpetSize,
 	} from '@repo/shared/carpets';
@@ -31,6 +33,7 @@
 	import { onMount, tick } from 'svelte';
 	import type { Attachment } from 'svelte/attachments';
 	import type { MeasureState, MeasureTool } from '../lib/measure';
+	import Configurator, { type ConfigAxis } from '../lib/Configurator.svelte';
 	import { createViewer, type Mode, type Selection } from '../lib/scene';
 
 	// Living room, clear of the island and the column.
@@ -38,6 +41,7 @@
 	const SAVE_DELAY_MS = 300;
 
 	let container: HTMLDivElement;
+	let overlay: HTMLDivElement;
 	let mode = $state<Mode>('orbit');
 	const OPTIONS_KEY = 'viewer-options';
 	const saved = JSON.parse(localStorage.getItem(OPTIONS_KEY) ?? '{}');
@@ -275,7 +279,7 @@
 	}
 	const carpetProduct = (c: CarpetEntry): Product => ({
 		name: c.name,
-		image: c.texture?.map ?? c.image,
+		image: carpetImage(c),
 		url: c.url,
 		facts: [carpetFacts(c), c.brand ?? ''].filter(Boolean),
 		warning: null,
@@ -367,11 +371,11 @@
 	const carpetTile = (c: CarpetEntry): Tile => ({
 		id: c.id,
 		name: c.name,
-		image: c.texture?.map ?? c.image,
+		image: carpetImage(c),
 		swatchSize: null,
 		on: !!c.placement,
 		count: 0,
-		job: c.textureJob,
+		job: c.textureJobs[c.variant],
 		warning: false,
 		peek: () => ({ kind: 'product', product: carpetProduct(c) }),
 		open: () => (c.placement ? viewer?.select({ kind: 'carpet', id: c.id }) : openCard({ kind: 'carpet', id: c.id })),
@@ -695,7 +699,7 @@
 			return carpetSavesPending ? (queryClient.getQueryData<CarpetEntry[]>(queryKey) ?? data) : data;
 		},
 		refetchInterval: query =>
-			query.state.data?.some(c => c.textureJob && c.textureJob.state !== 'failed') ? 3000 : false,
+			query.state.data?.some(c => Object.values(c.textureJobs).some(job => job.state !== 'failed')) ? 3000 : false,
 	}));
 	const carpetList = $derived(carpetsQuery.data ?? []);
 	const selectedCarpet = $derived(
@@ -703,7 +707,7 @@
 	);
 	let carpetError = $state<string | null>(null);
 	// Saved optimistically; a reply to an older save that lands after a newer one is dropped.
-	async function saveCarpet(id: string, patch: Partial<Pick<CarpetEntry, 'size' | 'placement'>>) {
+	async function saveCarpet(id: string, patch: Partial<Pick<CarpetEntry, 'variant' | 'size' | 'placement'>>) {
 		const n = ++carpetSaves;
 		const key = ['carpets', layout];
 		carpetError = null;
@@ -749,17 +753,73 @@
 	function resizeCarpet(carpet: CarpetEntry, size: CarpetSize) {
 		if (carpet.placement && carpetHitsWalls(carpet.placement, size, plan)) {
 			carpetError = `At ${sizeLabel(size)} it would cross a wall here. Drag it into open floor first.`;
-			return false;
+			return;
 		}
 		void saveCarpet(carpet.id, { size });
-		return true;
 	}
-	const carpetPrice = (c: Carpet) =>
-		c.size.price === null ? null : c.size.price.toLocaleString('en-US', { style: 'currency', currency: c.currency });
-	const carpetFacts = (c: Carpet) =>
-		[sizeLabel(c.size), carpetPrice(c), c.sizes.length > 1 ? `${c.sizes.length} sizes` : null]
+	// Another look keeps the size when it comes in it, else takes the closest one it does.
+	function changeLook(carpet: CarpetEntry, id: string) {
+		const look = carpet.variants.find(v => v.id === id)!;
+		const size = closestSize(look.sizes, carpet.size);
+		if (carpet.placement && carpetHitsWalls(carpet.placement, size, plan)) {
+			carpetError = `${look.name} comes no closer to this size than ${sizeLabel(size)}, which would cross a wall here. Drag it into open floor first.`;
+			return;
+		}
+		void saveCarpet(carpet.id, { variant: id, size });
+	}
+	const carpetImage = (c: CarpetEntry) => {
+		const look = variantOf(c);
+		return look.texture?.map ?? look.image;
+	};
+	const formatPrice = (price: number | null, currency: string) =>
+		price === null ? null : price.toLocaleString('en-US', { style: 'currency', currency });
+	// The layout saved the size with the price it had then; the listing's current price wins.
+	const carpetPrice = (c: CarpetEntry) =>
+		formatPrice(variantOf(c).sizes.find(s => sameSize(s, c.size))?.price ?? c.size.price, c.currency);
+	const plural = (n: number, noun: string) => `${n} ${noun.toLowerCase()}${n === 1 ? '' : 's'}`;
+	const carpetFacts = (c: CarpetEntry) => {
+		const look = variantOf(c);
+		return [
+			[look.name, sizeLabel(c.size)].filter(Boolean).join(', '),
+			carpetPrice(c),
+			c.variants.length > 1 ? plural(c.variants.length, c.variantLabel) : null,
+			look.sizes.length > 1 ? plural(look.sizes.length, 'size') : null,
+		]
 			.filter(Boolean)
 			.join(' · ');
+	};
+	function carpetAxes(c: CarpetEntry): ConfigAxis[] {
+		const look = variantOf(c);
+		const axes: ConfigAxis[] = [];
+		if (c.variants.length > 1)
+			axes.push({
+				key: 'look',
+				label: c.variantLabel,
+				selected: c.variant,
+				pick: id => changeLook(c, id),
+				choices: c.variants.map(v => ({
+					id: v.id,
+					label: v.name,
+					image: v.texture?.map ?? v.image,
+					busy: building(c.textureJobs[v.id]),
+				})),
+			});
+		if (look.sizes.length > 1)
+			axes.push({
+				key: 'size',
+				label: 'Size',
+				selected: String(look.sizes.findIndex(s => sameSize(s, c.size))),
+				pick: i => resizeCarpet(c, look.sizes[Number(i)]!),
+				choices: look.sizes.map((s, i) => ({
+					id: String(i),
+					label: sizeLabel(s),
+					detail: formatPrice(s.price, c.currency),
+				})),
+			});
+		return axes;
+	}
+	// The selected product's configuration, shown over it in the plan.
+	const selectedAxes = $derived(selectedCarpet ? carpetAxes(selectedCarpet) : []);
 
 	const carpetImport = createMutation(() => ({
 		mutationFn: (url: string) =>
@@ -780,7 +840,8 @@
 		},
 	}));
 	const carpetBuild = createMutation(() => ({
-		mutationFn: (id: string) => api<CarpetEntry>(`/api/carpets/${id}/build`, { method: 'POST' }),
+		mutationFn: ({ id, variant }: { id: string; variant: string }) =>
+			api<CarpetEntry>(`/api/carpets/${id}/build`, { method: 'POST', body: JSON.stringify({ variant }) }),
 		onSuccess: () => queryClient.invalidateQueries({ queryKey: ['carpets'] }),
 	}));
 
@@ -976,6 +1037,7 @@
 			(id, placement) => void saveCarpet(id, { placement }),
 			state => (measure = state),
 		);
+		v.setOverlay(overlay);
 		viewer = v;
 		const poll = setInterval(() => void pollPlacements().catch(() => {}), 2000);
 		return () => {
@@ -1013,7 +1075,16 @@
 	<title>Apartment</title>
 </svelte:head>
 
-<div class="viewer" bind:this={container}></div>
+<div class="viewer" bind:this={container}>
+	<div class="overlay" bind:this={overlay}>
+		{#if selectedAxes.length}
+			<div class="panel">
+				<Configurator axes={selectedAxes} compact />
+				{#if carpetError}<p class="error">{carpetError}</p>{/if}
+			</div>
+		{/if}
+	</div>
+</div>
 
 <div class="left panel">
 	{#if import.meta.env.DEV}<p class="dev-band">local dev database</p>{/if}
@@ -1404,7 +1475,11 @@
 
 	{#if card}
 		{@const cardJob =
-			card.kind === 'item' ? card.item.modelJob : card.kind === 'carpet' ? card.carpet.textureJob : null}
+			card.kind === 'item'
+				? card.item.modelJob
+				: card.kind === 'carpet'
+					? (card.carpet.textureJobs[card.carpet.variant] ?? null)
+					: null}
 		<aside class="panel card">
 			<button type="button" class="close" aria-label="Close" onclick={closeCard}>×</button>
 			{#if card.kind === 'item'}
@@ -1491,19 +1566,19 @@
 				<a href={item.url} target="_blank" rel="noreferrer">View on {host(item.url)} ↗</a>
 			{:else if card.kind === 'carpet'}
 				{@const c = card.carpet}
-				{#if c.texture ?? c.image}<img src={c.texture?.map ?? c.image} alt={c.name} />{/if}
+				{@const look = variantOf(c)}
+				{@const drawing = Object.values(c.textureJobs).filter(building).length}
+				{#if carpetImage(c)}<img src={carpetImage(c)} alt={c.name} />{/if}
 				<h2>{c.name}</h2>
 				<p class="meta">
 					{#if carpetPrice(c)}<strong>{carpetPrice(c)}</strong>{/if}
 					{#if c.brand}<span>{c.brand}</span>{/if}
 					<span>Carpet</span>
 				</p>
+				<p class="dims">{[look.name, sizeLabel(c.size)].filter(Boolean).join(', ')}</p>
 
 				<div class="controls">
-					<label class="row">
-						<span>Size</span>
-						{@render sizePicker(c)}
-					</label>
+					{#if carpetAxes(c).length}<Configurator axes={carpetAxes(c)} />{/if}
 					{#if c.placement}
 						<div class="row">
 							<span>Turn</span>
@@ -1528,10 +1603,14 @@
 						<span class="status busy">Drawing the rug · 2–5 min</span>
 					{:else}
 						{#if cardJob?.state === 'failed'}<span class="error">Drawing the rug failed: {cardJob.error}</span>
-						{:else if !c.texture}<span class="muted">No rug image yet</span>{/if}
-						<button type="button" onclick={() => carpetBuild.mutate(c.id)}>
-							{c.texture ? 'Redraw' : 'Draw'} the rug
+						{:else if !look.texture}<span class="muted">No rug image yet</span>{/if}
+						<button type="button" onclick={() => carpetBuild.mutate({ id: c.id, variant: c.variant })}>
+							{look.texture ? 'Redraw' : 'Draw'}
+							{look.name || 'the rug'}
 						</button>
+					{/if}
+					{#if drawing > 1 || (drawing === 1 && !building(cardJob))}
+						<span class="muted">{plural(drawing, c.variantLabel)} still being drawn</span>
 					{/if}
 				</p>
 
@@ -1612,24 +1691,6 @@
 	<a href={t.url} target="_blank" rel="noreferrer">View on {host(t.url)} ↗</a>
 {/snippet}
 
-{#snippet sizePicker(c: CarpetEntry)}
-	{@const current = c.sizes.findIndex(s => s.widthIn === c.size.widthIn && s.lengthIn === c.size.lengthIn)}
-	<select
-		value={current}
-		onchange={e => {
-			if (!resizeCarpet(c, c.sizes[Number(e.currentTarget.value)]!)) e.currentTarget.value = String(current);
-		}}
-	>
-		{#each c.sizes as size, i (i)}
-			<option value={i}
-				>{sizeLabel(size)}{size.price === null
-					? ''
-					: ` · ${size.price.toLocaleString('en-US', { style: 'currency', currency: c.currency })}`}</option
-			>
-		{/each}
-	</select>
-{/snippet}
-
 {#if peek}
 	<div
 		class="peek panel"
@@ -1669,6 +1730,23 @@
 		position: fixed;
 		inset: 0;
 		background: var(--app-bg);
+	}
+
+	/* Placed above the selected thing by the viewer; above the canvas, below the side panels. */
+	.overlay {
+		position: absolute;
+		top: 0;
+		left: 0;
+		z-index: 1;
+		visibility: hidden;
+		pointer-events: none;
+	}
+
+	.overlay .panel {
+		display: grid;
+		gap: 0.4rem;
+		max-width: min(19rem, calc(100vw - 2rem));
+		padding: 0.55rem 0.65rem;
 	}
 
 	.panel {

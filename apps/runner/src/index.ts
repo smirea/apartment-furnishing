@@ -23,7 +23,7 @@ const RUN: Record<JobKind, (job: QueuedJob) => Promise<string | null>> = {
 	importTv: async job => (await importTv(job.target)).id,
 	buildModel: async job => (await generateModel(await db.catalog.read(job.target), log), null),
 	buildTexture: async job => (await generateTexture(await db.textures.read(job.target), log), null),
-	buildCarpet: async job => (await generateCarpetTexture(await db.carpets.read(job.target)), null),
+	buildCarpet: async job => (await generateCarpetTexture(job.target), null),
 };
 
 // Each Codex build is a long session and a store import can queue dozens, so each kind gets a few slots.

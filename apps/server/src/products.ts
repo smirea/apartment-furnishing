@@ -45,7 +45,10 @@ async function deleteProduct(kind: ProductKind, id: string) {
 	await db.sql([
 		...(kind === 'item' ? [statement('DELETE FROM placements WHERE itemId = ?1', id)] : []),
 		...(kind === 'carpet' ? [statement('DELETE FROM layout_carpets WHERE carpetId = ?1', id)] : []),
-		...(build ? [statement('DELETE FROM jobs WHERE kind = ?1 AND target = ?2', build, id)] : []),
+		// A carpet's builds each draw one of its looks, `<id>/<look>`.
+		...(build
+			? [statement("DELETE FROM jobs WHERE kind = ?1 AND (target = ?2 OR target LIKE ?2 || '/%')", build, id)]
+			: []),
 		statement('DELETE FROM layout_hidden WHERE kind = ?1 AND productId = ?2', kind, id),
 		statement(`DELETE FROM ${table} WHERE id = ?1`, id),
 	]);

@@ -1,4 +1,4 @@
-import { carpetSpawn, type CarpetEntry } from '@repo/shared/carpets';
+import { carpetSpawn, textureTarget, variantOf, type Carpet, type CarpetEntry } from '@repo/shared/carpets';
 import type { Statement } from '@repo/shared/db';
 import {
 	isTvPlacement,
@@ -202,12 +202,16 @@ const api = router({
 					(await findImported('carpet', url)) ?? (await runImport('importCarpet', url)),
 				);
 				await unhide(layout, 'carpet', carpet.id);
-				if (!carpet.texture) await startBuild('buildCarpet', carpet.id);
+				await drawLooks(carpet);
 				// Pasting a rug lays it in the middle of the living room, unless it is on this layout's floor already.
 				const state = (await carpetStates(layout)).get(carpet.id);
 				if (!state?.placement) {
 					const size = state?.size ?? carpet.size;
-					await putCarpetState(layout, carpet.id, { size, placement: carpetSpawn(size, plan) });
+					await putCarpetState(layout, carpet.id, {
+						variant: state?.variant ?? carpet.variant,
+						size,
+						placement: carpetSpawn(size, plan),
+					});
 				}
 				return Response.json(await carpetEntry(carpet.id, layout));
 			} catch (error) {
@@ -221,7 +225,7 @@ const api = router({
 			if (!(await carpets.get(id))) return Response.json({ error: `No carpet ${id}` }, { status: 404 });
 			try {
 				const layout = await layoutOf(request);
-				await updateCarpet(id, await body<{ size: unknown; placement: unknown }>(request), layout);
+				await updateCarpet(id, await body<{ variant: unknown; size: unknown; placement: unknown }>(request), layout);
 				return Response.json(await carpetEntry(id, layout));
 			} catch (error) {
 				return failure(error);
@@ -233,11 +237,16 @@ const api = router({
 			return Response.json({ deleted: await removeProduct('carpet', id, await layoutOf(request)) });
 		},
 	},
+	// Draws one look again, or for the first time after a failed build.
 	'/api/carpets/:id/build': {
 		POST: async request => {
 			const { id } = request.params as { id: string };
-			if (!(await carpets.get(id))) return Response.json({ error: `No carpet ${id}` }, { status: 404 });
-			await startBuild('buildCarpet', id);
+			const carpet = await carpets.get(id);
+			if (!carpet) return Response.json({ error: `No carpet ${id}` }, { status: 404 });
+			const { variant } = await body<{ variant: unknown }>(request);
+			if (!carpet.variants.some(v => v.id === variant))
+				return Response.json({ error: `Expected variant: one of ${id}'s looks` }, { status: 400 });
+			await startBuild('buildCarpet', textureTarget(id, variant as string));
 			return Response.json(await carpetEntry(id, await layoutOf(request)));
 		},
 	},
@@ -417,15 +426,29 @@ async function carpetEntries(layout: string): Promise<CarpetEntry[]> {
 	]);
 	return all
 		.filter(c => !hidden.has(c.id))
-		.map(c => {
+		.map((c): CarpetEntry => {
 			const state = states.get(c.id);
 			return {
 				...c,
+				variant: state ? variantOf({ variants: c.variants, variant: state.variant }).id : c.variant,
 				size: state?.size ?? c.size,
 				placement: state?.placement ?? null,
-				textureJob: jobs.get(c.id) ?? null,
+				textureJobs: Object.fromEntries(
+					c.variants.flatMap(v => {
+						const job = jobs.get(textureTarget(c.id, v.id));
+						return job ? [[v.id, job]] : [];
+					}),
+				),
 			};
 		});
+}
+
+// Every look still without an image gets drawn, the listing's own look first.
+async function drawLooks(carpet: Carpet) {
+	const looks = carpet.variants
+		.filter(v => !v.texture)
+		.toSorted((a, b) => +(b.id === carpet.variant) - +(a.id === carpet.variant));
+	for (const look of looks) await startBuild('buildCarpet', textureTarget(carpet.id, look.id));
 }
 
 const carpetEntry = async (id: string, layout: string) => (await carpetEntries(layout)).find(c => c.id === id)!;
