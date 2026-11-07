@@ -340,15 +340,15 @@
 				const product = optionProduct(f, option);
 				return product && { kind: 'product', product };
 			},
-			open: () => openCard({ kind: 'option', key: f.key, id: option.id }),
+			// A fixture holds one product, so a click picks it; the card has the button to take it out.
+			open: () => {
+				if (option.ready && option.id !== f.selected) actions.select.mutate(option.id);
+				openCard({ kind: 'option', key: f.key, id: option.id });
+			},
 			action:
 				option.job?.state === 'failed'
 					? { label: 'Retry build', icon: '↻', run: () => actions.build.mutate(option.id) }
-					: option.ready
-						? toggleAction(option.id === f.selected, 'Put in the room', 'Take out of the room', on =>
-								actions.select.mutate(on ? null : option.id),
-							)
-						: null,
+					: null,
 		};
 	}
 	const itemTile = (item: CatalogEntry): Tile => ({
