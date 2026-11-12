@@ -51,14 +51,14 @@ for col, (joints, lengths) in enumerate(columns):
             sample = sample.transpose(Image.Transpose.FLIP_TOP_BOTTOM)
         grain = np.asarray(sample.resize((WIDTH - 2, length), Image.Resampling.LANCZOS), dtype=np.float32)
         luminance = grain @ np.array([.299, .587, .114], dtype=np.float32)
-        detail = np.clip((luminance - luminance.mean()) * .55, -24, 24)
+        detail = np.clip((luminance - luminance.mean()) * .85, -32, 32)
         light = rng.uniform(-12, 12)
-        warm = rng.uniform(2, 8) if rng.random() < .18 else rng.uniform(-3, 2)
-        color = np.array([202 + warm, 190 + warm * .3, 171 - warm * .3]) + light
+        warm = rng.uniform(6, 16) if rng.random() < .2 else rng.uniform(-6, 4)
+        color = np.array([206 + warm * .4, 175 - warm * .3, 136 - warm * 1.2]) + light
         board = np.clip(color + detail[..., None], 0, 255).astype(np.uint8)
         rows = (np.arange(length) + start) % SIZE
         canvas[rows, col * WIDTH + 1: (col + 1) * WIDTH - 1] = board
         canvas[start, col * WIDTH + 1: (col + 1) * WIDTH - 1] = np.clip(color - 22, 0, 255)
-    canvas[:, col * WIDTH:col * WIDTH + 1] = (158, 147, 132)
-    canvas[:, (col + 1) * WIDTH - 1:(col + 1) * WIDTH] = (158, 147, 132)
+    canvas[:, col * WIDTH:col * WIDTH + 1] = (150, 128, 102)
+    canvas[:, (col + 1) * WIDTH - 1:(col + 1) * WIDTH] = (150, 128, 102)
 Image.fromarray(canvas).save(ROOT / 'apps/ui/static/wood-floor.jpg', quality=95, subsampling=0)
