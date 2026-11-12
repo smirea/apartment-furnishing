@@ -95,6 +95,10 @@ export function createViewer(
 	const renderer = new WebGLRenderer({ antialias: true });
 	renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 	container.append(renderer.domElement);
+	const woodTexture = new TextureLoader().load('/wood-floor.jpg');
+	woodTexture.colorSpace = SRGBColorSpace;
+	woodTexture.wrapS = woodTexture.wrapT = RepeatWrapping;
+	woodTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
 
 	const labelRenderer = new CSS2DRenderer();
 	Object.assign(labelRenderer.domElement.style, { position: 'absolute', inset: '0', pointerEvents: 'none' });
@@ -147,8 +151,20 @@ export function createViewer(
 	}
 
 	for (const room of rooms) {
-		const mat = new MeshStandardMaterial({ color: floorColors[room.floor], roughness: 0.8 });
-		addBox(scene, room.rect, -0.1, 0.1, mat);
+		const wood = room.floor === 'wood';
+		const mat = new MeshStandardMaterial({
+			color: wood ? 0xffffff : floorColors[room.floor],
+			map: wood ? woodTexture : null,
+			roughness: 0.8,
+		});
+		const floor = addBox(scene, room.rect, -0.1, 0.1, mat);
+		if (wood) {
+			const positions = floor.geometry.attributes.position;
+			const uvs = floor.geometry.attributes.uv;
+			for (let i = 0; i < positions.count; i++) {
+				uvs.setXY(i, (positions.getX(i) + floor.position.x) / 7.2, (positions.getZ(i) + floor.position.z) / 7.2);
+			}
+		}
 	}
 
 	const plaster = new MeshStandardMaterial({ color: 0xf1efea, roughness: 0.95 });
@@ -1158,6 +1174,7 @@ export function createViewer(
 		clearMeasurements: () => measurer.clear(),
 		snapWhenLoaded: (key: string) => snapOnLoad.add(key),
 		dispose() {
+			woodTexture.dispose();
 			renderer.setAnimationLoop(null);
 			observer.disconnect();
 			removeEventListener('keydown', onKeyDown);
