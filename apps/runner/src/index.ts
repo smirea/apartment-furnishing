@@ -1,5 +1,5 @@
-// The laptop's half of the app: claims the jobs the Worker queues (imports, Codex builds) and runs them with the tools
-// only this Mac has. Start with `bun run runner` against the local server or `bun run runner:prod` against production.
+// The Mac's half of the app: claims the jobs the Worker queues (imports, Codex builds) and runs them with the tools a
+// Worker can't. Production's runs on the Mac mini (scripts/runner-service.ts). Start with `bun run runner` against the local server or `bun run runner:prod` against production.
 import { statement, type JobKind, type QueuedJob } from '@repo/shared/db';
 import env from '@repo/shared/env';
 import { generateCarpetTexture, importCarpet } from './carpets';
@@ -9,7 +9,7 @@ import { db } from './remote';
 import { generateTexture, importTexture } from './textures';
 import { importTv } from './tvs';
 
-const POLL_MS = 5000;
+const POLL_MS = 10_000;
 // An import the Worker gave up waiting on leaves its finished row behind.
 const ORPHAN_MS = 60 * 60_000;
 

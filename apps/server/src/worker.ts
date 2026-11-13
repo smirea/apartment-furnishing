@@ -397,7 +397,7 @@ const api = router({
 			return Response.json({ ok: true });
 		},
 	},
-	// The laptop runner's view of the database and the bucket.
+	// The job runner's view of the database and the bucket.
 	'/api/runner/sql': {
 		POST: async request => {
 			const { statements } = await body<{ statements: Statement[] }>(request);

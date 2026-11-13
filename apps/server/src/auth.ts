@@ -1,5 +1,5 @@
 // One shared token guards every route, the product media and the UI itself; only the sign-in form is open. The iOS app
-// and the laptop runner send it as a bearer, and a browser keeps it in a cookie after signing in once.
+// and the job runner send it as a bearer, and a browser keeps it in a cookie after signing in once.
 const COOKIE = 'apartment_token';
 const encoder = new TextEncoder();
 

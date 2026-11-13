@@ -2,7 +2,7 @@ import { RUNNER_STALE_MS, type JobKind } from '@repo/shared/db';
 import type { Mount } from '@repo/shared/items';
 import { db } from './db';
 
-// An import holds its request open until the laptop finishes it, about a minute, so the clients keep their
+// An import holds its request open until the runner finishes it, about a minute, so the clients keep their
 // paste-and-wait flow. Nothing claims it while the runner is off, so that fails right away instead.
 const IMPORT_TIMEOUT_MS = 10 * 60_000;
 const POLL_MS = 1000;
@@ -22,7 +22,7 @@ export async function runImport(
 ): Promise<string> {
 	if (!(await runnerOnline()))
 		throw new RunnerOffline(
-			"Imports run on the laptop, and its job runner isn't running. Start it with bun run runner:prod.",
+			"Imports run on the Mac mini, and its job runner isn't running. Start it with bun scripts/runner-service.ts setup.",
 		);
 	const id = (await db.jobs.enqueue(kind, url, category, mount))!;
 	const deadline = Date.now() + IMPORT_TIMEOUT_MS;
@@ -39,5 +39,5 @@ export async function runImport(
 	throw new Error(`Import of ${url} took longer than ${IMPORT_TIMEOUT_MS / 60_000} minutes`);
 }
 
-// Builds just queue: the clients poll the item's job state, and a build queued while the laptop sleeps runs when it wakes.
+// Builds just queue: the clients poll the item's job state, and a build queued while the runner is down runs when it comes back.
 export const startBuild = (kind: JobKind, id: string) => db.jobs.enqueue(kind, id);

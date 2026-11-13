@@ -39,7 +39,7 @@ export async function removeProduct(kind: ProductKind, id: string, layout: strin
 }
 
 // Takes everything that uses the product along in one transaction: its placements, its carpet poses, its build jobs.
-// A build the laptop is already running then fails when it reads the row back, before it saves anything.
+// A build the runner is already running then fails when it reads the row back, before it saves anything.
 async function deleteProduct(kind: ProductKind, id: string) {
 	const { table, build } = PRODUCTS[kind];
 	await db.sql([

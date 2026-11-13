@@ -1,4 +1,4 @@
-// Which listing pages a rug import captures, kept apart from the import so it can be tested without the laptop's tools.
+// Which listing pages a rug import captures, kept apart from the import so it can be tested without the runner's tools.
 import type { PageData, Variations } from './catalog';
 
 export type Combo = Variations['combos'][number];

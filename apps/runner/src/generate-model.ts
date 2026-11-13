@@ -15,7 +15,7 @@ if (!(await PROMPT_FILE.exists())) throw new Error(`missing ${PROMPT_FILE.name}`
 const UV_CACHE = join(ROOT, '.cache/uv');
 
 if (!Bun.which('codex')) throw new Error('codex CLI not found on PATH');
-// Pinned so the builds don't follow whatever model the laptop's own Codex config picks.
+// Pinned so the builds don't follow whatever model the runner Mac's own Codex config picks.
 const CODEX_MODEL = 'gpt-6.1-terra';
 const CODEX_EFFORT = 'medium';
 

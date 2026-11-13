@@ -160,7 +160,7 @@ enum API {
         try await send(json(["selected": option ?? NSNull()], "PUT", "api/fixtures/\(fixture)", timeout: 10))
     }
 
-    // The laptop reads the page and calls grok, which takes about a minute.
+    // The job runner reads the page and calls grok, which takes about a minute.
     static func importOption(_ fixture: String, url: String) async throws -> Fixture {
         try await send(json(["url": url], "POST", "api/fixtures/\(fixture)/import", timeout: 240))
     }
