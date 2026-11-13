@@ -5,6 +5,7 @@ import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, extname, join } from 'node:path';
 import { GALLERY_DIR, ROOT } from './catalog';
+import { codex } from './codex';
 import { assets, db } from './remote';
 import { uploadModel } from './usdz';
 
@@ -14,9 +15,6 @@ if (!(await PROMPT_FILE.exists())) throw new Error(`missing ${PROMPT_FILE.name}`
 // Shared so each run doesn't re-download numpy/trimesh; Codex's sandbox only gets write access to it.
 const UV_CACHE = join(ROOT, '.cache/uv');
 
-if (!Bun.which('codex')) throw new Error('codex CLI not found on PATH');
-// Pinned so the builds don't follow whatever model the runner Mac's own Codex config picks.
-const CODEX_MODEL = 'gpt-6.1-terra';
 const CODEX_EFFORT = 'medium';
 
 async function prompt(item: CatalogItem, photos: string[]) {
@@ -64,16 +62,10 @@ export async function collectPhotos(id: string, work: string): Promise<string[]>
 
 // Codex runs in a scratch folder holding the photos, with network for uv, and writes its outputs there.
 export async function runCodex(work: string, photos: string[], prompt: string, expect: string[]) {
-	const proc = Bun.spawn(
+	const { out, err, code } = await codex(
 		[
-			'codex',
-			'exec',
-			'-m',
-			CODEX_MODEL,
 			'-c',
 			`model_reasoning_effort="${CODEX_EFFORT}"`,
-			'--skip-git-repo-check',
-			'--ephemeral',
 			'-s',
 			'workspace-write',
 			'-c',
@@ -86,20 +78,10 @@ export async function runCodex(work: string, photos: string[], prompt: string, e
 			...photos.map(p => join(work, p)),
 			'-o',
 			join(work, 'last-message.txt'),
-			'-',
 		],
-		{
-			stdin: new Blob([prompt]),
-			stdout: 'pipe',
-			stderr: 'pipe',
-			env: { ...process.env, UV_CACHE_DIR: UV_CACHE },
-		},
+		prompt,
+		{ UV_CACHE_DIR: UV_CACHE },
 	);
-	const [out, err, code] = await Promise.all([
-		new Response(proc.stdout).text(),
-		new Response(proc.stderr).text(),
-		proc.exited,
-	]);
 	const missing = [];
 	for (const name of expect) if (!(await Bun.file(join(work, name)).exists())) missing.push(name);
 	if (code !== 0 || missing.length)

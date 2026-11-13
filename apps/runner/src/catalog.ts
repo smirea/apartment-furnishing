@@ -1,18 +1,16 @@
 // Product import pipeline behind the importItem job (POST /api/catalog/import) and scripts/import-item.ts.
-// Captures each page with a headless Camoufox browser, has the grok CLI turn it into
+// Captures each page with a headless Camoufox browser, has Codex read it into
 // structured product info, uploads the photos and any 3D model, and saves the item to the catalog table.
 import type { CatalogItem, Mount } from '@repo/shared/items';
 import { productKey } from '@repo/shared/layouts';
-import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { codexStructured } from './codex';
 import { assets, db } from './remote';
 import { uploadModel } from './usdz';
 
 export const ROOT = join(import.meta.dir, '../../..');
 export const GALLERY_DIR = 'gallery';
-const GROK_MODEL = 'grok-4.7-build-fast';
-
-for (const bin of ['grok', 'uv', 'pdftotext']) if (!Bun.which(bin)) throw new Error(`${bin} CLI not found on PATH`);
+for (const bin of ['uv', 'pdftotext']) if (!Bun.which(bin)) throw new Error(`${bin} CLI not found on PATH`);
 
 const { catalog } = db;
 
@@ -186,11 +184,11 @@ ${page.jsonLd}
 Visible page text:
 ${page.text}`;
 
-async function parseWithGrok(page: PageData, mount?: Mount): Promise<Product> {
+async function readProduct(page: PageData, mount?: Mount): Promise<Product> {
 	const modelLines = await Promise.all(
 		page.models.slice(0, 3).map(async url => `${url} (nodes: ${(await glbNodeNames(url)).join(', ') || 'unknown'})`),
 	);
-	return grokStructured<Product>(
+	return codexStructured<Product>(
 		`Extract product information from this retailer page capture. Use only facts in the input. If width/height/depth are not all listed but can be derived (for example a TV's width from its diagonal and 16:9 aspect), derive them and explain in dimensionsNote; otherwise use null. Convert sizes to inches and weight to pounds. Pick imageUrl from the image candidates and modelUrl from the 3D model candidates exactly as written. ${mount ? `It will be mounted on a ${mount}: set mount to ${mount}, defaultElevationIn to the usual height of its bottom edge when hung there, and removeNodes to any model nodes it doesn't need there.` : 'Decide how the item mounts in a home and which model nodes to drop for that mount.'}
 
 3D model candidates:
@@ -199,42 +197,6 @@ ${modelLines.join('\n') || 'none'}
 ${pageContext(page)}`,
 		productSchema,
 	);
-}
-
-export async function grokStructured<T>(prompt: string, schema: object): Promise<T> {
-	const promptFile = join(ROOT, '.cache', `grok-prompt-${crypto.randomUUID()}.txt`);
-	await mkdir(join(ROOT, '.cache'), { recursive: true });
-	await writeFile(promptFile, prompt);
-	const proc = Bun.spawn(
-		[
-			'grok',
-			'--prompt-file',
-			promptFile,
-			'-m',
-			GROK_MODEL,
-			'--disable-web-search',
-			'--no-subagents',
-			'--tools',
-			'',
-			'--max-turns',
-			'3',
-			'--output-format',
-			'json',
-			'--json-schema',
-			JSON.stringify(schema),
-		],
-		{ cwd: join(ROOT, '.cache'), stdout: 'pipe', stderr: 'pipe' },
-	);
-	const [out, err, code] = await Promise.all([
-		new Response(proc.stdout).text(),
-		new Response(proc.stderr).text(),
-		proc.exited,
-	]);
-	await Bun.file(promptFile).delete();
-	if (code !== 0) throw new Error(`grok exited ${code}: ${err || out}`);
-	const result = JSON.parse(out);
-	if (!result.structuredOutput) throw new Error(`grok returned no structured output: ${out.slice(0, 500)}`);
-	return result.structuredOutput;
 }
 
 // Text of the page's linked spec sheets, for prompts that need exact dimensions.
@@ -302,7 +264,7 @@ export async function importProducts(
 	const imported: CatalogItem[] = [];
 	for (const page of await fetchPages(urls)) {
 		log(`→ ${page.title.slice(0, 80)} (${page.models.length} model candidate(s))`);
-		const { imageUrl, modelUrl, ...product } = await parseWithGrok(page, mount);
+		const { imageUrl, modelUrl, ...product } = await readProduct(page, mount);
 		if (mount) product.mount = mount;
 		// TVs are built into the plan; the TV panel only needs their size.
 		if (product.category === 'tv')
@@ -366,7 +328,7 @@ async function assignGroups(log: (line: string) => void) {
 	const missing = all.filter(item => !item.group);
 	if (!missing.length) return;
 	const groups = [...new Set(all.map(item => item.group).filter(Boolean))];
-	const { assignments } = await grokStructured<{ assignments: { id: string; group: string }[] }>(
+	const { assignments } = await codexStructured<{ assignments: { id: string; group: string }[] }>(
 		`Group these furniture products by type, so a furniture list can show each type under a small section header. Keep types high level and plural, in sentence case: for example "Couches", "Chairs", "Dining tables", "Coffee tables", "Standing desks", "Beds", "Lamps", "Rugs". A sectional, a sofa and a loveseat are all "Couches"; an accent chair, a swivel chair and an armchair are all "Chairs". Never split a type by style, material, color or size. Reuse these existing groups where a product fits: ${groups.join(', ') || 'none yet'}.
 
 ${missing.map(item => `${item.id}: ${item.name} (${item.category}). ${item.summary}`).join('\n')}`,
@@ -390,7 +352,7 @@ ${missing.map(item => `${item.id}: ${item.name} (${item.category}). ${item.summa
 	const byId = new Map(assignments.map(a => [a.id, a.group]));
 	for (const item of missing) {
 		const group = byId.get(item.id);
-		if (!group) throw new Error(`grok assigned no group to ${item.id}`);
+		if (!group) throw new Error(`codex assigned no group to ${item.id}`);
 		await catalog.put({ ...(await catalog.read(item.id)), group });
 	}
 	log(`grouped ${missing.length} item(s): ${[...new Set(byId.values())].join(', ')}`);

@@ -82,8 +82,8 @@ function setting<T>(sql: Sql, key: string, fallback: () => T) {
 	};
 }
 
-// Work only the laptop can do: page captures, grok and Codex sessions, USDZ conversion. The Worker queues it, the
-// runner on the laptop claims and runs it. An import's result is the id it saved; builds have none.
+// Work a Worker can't do: page captures, Codex sessions, USDZ conversion. The Worker queues it, the runner on the Mac
+// mini claims and runs it. An import's result is the id it saved; builds have none.
 export const JOB_KINDS = [
 	'importItem',
 	'importTexture',

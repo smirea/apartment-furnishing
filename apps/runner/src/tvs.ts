@@ -1,7 +1,8 @@
 // TV candidates: a pasted product link yields the TV's name, screen size, price and photo, which the TV panel can switch to.
 import { productKey } from '@repo/shared/layouts';
 import { tvSize, type TvModel } from '@repo/shared/items';
-import { downloadPhotos, fetchPages, grokStructured, pageContext, slug } from './catalog';
+import { downloadPhotos, fetchPages, pageContext, slug } from './catalog';
+import { codexStructured } from './codex';
 import { db } from './remote';
 
 const { tvs } = db;
@@ -10,7 +11,7 @@ const { tvs } = db;
 // ratio rather than the overall body, whose bezel and depth vary between spec sheets.
 export async function importTv(url: string): Promise<TvModel> {
 	const [page] = await fetchPages([url]);
-	const tv = await grokStructured<{
+	const tv = await codexStructured<{
 		isTv: boolean;
 		name: string;
 		brand: string | null;

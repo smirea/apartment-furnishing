@@ -9,7 +9,7 @@ export type CatalogItem = {
 	price: number | null;
 	currency: string;
 	category: string;
-	// High-level type the furniture list groups under, e.g. "Couches" or "Standing desks"; one grok call names it
+	// High-level type the furniture list groups under, e.g. "Couches" or "Standing desks"; one Codex call names it
 	// against the groups already in use so the list doesn't splinter.
 	group: string | null;
 	// Inches; width runs side to side as seen from the front.
@@ -61,7 +61,7 @@ export type WallTexture = {
 	// One panel as installed, in inches; height runs floor to ceiling for vertical slats.
 	panel: { width: number; height: number; depth: number } | null;
 	summary: string;
-	// Product type the swatches group under, e.g. "Ultralight slats" or "Hexagon tiles"; one grok call names them
+	// Product type the swatches group under, e.g. "Ultralight slats" or "Hexagon tiles"; one Codex call names them
 	// across the whole collection so colorways of a line land together.
 	group: string | null;
 	image: string | null;

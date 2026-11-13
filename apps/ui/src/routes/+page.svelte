@@ -860,7 +860,7 @@
 			await queryClient.invalidateQueries({ queryKey: ['catalog'] });
 			const fixture = fixtureCategories.get(item.category);
 			if (!fixture) {
-				// grok can read a product as wall-mounted, which lists it under Wall.
+				// Codex can read a product as wall-mounted, which lists it under Wall.
 				if (item.mount === 'wall') open.wall = true;
 				return addToRoom(item.id, at);
 			}

@@ -1,11 +1,12 @@
-// Wall textures: wall-panel products imported like furniture (page capture, grok, photos), then turned into a
+// Wall textures: wall-panel products imported like furniture (page capture, Codex, photos), then turned into a
 // seamless tile by Codex instead of a 3D model. The wallTexture fixture (fixtures.ts) picks which one the living room wears.
 import { productKey } from '@repo/shared/layouts';
 import type { WallTexture } from '@repo/shared/items';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { downloadPhotos, fetchPages, grokStructured, readDocuments, pageContext, slug } from './catalog';
+import { downloadPhotos, fetchPages, readDocuments, pageContext, slug } from './catalog';
+import { codexStructured } from './codex';
 import { collectPhotos, runCodex } from './generate-model';
 import { assets, db } from './remote';
 
@@ -47,7 +48,7 @@ type Panel = Omit<WallTexture, 'id' | 'url' | 'importedAt' | 'image' | 'texture'
 	imageUrl: string | null;
 };
 
-// Parallel grok calls per batch: each takes 10 to 20 s and a store import can be dozens of pages.
+// Parallel Codex calls per batch: each takes 5 to 10 s and a store import can be dozens of pages.
 const PARSE_CONCURRENCY = 6;
 
 async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
@@ -69,7 +70,7 @@ export async function importTextures(urls: string[], log: (line: string) => void
 	const specs = await Promise.all(pages.map(page => readDocuments(page.documents)));
 	// One unreadable page shouldn't throw away the rest of a store import: keep the others, report it at the end.
 	const parsed = await mapLimit([...pages.entries()], PARSE_CONCURRENCY, ([i, page]) =>
-		grokStructured<Panel>(
+		codexStructured<Panel>(
 			`Extract wall-panel product information from this retailer page capture. Use only facts in the input; the manufacturer's spec sheets, when present, beat the page for sizes. Convert sizes to inches. Pick imageUrl from the image candidates exactly as written.\n\n${pageContext(page)}${specs[i] ? `\n\nSpec sheets:\n${specs[i]}` : ''}`,
 			panelSchema,
 		).catch((error: unknown) => (error instanceof Error ? error : new Error(String(error)))),
@@ -120,7 +121,7 @@ export async function assignGroups(log: (line: string) => void = () => {}) {
 	const missing = all.filter(t => !t.group);
 	if (!missing.length) return;
 	const groups = [...new Set(all.map(t => t.group).filter(Boolean))];
-	const { assignments } = await grokStructured<{ assignments: { id: string; group: string }[] }>(
+	const { assignments } = await codexStructured<{ assignments: { id: string; group: string }[] }>(
 		`Group these wall-panel products by product type, so a wall-texture picker can show each type as one row of color swatches. A type is the product line and construction, never the color or the felt: for example "Ultralight slats", "Ultralight wide slats", "Full accent panels", "Truewood Lite slats", "Solid wood slats", "Paint-ready fluted", "Hexagon tiles". Keep names short and in sentence case. Reuse these existing groups where a product fits: ${groups.join(', ') || 'none yet'}.
 
 ${missing.map(t => `${t.id}: ${t.name} (${t.url}). ${t.summary}`).join('\n')}`,
@@ -144,7 +145,7 @@ ${missing.map(t => `${t.id}: ${t.name} (${t.url}). ${t.summary}`).join('\n')}`,
 	const byId = new Map(assignments.map(a => [a.id, a.group]));
 	for (const t of missing) {
 		const group = byId.get(t.id);
-		if (!group) throw new Error(`grok assigned no group to ${t.id}`);
+		if (!group) throw new Error(`codex assigned no group to ${t.id}`);
 		await textures.put({ ...(await textures.read(t.id)), group });
 	}
 	log(`grouped ${missing.length} texture(s): ${[...new Set(byId.values())].join(', ')}`);

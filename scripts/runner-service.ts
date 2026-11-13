@@ -14,10 +14,10 @@ const REPO = 'git@github.com:smirea/apartment-furnishing.git';
 const CHECKOUT = '$HOME/code/apartment-furnishing';
 const PLIST = `$HOME/Library/LaunchAgents/${LABEL}.plist`;
 const LOG = '$HOME/Library/Logs/apartment-runner.log';
-// launchd gives the agent only this PATH. codex is a node script, and the import and build jobs shell out to grok, uv,
+// launchd gives the agent only this PATH. codex is a node script, and the import and build jobs shell out to uv,
 // pdftotext and Apple's USD tools.
-const PATH = '$HOME/.bun/bin:$HOME/.grok/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin';
-const TOOLS = ['bun', 'node', 'codex', 'grok', 'uv', 'pdftotext', 'usdextract', 'usdzip', 'env-manager', 'git'];
+const PATH = '$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin';
+const TOOLS = ['bun', 'node', 'codex', 'uv', 'pdftotext', 'usdextract', 'usdzip', 'env-manager', 'git'];
 
 const PRELUDE = `set -euo pipefail
 export PATH="${PATH}"
@@ -35,10 +35,8 @@ const SETUP = `${PRELUDE}
 launchctl print "$domain" >/dev/null 2>&1 || fail "nobody is logged in to ${HOST}'s desktop, which a LaunchAgent needs"
 
 command -v pdftotext >/dev/null || brew install poppler
-command -v grok >/dev/null || curl -fsSL https://x.ai/cli/install.sh | bash
 for bin in ${TOOLS.join(' ')}; do command -v "$bin" >/dev/null || fail "$bin is not on the agent's PATH ($PATH)"; done
 codex login status >/dev/null 2>&1 || fail "codex is signed out on ${HOST}: ssh ${HOST}, then run codex login --device-auth"
-[ -s "$HOME/.grok/auth.json" ] || fail "grok is signed out on ${HOST}: ssh ${HOST}, then run grok login --device-auth"
 
 if [ -d "${CHECKOUT}/.git" ]; then
 	git -C "${CHECKOUT}" fetch -q origin master
