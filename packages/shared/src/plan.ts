@@ -1,8 +1,19 @@
-import { CEILING_FT, columns, finishAreasIn, fixtures, ft, rooms, tvWallFace, walls, type Rect } from './floorplan';
+import {
+	balconyGlassFace,
+	CEILING_FT,
+	columns,
+	finishAreasIn,
+	fixtures,
+	ft,
+	rooms,
+	tvWallFace,
+	walls,
+	type Rect,
+} from './floorplan';
 import type { TvPlacement, TvSettings } from './items';
 
 // A spot the TV can hang at, in plan feet: the point on the bare wall behind the screen's center and the way the screen
-// faces, as Placement.rotation[1] (-90 west, 180 north). `onBackWall` spots move out with a wall texture on the back
+// faces, as Placement.rotation[1] (-90 west, 90 east, 180 north). `onBackWall` spots move out with a wall texture on the back
 // wall. A `corner` spot is the corner itself, and the TV stands out from it until its back edges clear both walls.
 export type TvSpot = { x: number; z: number; yaw: number; onBackWall: boolean; corner: boolean };
 
@@ -52,6 +63,13 @@ export const tvSpots: Record<TvPlacement, TvSpot> = {
 		corner: false,
 	},
 	corner: { x: backX, z: pillarZ, yaw: -135, onBackWall: true, corner: true },
+	balconyWindow: {
+		x: round(ft(balconyGlassFace.x)),
+		z: round(ft((balconyGlassFace.y1 + balconyGlassFace.y2) / 2)),
+		yaw: 90,
+		onBackWall: false,
+		corner: false,
+	},
 };
 
 // The TV body's center in plan feet and its yaw in degrees. `backWallDepthFt` is how far a wall texture stands out from

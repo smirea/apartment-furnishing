@@ -35,13 +35,14 @@ struct Plan: Decodable {
     // Where the TV can hang; see TvSpot in packages/shared/src/plan.ts.
     struct TVSpot: Decodable { let x, z, yaw: Float; let onBackWall, corner: Bool }
     struct TVSpots: Decodable {
-        let backWall, pillarWall, corner: TVSpot
+        let backWall, pillarWall, corner, balconyWindow: TVSpot
 
         subscript(placement: TVSettings.Placement) -> TVSpot {
             switch placement {
             case .backWall: backWall
             case .pillarWall: pillarWall
             case .corner: corner
+            case .balconyWindow: balconyWindow
             }
         }
     }
@@ -119,13 +120,14 @@ struct Fixture: Decodable, Identifiable, Equatable {
 struct TVSettings: Codable, Equatable {
     // TV_PLACEMENTS in packages/shared/src/items.ts.
     enum Placement: String, Codable, CaseIterable {
-        case backWall, pillarWall, corner
+        case backWall, pillarWall, corner, balconyWindow
 
         var label: String {
             switch self {
             case .backWall: "Back wall"
             case .pillarWall: "Pillar wall"
             case .corner: "Corner"
+            case .balconyWindow: "Balcony"
             }
         }
     }

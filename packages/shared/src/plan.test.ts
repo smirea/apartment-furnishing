@@ -24,11 +24,12 @@ test('places the texture surfaces on the TV wall face and the column, in feet', 
 	});
 });
 
-test('offers the back wall center, the pillar wall between column and back wall, and the corner of the two', () => {
+test('offers the back wall center, the pillar wall between column and back wall, the corner of the two, and the balcony glass', () => {
 	expect(planGeometry().tvSpots).toEqual({
 		backWall: { x: 24.388, z: 32.596, yaw: -90, onBackWall: true, corner: false },
 		pillarWall: { x: 19.367, z: 37.679, yaw: 180, onBackWall: false, corner: false },
 		corner: { x: 24.388, z: 37.679, yaw: -135, onBackWall: true, corner: true },
+		balconyWindow: { x: 7.806, z: 32.068, yaw: 90, onBackWall: false, corner: false },
 	});
 });
 
@@ -43,6 +44,13 @@ test('ignores a back-wall texture for a TV on the pillar wall', () => {
 	const pose = tvPose({ ...DEFAULT_TV, placement: 'pillarWall' }, 1 / 12);
 	expect(pose.x).toBeCloseTo(19.367, 6);
 	expect(pose.z).toBeCloseTo(37.679 - (2.5 + TV_DEPTH_IN / 2) / 12, 6);
+});
+
+test('hangs a balcony-window TV out from the glass, facing the back wall, whatever the back-wall texture', () => {
+	const pose = tvPose({ ...DEFAULT_TV, placement: 'balconyWindow' }, 1 / 12);
+	expect(pose.x).toBeCloseTo(7.806 + (2.5 + TV_DEPTH_IN / 2) / 12, 6);
+	expect(pose.z).toBeCloseTo(32.068, 6);
+	expect(pose.yaw).toBe(90);
 });
 
 test('pulls a corner TV out until both back corners clear the walls by the same 1.77"', () => {

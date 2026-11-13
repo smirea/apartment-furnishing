@@ -90,8 +90,14 @@ export function panelsNeeded(panel: { width: number; height: number }, area: { w
 }
 
 // Where the living-room TV hangs: centered on the back (TV) wall's measured span, on the pillar wall centered between
-// the column and the back wall, or across the corner where those two walls meet.
-export const TV_PLACEMENTS = { backWall: 'Back wall', pillarWall: 'Pillar wall', corner: 'Corner' } as const;
+// the column and the back wall, across the corner where those two walls meet, or facing the back wall from the balcony
+// glass, centered between the balcony door and the south glass.
+export const TV_PLACEMENTS = {
+	backWall: 'Back wall',
+	pillarWall: 'Pillar wall',
+	corner: 'Corner',
+	balconyWindow: 'Balcony window',
+} as const;
 export type TvPlacement = keyof typeof TV_PLACEMENTS;
 export const isTvPlacement = (value: unknown): value is TvPlacement =>
 	typeof value === 'string' && Object.hasOwn(TV_PLACEMENTS, value);
