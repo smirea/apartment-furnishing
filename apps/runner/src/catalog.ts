@@ -1,7 +1,7 @@
 // Product import pipeline behind the importItem job (POST /api/catalog/import) and scripts/import-item.ts.
 // Captures each page with a headless Camoufox browser, has Codex read it into
 // structured product info, uploads the photos and any 3D model, and saves the item to the catalog table.
-import type { CatalogItem, Mount } from '@repo/shared/items';
+import { MOUNTS, type CatalogItem, type Mount } from '@repo/shared/items';
 import { productKey } from '@repo/shared/layouts';
 import { join } from 'node:path';
 import { codexStructured } from './codex';
@@ -62,9 +62,9 @@ const productSchema = {
 		imageUrl: { type: ['string', 'null'], description: 'Main product photo URL, copied exactly from the input' },
 		mount: {
 			type: 'string',
-			enum: ['floor', 'wall', 'ceiling', 'surface'],
+			enum: [...MOUNTS],
 			description:
-				'How this is normally placed in a home: floor (sofas, beds, floor lamps, TV stands), wall (wall-mounted TVs, art, mirrors, shelves), ceiling (pendants, fans), surface (table lamps, decor that sits on furniture). Large TVs default to wall.',
+				'How this is normally placed in a home: floor (sofas, beds, bookcases, floor lamps, TV stands, rugs), wall (wall-mounted TVs, art, mirrors, floating shelves), ceiling (pendants, fans), surface (table lamps, decor that sits on furniture). Large TVs default to wall.',
 		},
 		defaultElevationIn: {
 			type: 'number',
@@ -96,7 +96,7 @@ type Product = {
 	highlights: string[];
 	imageUrl: string | null;
 	modelUrl: string | null;
-	mount: 'floor' | 'wall' | 'ceiling' | 'surface';
+	mount: Mount;
 	defaultElevationIn: number;
 	removeNodes: string[];
 };

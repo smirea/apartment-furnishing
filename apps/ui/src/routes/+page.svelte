@@ -13,6 +13,7 @@
 		type CarpetSize,
 	} from '@repo/shared/carpets';
 	import {
+		MOUNTS,
 		panelsNeeded,
 		TV_PLACEMENTS,
 		TV_RATIOS,
@@ -24,6 +25,7 @@
 		type CatalogItem,
 		type FinishSurface,
 		type Job,
+		type Mount,
 		type Placement,
 		type WallTexture,
 		type WallTextureEntry,
@@ -681,9 +683,9 @@
 		patchPlacement(selectedPlacement.key, { rotation: [rx, deg, rz] });
 	}
 
-	const mountLabel = {
+	const mountLabel: Record<Mount, string> = {
 		floor: 'Stands on the floor',
-		wall: 'Wall-mounted',
+		wall: 'Hangs on a wall',
 		ceiling: 'Hangs from the ceiling',
 		surface: 'Sits on a surface',
 	};
@@ -881,6 +883,19 @@
 		},
 	}));
 
+	// The item rebuilds under its new mount, and every copy in this room settles again as it loads: off a wall onto the
+	// floor, or onto the nearest wall.
+	const mountMutation = createMutation(() => ({
+		mutationFn: ({ id, mount }: { id: string; mount: Mount }) =>
+			api(`/api/catalog/${id}`, { method: 'PATCH', body: JSON.stringify({ mount }) }),
+		onSuccess: async (_: unknown, { id, mount }: { id: string; mount: Mount }) => {
+			for (const p of placements) if (p.itemId === id) viewer?.snapWhenLoaded(p.key);
+			if (mount === 'wall') open.wall = true;
+			else open.furniture = true;
+			await queryClient.invalidateQueries({ queryKey: ['catalog'] });
+		},
+	}));
+
 	const generateMutation = createMutation(() => ({
 		mutationFn: (id: string) => api(`/api/catalog/${id}/model`, { method: 'POST' }),
 		onSuccess: () => queryClient.invalidateQueries({ queryKey: ['catalog'] }),
@@ -903,7 +918,7 @@
 			title: 'Wall',
 			summary: String(wallList.length),
 			groups: grouped(wallList).map(([group, items]) => [group, items!.map(itemTile)] as const),
-			placeholder: 'Paste a link to art, a mirror or a shelf',
+			placeholder: 'Paste a link to art, a mirror or a wall shelf',
 			importer: wallImport,
 			errors: [],
 			loading: catalogQuery.isPending,
@@ -1522,7 +1537,7 @@
 				<p class="meta">
 					{#if money(item)}<strong>{money(item)}</strong>{/if}
 					{#if item.brand}<span>{item.brand}</span>{/if}
-					<span>{mountLabel[item.mount]}</span>
+					{#if fixture}<span>{mountLabel[item.mount]}</span>{/if}
 				</p>
 				{#if item.dimensions}
 					<p class="dims">
@@ -1532,6 +1547,21 @@
 				{/if}
 
 				<div class="controls">
+					{#if !fixture}
+						<label class="row">
+							<span>Placed</span>
+							<select
+								value={item.mount}
+								disabled={mountMutation.isPending}
+								onchange={e => mountMutation.mutate({ id: item.id, mount: e.currentTarget.value as Mount })}
+							>
+								{#each MOUNTS as mount (mount)}
+									<option value={mount}>{mountLabel[mount]}</option>
+								{/each}
+							</select>
+						</label>
+						{#if mountMutation.isError}<p class="error">{mountMutation.error.message}</p>{/if}
+					{/if}
 					{#if placement}
 						<!-- A wall piece faces out of the wall it hangs on. -->
 						{#if item.mount !== 'wall'}
@@ -2271,6 +2301,14 @@
 
 	.controls button {
 		padding: 0.3rem 0.6rem;
+	}
+
+	.controls select {
+		border: 1px solid var(--app-border);
+		border-radius: 0.375rem;
+		padding: 0.3rem 0.4rem;
+		background: var(--app-bg);
+		color: var(--app-text);
 	}
 
 	button.danger {

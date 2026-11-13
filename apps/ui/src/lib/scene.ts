@@ -583,7 +583,8 @@ export function createViewer(
 	// Newly added items settle (floor, wall, ceiling) once their model has loaded and has a size.
 	const snapOnLoad = new Set<string>();
 	let catalogById: Record<string, CatalogItem> = {};
-	const signature = (item: CatalogItem) => `${item.id}|${item.model}|${item.removeNodes.join(',')}`;
+	// A new mount rebuilds the item too, so it settles the new way once loaded.
+	const signature = (item: CatalogItem) => `${item.id}|${item.model}|${item.mount}|${item.removeNodes.join(',')}`;
 
 	async function buildItem(item: CatalogItem): Promise<Object3D> {
 		const dims = item.dimensions;
@@ -769,9 +770,10 @@ export function createViewer(
 		if (normal[1] === 1) return w.z2 - box.min.z;
 		return w.z1 - box.max.z;
 	}
-	function nearestWall(box: Box3, threshold: number): WallHit | null {
+	function nearestWall(box: Box3, threshold: number, axis: WallHit['axis']): WallHit | null {
 		let best: WallHit | null = null;
 		const consider = (wall: Box, normal: [number, number]) => {
+			if ((normal[0] ? 'x' : 'z') !== axis) return;
 			const shift = flushShift(box, wall, normal);
 			if (Math.abs(shift) < threshold && (!best || Math.abs(shift) < Math.abs(best.shift)))
 				best = { wall, shift, axis: normal[0] ? 'x' : 'z', normal };
@@ -815,8 +817,8 @@ export function createViewer(
 		showWallArrow(root, face.axis);
 	}
 
-	// Pull items flush to nearby walls, then settle them onto the floor or the highest surface under their center. Wall
-	// pieces hang on a wall instead.
+	// Pull items flush to nearby walls, once along each axis so one dropped near a corner sits square in it, then settle
+	// them onto the floor or the highest surface under their center. Wall pieces hang on a wall instead.
 	function snap(root: Group) {
 		const mount = catalogById[root.userData.itemId]?.mount ?? 'floor';
 		if (mount === 'wall') return hang(root);
@@ -824,9 +826,10 @@ export function createViewer(
 		let box = new Box3().setFromObject(root);
 		if (box.isEmpty()) return;
 
-		const wall = nearestWall(box, SNAP_FT);
-		if (wall) {
-			root.position[wall.axis] += flushShift(box, wall.wall, wall.normal);
+		for (const axis of ['x', 'z'] as const) {
+			const wall = nearestWall(box, SNAP_FT, axis);
+			if (!wall) continue;
+			root.position[axis] += flushShift(box, wall.wall, wall.normal);
 			root.updateMatrixWorld(true);
 			box = new Box3().setFromObject(root);
 		}

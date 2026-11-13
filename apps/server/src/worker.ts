@@ -1,7 +1,9 @@
 import { carpetSpawn, savedLook, textureTarget, type Carpet, type CarpetEntry } from '@repo/shared/carpets';
 import type { Statement } from '@repo/shared/db';
 import {
+	isMount,
 	isTvPlacement,
+	remount,
 	TV_PLACEMENTS,
 	type CatalogEntry,
 	type Placement,
@@ -165,8 +167,7 @@ const api = router({
 					(await findImported('item', url)) ?? (await runImport('importItem', url, null, mount ?? null)),
 				);
 				if (mount && item.mount !== mount) {
-					// Read as standing on the floor, it has no height to hang at; 48″ puts most art's center near eye level.
-					item = { ...item, mount, defaultElevationIn: item.defaultElevationIn || 48 };
+					item = remount(item, mount);
 					await catalog.put(item);
 				}
 				await unhide(layout, 'item', item.id);
@@ -182,6 +183,17 @@ const api = router({
 	},
 	// After /import, which the :id pattern would match too.
 	'/api/catalog/:id': {
+		// Corrects how an item mounts, say a bookcase pasted in the Wall panel that stands on the floor.
+		PATCH: async request => {
+			const item = await catalog.get(request.params.id!);
+			if (!item) return Response.json({ error: 'Unknown item' }, { status: 404 });
+			const { mount } = await body<{ mount: unknown }>(request);
+			if (!isMount(mount))
+				return Response.json({ error: 'Expected mount: floor, wall, ceiling or surface' }, { status: 400 });
+			const next = remount(item, mount);
+			await catalog.put(next);
+			return Response.json(next);
+		},
 		DELETE: async request => {
 			const { id } = request.params as { id: string };
 			if (!(await catalog.get(id))) return Response.json({ error: `No catalog item ${id}` }, { status: 404 });

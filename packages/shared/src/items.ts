@@ -1,4 +1,14 @@
-export type Mount = 'floor' | 'wall' | 'ceiling' | 'surface';
+export const MOUNTS = ['floor', 'wall', 'ceiling', 'surface'] as const;
+export type Mount = (typeof MOUNTS)[number];
+export const isMount = (value: unknown): value is Mount => MOUNTS.includes(value as Mount);
+
+// Hung on a wall, an item read as standing has no height to hang at; 48″ puts most art's center near eye level. Off a
+// wall it rests on the floor or whatever is under it.
+export const remount = (item: CatalogItem, mount: Mount): CatalogItem => ({
+	...item,
+	mount,
+	defaultElevationIn: mount === 'wall' ? item.defaultElevationIn || 48 : 0,
+});
 
 export type CatalogItem = {
 	id: string;

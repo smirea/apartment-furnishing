@@ -3,7 +3,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { run } from './lib';
+import { readEnv, run, type Values } from './lib';
 
 const SERVER = join(import.meta.dir, '../apps/server');
 const PERSIST = ['--persist-to', '../../.wrangler/state'];
@@ -19,7 +19,12 @@ const TABLES = [
 	'layout_hidden',
 ];
 
-const wrangler = (args: string[]) => run(['bunx', 'wrangler', ...args], { cwd: SERVER });
+// Reading production needs its Cloudflare token, which only env-manager prod holds; without AWS access the copy is skipped.
+let cloudflare: Values = {};
+try {
+	cloudflare = Object.fromEntries(Object.entries(readEnv('prod')).filter(([key]) => key.startsWith('CLOUDFLARE_')));
+} catch {}
+const wrangler = (args: string[]) => run(['bunx', 'wrangler', ...args], { cwd: SERVER, env: cloudflare });
 const query = (where: '--local' | '--remote', sql: string) => {
 	const out = wrangler([
 		'd1',

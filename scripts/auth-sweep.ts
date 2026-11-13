@@ -16,7 +16,7 @@ const source = readFileSync(join(import.meta.dir, '../apps/server/src/worker.ts'
 const table = source.slice(source.indexOf('router({'));
 const routes = [...table.matchAll(/^\t'(\/[^']+)': (\{[^]*?^\t\},|.*,)$/gm)].map(([, path, body]) => ({
 	path: path!,
-	methods: body!.startsWith('{') ? [...body!.matchAll(/^\t\t(GET|PUT|POST|DELETE):/gm)].map(m => m[1]!) : ['GET'],
+	methods: body!.startsWith('{') ? [...body!.matchAll(/^\t\t(GET|PUT|PATCH|POST|DELETE):/gm)].map(m => m[1]!) : ['GET'],
 }));
 if (routes.length < 15) throw new Error(`Read only ${routes.length} routes from worker.ts; the parser is out of date`);
 

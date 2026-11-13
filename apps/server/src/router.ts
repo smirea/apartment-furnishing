@@ -1,7 +1,7 @@
 // Bun.serve-style route tables on URLPattern, so the API reads as one map of path to handler.
 export type RouteRequest = Request & { params: Record<string, string> };
 type Handler = (request: RouteRequest) => Response | Promise<Response>;
-type Method = 'GET' | 'PUT' | 'POST' | 'DELETE';
+type Method = 'GET' | 'PUT' | 'PATCH' | 'POST' | 'DELETE';
 export type Routes = Record<string, Handler | Partial<Record<Method, Handler>>>;
 
 export function router(routes: Routes) {
