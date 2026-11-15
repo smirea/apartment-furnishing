@@ -61,8 +61,8 @@
 	let viewer = $state<ReturnType<typeof createViewer>>();
 	let measure = $state<MeasureState>({ tool: null, draft: null, done: [] });
 	const measureHints: Record<MeasureTool, string> = {
-		line: 'Click points on the floor. Click the last point again or press Enter to finish.',
-		area: 'Click the corners on the floor. Click the first corner again or press Enter to close the shape.',
+		line: 'Click points on the floor. Click the last point again or press Enter to finish. Shift keeps a segment straight.',
+		area: 'Click two opposite corners on the floor.',
 	};
 
 	// Everything the plan shows and changes belongs to this layout. Each request names the layout it was made for, so a
@@ -1478,11 +1478,13 @@
 		{#if measure.tool || measure.done.length}
 			<section class="panel measure">
 				{#if measure.tool}
-					<p class="muted">{measureHints[measure.tool]} Shift keeps a segment straight.</p>
+					<p class="muted">{measureHints[measure.tool]}</p>
 					{#if measure.draft}
 						<div class="measure-row draft">
 							<span>{measure.draft.value} <span class="muted">{measure.draft.detail}</span></span>
-							<button type="button" onclick={() => viewer?.finishMeasurement()}>Done</button>
+							{#if measure.tool === 'line'}
+								<button type="button" onclick={() => viewer?.finishMeasurement()}>Done</button>
+							{/if}
 						</div>
 					{/if}
 				{/if}

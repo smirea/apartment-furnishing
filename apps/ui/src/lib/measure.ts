@@ -8,7 +8,6 @@ import {
 	MeshBasicMaterial,
 	Object3D,
 	Plane,
-	ShapeUtils,
 	Vector2,
 	Vector3,
 	type Camera,
@@ -28,40 +27,28 @@ const COLOR = 0xfbbf24;
 const DRAFT_COLOR = 0x5eead4;
 const FLOOR = new Plane(new Vector3(0, 1, 0), 0);
 
-export function feetInches(feet: number) {
-	const halfInches = Math.round(feet * 24);
-	const ft = Math.floor(halfInches / 24);
-	const inches = (halfInches % 24) / 2;
-	return ft ? `${ft}′ ${inches}″` : `${inches}″`;
+const toInches = (feet: number) => Math.round(feet * 24) / 2;
+const inches = (feet: number) => `${toInches(feet)}″`;
+
+// The two clicked corners span a rectangle square to the plan, listed in drawing order.
+function rectangle(a: Vector3, b: Vector3) {
+	return [a, new Vector3(b.x, a.y, a.z), b, new Vector3(a.x, a.y, b.z)];
 }
 
-const onFloor = (points: Vector3[]) => points.map(p => new Vector2(p.x, p.z));
-const floorArea = (points: Vector3[]) => Math.abs(ShapeUtils.area(onFloor(points)));
-
-function pathLength(points: Vector3[], closed: boolean) {
+function pathLength(points: Vector3[]) {
 	let total = 0;
 	for (let i = 1; i < points.length; i++) total += points[i]!.distanceTo(points[i - 1]!);
-	if (closed && points.length > 2) total += points.at(-1)!.distanceTo(points[0]!);
 	return total;
 }
 
 function summarize(id: number, tool: MeasureTool, points: Vector3[]): Measurement {
 	if (tool === 'line') {
 		const segments = points.length - 1;
-		return {
-			id,
-			tool,
-			value: feetInches(pathLength(points, false)),
-			detail: segments > 1 ? `${segments} segments` : 'length',
-		};
+		return { id, tool, value: inches(pathLength(points)), detail: segments > 1 ? `${segments} segments` : 'length' };
 	}
-	const area = points.length > 2 ? floorArea(points) : 0;
-	return {
-		id,
-		tool,
-		value: `${area.toFixed(1)} ft²`,
-		detail: `perimeter ${feetInches(pathLength(points, true))}`,
-	};
+	const [a, b] = [points[0]!, points.at(-1)!];
+	const [w, d] = [toInches(Math.abs(b.x - a.x)), toInches(Math.abs(b.z - a.z))];
+	return { id, tool, value: `${w}″ × ${d}″`, detail: `${(w * d).toLocaleString()} in²` };
 }
 
 function label(text: string, className: string, at: Vector3) {
@@ -76,38 +63,40 @@ function label(text: string, className: string, at: Vector3) {
 function draw(tool: MeasureTool, points: Vector3[], draft: boolean) {
 	const group = new Group();
 	const color = draft ? DRAFT_COLOR : COLOR;
-	const closed = tool === 'area' && points.length > 2;
-	const path = closed ? [...points, points[0]!] : points;
+	const corners = tool === 'area' && points.length > 1 ? rectangle(points[0]!, points.at(-1)!) : null;
+	const path = corners ? [...corners, corners[0]!] : points;
 	if (path.length > 1) {
 		const geometry = new LineGeometry().setPositions(path.flatMap(p => [p.x, p.y, p.z]));
 		const line = new Line2(geometry, new LineMaterial({ color, linewidth: 3, depthTest: false, transparent: true }));
 		line.renderOrder = 10;
 		group.add(line);
 	}
-	for (let i = 1; i < path.length; i++) {
-		const [a, b] = [path[i - 1]!, path[i]!];
+	// A rectangle labels one width edge and one depth edge; the other two would only repeat them.
+	const labelled = corners ? path.slice(0, 3) : path;
+	for (let i = 1; i < labelled.length; i++) {
+		const [a, b] = [labelled[i - 1]!, labelled[i]!];
 		const length = a.distanceTo(b);
-		if (length > 0.05) group.add(label(feetInches(length), 'measure-label', a.clone().lerp(b, 0.5)));
+		if (length > 0.05) group.add(label(inches(length), 'measure-label', a.clone().lerp(b, 0.5)));
 	}
-	for (const p of points) group.add(label('', `measure-dot${draft ? ' draft' : ''}`, p));
-	if (closed) {
+	for (const p of corners ?? points) group.add(label('', `measure-dot${draft ? ' draft' : ''}`, p));
+	if (corners) {
 		const geometry = new BufferGeometry();
 		geometry.setAttribute(
 			'position',
 			new Float32BufferAttribute(
-				points.flatMap(p => [p.x, p.y, p.z]),
+				corners.flatMap(p => [p.x, p.y, p.z]),
 				3,
 			),
 		);
-		geometry.setIndex(ShapeUtils.triangulateShape(onFloor(points), []).flat());
+		geometry.setIndex([0, 1, 2, 0, 2, 3]);
 		const fill = new Mesh(
 			geometry,
 			new MeshBasicMaterial({ color, transparent: true, opacity: 0.22, side: DoubleSide, depthTest: false }),
 		);
 		fill.renderOrder = 9;
 		group.add(fill);
-		const center = points.reduce((sum, p) => sum.add(p), new Vector3()).divideScalar(points.length);
-		group.add(label(`${floorArea(points).toFixed(1)} ft²`, 'measure-label area', center));
+		const center = corners[0]!.clone().lerp(corners[2]!, 0.5);
+		group.add(label(summarize(0, tool, points).detail, 'measure-label area', center));
 	}
 	return group;
 }
@@ -123,9 +112,9 @@ function dispose(group: Group) {
 	group.removeFromParent();
 }
 
-// Clicks drop points on the floor. A segment stops at the first wall, fixture or door in its way, like a laser measure;
-// furniture doesn't stop it. Clicking the last point again ends a line and clicking
-// the first point closes an area; Enter does either, Backspace drops the last point, and Escape drops the draft.
+// Clicks drop points on the floor. A line segment stops at the first wall, fixture or door in its way, like a laser
+// measure; furniture doesn't stop it. Clicking the last point again or Enter ends a line. An area is the rectangle
+// between two clicked corners and ends on the second click. Backspace drops the last point, and Escape drops the draft.
 export function createMeasurer(
 	parent: Object3D,
 	camera: Camera,
@@ -138,7 +127,7 @@ export function createMeasurer(
 	parent.add(root);
 	let tool: MeasureTool | null = null;
 	let nextId = 1;
-	const done: { measurement: Measurement; points: Vector3[]; group: Group }[] = [];
+	const done: { measurement: Measurement; snaps: Vector3[]; group: Group }[] = [];
 	let points: Vector3[] = [];
 	let hover: Vector3 | null = null;
 	let draftGroup: Group | null = null;
@@ -173,13 +162,13 @@ export function createMeasurer(
 		return candidates.find(p => screen(p).distanceTo(at) < SNAP_PX) ?? null;
 	}
 
-	// Snaps to existing points, then to the floor under the cursor. Shift keeps the new segment straight along x or z.
+	// Snaps to existing points, then to the floor under the cursor. Shift keeps a new line segment straight along x or z.
 	function locate(e: PointerEvent) {
-		const snapped = nearby(e, [...points, ...done.flatMap(d => d.points)]);
+		const snapped = nearby(e, [...points, ...done.flatMap(d => d.snaps)]);
 		if (snapped) return snapped;
 		const hit = cast(e).ray.intersectPlane(FLOOR, new Vector3());
 		const last = points.at(-1);
-		if (!hit || !last) return hit;
+		if (!hit || !last || tool === 'area') return hit;
 		const target = last.clone();
 		if (!e.shiftKey) target.copy(hit);
 		else if (Math.abs(hit.x - last.x) >= Math.abs(hit.z - last.z)) target.x = hit.x;
@@ -189,12 +178,11 @@ export function createMeasurer(
 
 	function finish() {
 		if (!tool) return;
-		const enough = tool === 'line' ? points.length > 1 : points.length > 2;
-		if (enough) {
+		if (points.length > 1) {
 			const measurement = summarize(nextId++, tool, points);
 			const group = draw(tool, points, false);
 			root.add(group);
-			done.push({ measurement, points, group });
+			done.push({ measurement, snaps: tool === 'area' ? rectangle(points[0]!, points[1]!) : points, group });
 		}
 		points = [];
 		hover = null;
@@ -243,9 +231,9 @@ export function createMeasurer(
 			const p = locate(e);
 			if (!p) return;
 			if (tool === 'line' && p === points.at(-1)) return finish();
-			if (tool === 'area' && points.length > 2 && p === points[0]) return finish();
 			if (points.includes(p)) return;
 			points = [...points, p];
+			if (tool === 'area' && points.length === 2) return finish();
 			redraw();
 		},
 		finish,
