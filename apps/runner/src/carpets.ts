@@ -7,7 +7,8 @@ import { productKey } from '@repo/shared/layouts';
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { downloadPhotos, fetchPages, pageContext, slug } from './catalog';
+import { downloadPhotos, fetchPages, pageContext, variationLines } from './catalog';
+import { slug } from './slug';
 import { codexStructured } from './codex';
 import { pagesToCapture, type Combo, type Look } from './carpet-pages';
 import { collectPhotos, runCodex } from './generate-model';
@@ -116,14 +117,11 @@ export async function importCarpet(url: string, log: (line: string) => void = ()
 	const [main] = await fetchPages([url]);
 	if (main!.variationsError) log(`  could not read the listing's other looks: ${main!.variationsError}`);
 	const variations = main!.variations;
-	const dimensions = variations?.dimensions.map(
-		(d, i) => `${i}. ${d}: ${[...new Set(variations.combos.map(c => c.values[i]))].join(' | ')}`,
-	);
 	const parsed = await codexStructured<Parsed>(
 		`Extract rug product information from this retailer page capture. Use only facts in the input. Convert sizes to inches (8' x 10' is 96 x 120). Pick imageUrl from the image candidates exactly as written.
 
 Variation dimensions the listing sells, with their values:
-${dimensions?.join('\n') ?? 'none'}
+${variationLines(variations)}
 
 ${pageContext(main!)}`,
 		carpetSchema,

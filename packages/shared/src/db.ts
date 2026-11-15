@@ -92,10 +92,12 @@ export const JOB_KINDS = [
 	'buildModel',
 	'buildTexture',
 	'buildCarpet',
+	'buildVariants',
 ] as const;
 export type JobKind = (typeof JOB_KINDS)[number];
 
-// `target` is the product URL of an import and the item id of a build. `category` limits an item import to one kind
+// `target` is the product URL of an import and the item id of a build (`buildVariants` recolors an item's model for each
+// of its looks). `category` limits an item import to one kind
 // of product, so a link pasted in the Bed panel can't add a lamp nobody sees. `mount` sets how an imported item is
 // placed, so one pasted in the Wall panel hangs on a wall.
 export type QueuedJob = { id: number; kind: JobKind; target: string; category: string | null; mount: Mount | null };
@@ -226,6 +228,9 @@ export function createDb(sql: Sql) {
 				image: 'value',
 				model: 'value',
 				modelSource: 'value',
+				variantLabel: 'value',
+				variants: 'json',
+				variant: 'value',
 			},
 			'importedAt DESC',
 		),
@@ -233,7 +238,7 @@ export function createDb(sql: Sql) {
 			sql,
 			'placements',
 			'key',
-			{ key: 'value', layoutId: 'value', itemId: 'value', position: 'json', rotation: 'json' },
+			{ key: 'value', layoutId: 'value', itemId: 'value', position: 'json', rotation: 'json', variant: 'value' },
 			'rowid',
 		),
 		textures: table<WallTexture>(

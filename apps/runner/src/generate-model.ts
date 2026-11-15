@@ -98,8 +98,11 @@ export async function generateModel(item: CatalogItem, log: (line: string) => vo
 	const current = await db.catalog.read(item.id);
 	await assets.put(`${item.id}/model.py`, await Bun.file(join(work, 'build.py')).text());
 	const model = await uploadModel(item.id, await Bun.file(join(work, 'model.glb')).bytes());
-	const updated: CatalogItem = { ...current, ...size, model, modelSource: 'generated' };
+	// The looks were recolored copies of the old model.
+	const variants = current.variants.map(v => ({ ...v, model: null }));
+	const updated: CatalogItem = { ...current, ...size, model, modelSource: 'generated', variants };
 	await db.catalog.put(updated);
+	if (variants.length) await db.jobs.enqueue('buildVariants', item.id);
 	log(`codex: ${item.id} done, ${JSON.stringify(size)} (${work})`);
 	return updated;
 }

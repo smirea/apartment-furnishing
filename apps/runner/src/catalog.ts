@@ -1,11 +1,14 @@
 // Product import pipeline behind the importItem job (POST /api/catalog/import) and scripts/import-item.ts.
 // Captures each page with a headless Camoufox browser, has Codex read it into
 // structured product info, uploads the photos and any 3D model, and saves the item to the catalog table.
-import { MOUNTS, type CatalogItem, type Mount } from '@repo/shared/items';
+import { MOUNTS, type CatalogItem, type ItemVariant, type Mount } from '@repo/shared/items';
 import { productKey } from '@repo/shared/layouts';
 import { join } from 'node:path';
 import { codexStructured } from './codex';
+import { readGlb } from './glb';
+import { listedLooks } from './item-variants';
 import { assets, db } from './remote';
+import { slug } from './slug';
 import { uploadModel } from './usdz';
 
 export const ROOT = join(import.meta.dir, '../../..');
@@ -33,6 +36,7 @@ const productSchema = {
 		'mount',
 		'defaultElevationIn',
 		'removeNodes',
+		'lookDimensions',
 	],
 	properties: {
 		name: { type: 'string', description: 'Short product name a person would say, without retailer noise' },
@@ -81,6 +85,12 @@ const productSchema = {
 			type: ['string', 'null'],
 			description: 'GLB 3D model URL, copied exactly from the input candidates, or null',
 		},
+		lookDimensions: {
+			type: 'array',
+			items: { type: 'integer' },
+			description:
+				"Indexes of the listed variation dimensions that change only the product's color, fabric, finish or pattern, never its size, shape, configuration or pack count. Empty when none do or none are listed",
+		},
 	},
 };
 type Product = {
@@ -99,6 +109,7 @@ type Product = {
 	mount: Mount;
 	defaultElevationIn: number;
 	removeNodes: string[];
+	lookDimensions: number[];
 };
 
 // Every combination of looks and sizes a listing sells, each with its own link; `values` follow `dimensions`.
@@ -106,7 +117,8 @@ type Product = {
 // swatch shows on the captured page.
 export type Variations = {
 	dimensions: string[];
-	combos: { url: string; values: string[]; price: number | null }[];
+	// `image` is the combination's own photo where the store lists one with it.
+	combos: { url: string; values: string[]; price: number | null; image?: string | null }[];
 	current: string | null;
 	perLook: boolean;
 };
@@ -157,15 +169,11 @@ export async function fetchPages(urls: string[]): Promise<PageData[]> {
 	return pages;
 }
 
-// glTF binary: 12-byte header, then a JSON chunk (length, type, data) describing the scene graph.
 async function glbNodeNames(url: string): Promise<string[]> {
 	try {
 		const res = await fetch(url, { headers: { 'user-agent': 'Mozilla/5.0' } });
 		if (!res.ok) return [];
-		const bytes = new Uint8Array(await res.arrayBuffer());
-		const length = new DataView(bytes.buffer).getUint32(12, true);
-		const gltf = JSON.parse(new TextDecoder().decode(bytes.subarray(20, 20 + length)));
-		return (gltf.nodes ?? []).map((n: { name?: string }) => n.name).filter(Boolean);
+		return (readGlb(new Uint8Array(await res.arrayBuffer())).nodes ?? []).flatMap(n => (n.name ? [n.name] : []));
 	} catch {
 		return [];
 	}
@@ -184,6 +192,12 @@ ${page.jsonLd}
 Visible page text:
 ${page.text}`;
 
+// The listing's variation dimensions, numbered, with their values.
+export const variationLines = (variations: Variations | null) =>
+	variations?.dimensions
+		.map((d, i) => `${i}. ${d}: ${[...new Set(variations.combos.map(c => c.values[i]))].join(' | ')}`)
+		.join('\n') ?? 'none';
+
 async function readProduct(page: PageData, mount?: Mount): Promise<Product> {
 	const modelLines = await Promise.all(
 		page.models.slice(0, 3).map(async url => `${url} (nodes: ${(await glbNodeNames(url)).join(', ') || 'unknown'})`),
@@ -193,6 +207,9 @@ async function readProduct(page: PageData, mount?: Mount): Promise<Product> {
 
 3D model candidates:
 ${modelLines.join('\n') || 'none'}
+
+Variation dimensions the listing sells, with their values:
+${variationLines(page.variations)}
 
 ${pageContext(page)}`,
 		productSchema,
@@ -230,13 +247,6 @@ export async function download(url: string) {
 
 const extension = (url: string) => url.match(/\.(png|webp|jpe?g)/i)?.[1] ?? 'jpg';
 
-export const slug = (s: string) =>
-	s
-		.toLowerCase()
-		.replace(/[^a-z0-9]+/g, '-')
-		.replace(/^-|-$/g, '')
-		.slice(0, 60);
-
 // Main photo as image.<ext> plus the listing gallery, under <id>/ in the bucket. Returns the main photo's asset URL,
 // versioned because a reimport overwrites the file and the iOS app keeps every asset URL on disk for good.
 export async function downloadPhotos(id: string, imageUrl: string | null, gallery: string[]): Promise<string | null> {
@@ -264,7 +274,7 @@ export async function importProducts(
 	const imported: CatalogItem[] = [];
 	for (const page of await fetchPages(urls)) {
 		log(`→ ${page.title.slice(0, 80)} (${page.models.length} model candidate(s))`);
-		const { imageUrl, modelUrl, ...product } = await readProduct(page, mount);
+		const { imageUrl, modelUrl, lookDimensions, ...product } = await readProduct(page, mount);
 		if (mount) product.mount = mount;
 		// TVs are built into the plan; the TV panel only needs their size.
 		if (product.category === 'tv')
@@ -273,6 +283,8 @@ export async function importProducts(
 			throw new Error(`${product.name} is not a ${category} (read as ${product.category})`);
 		const brandPrefix =
 			product.brand && !product.name.toLowerCase().startsWith(product.brand.toLowerCase()) ? `${product.brand} ` : '';
+		if (page.variationsError) log(`  could not read the listing's other looks: ${page.variationsError}`);
+		const looks = page.variations && listedLooks(page.variations, lookDimensions);
 		// Same product, same entry: re-importing a link updates it instead of adding a near-duplicate under whatever name
 		// the LLM picks this time.
 		const existing = (await catalog.all()).find(item => productKey(item.url) === productKey(page.url));
@@ -290,6 +302,10 @@ export async function importProducts(
 			({ dimensions: product.dimensions, dimensionsNote: product.dimensionsNote } = existing);
 		}
 
+		// Recolored looks stay good while the model they were made from does.
+		const kept = model && model === existing?.model ? existing.variants : [];
+		const variants = looks ? await lookVariants(id, looks, page, image, product.price, kept, log) : [];
+
 		const item: CatalogItem = {
 			id,
 			url: page.url.split('?')[0]!,
@@ -299,16 +315,63 @@ export async function importProducts(
 			image,
 			model,
 			modelSource,
+			variantLabel: looks?.label ?? 'Color',
+			variants,
+			variant: looks?.current.id ?? null,
 		};
 		await catalog.put(item);
 		log(
-			`  saved ${id}: ${product.price ?? '?'} ${product.currency}, dims ${JSON.stringify(product.dimensions)}, ${page.images.length} photo(s), model ${model ? 'yes' : 'no'}`,
+			`  saved ${id}: ${product.price ?? '?'} ${product.currency}, dims ${JSON.stringify(product.dimensions)}, ${page.images.length} photo(s), model ${model ? 'yes' : 'no'}, ${variants.length} look(s)`,
 		);
+		// Without a model the Worker queues one, whose build recolors the looks after.
+		if (model && variants.some(v => !recolored(item, v))) await db.jobs.enqueue('buildVariants', id);
 		imported.push(item);
 	}
 	// The group is only a list heading: a failed call leaves the items under "Other" and the next run retries them.
 	await groupFurniture(log).catch(error => log(`grouping failed, new items stay ungrouped: ${error}`));
 	return Promise.all(imported.map(item => catalog.read(item.id)));
+}
+
+export const recolored = (item: Pick<CatalogItem, 'variant'>, look: ItemVariant) =>
+	look.swatch !== null && (look.id === item.variant || look.model !== null);
+
+// Each look's photo, from its own page where the store shows a look's photos only there. Prices are the swatches'
+// where a captured page showed them.
+async function lookVariants(
+	id: string,
+	{ current, looks }: NonNullable<ReturnType<typeof listedLooks>>,
+	page: PageData,
+	image: string | null,
+	price: number | null,
+	kept: ItemVariant[],
+	log: (line: string) => void,
+): Promise<ItemVariant[]> {
+	const prices = new Map(page.variations!.combos.map(c => [c.url, c.price]));
+	const photos = new Map(looks.map(look => [look, look.combo.image ?? null]));
+	const capture = page.variations!.perLook ? looks.filter(look => look !== current && !photos.get(look)) : [];
+	if (capture.length) {
+		log(`  capturing ${capture.length} more page(s) for the photos of ${looks.length} looks…`);
+		const pages = await fetchPages(capture.map(look => look.combo.url));
+		pages.forEach((other, i) => {
+			photos.set(capture[i]!, other.images[0] ?? other.mainImage ?? other.ogImage);
+			for (const c of other.variations?.combos ?? []) if (c.price !== null) prices.set(c.url, c.price);
+		});
+	}
+	const variants: ItemVariant[] = [];
+	for (const look of looks) {
+		const photo = photos.get(look);
+		const old = kept.find(v => v.id === look.id);
+		variants.push({
+			id: look.id,
+			name: look.name,
+			url: look.combo.url,
+			price: look === current ? price : (prices.get(look.combo.url) ?? null),
+			image: look === current ? image : photo ? await downloadPhotos(`${id}/variants/${look.id}`, photo, []) : null,
+			swatch: old?.swatch ?? null,
+			model: old?.model ?? null,
+		});
+	}
+	return variants;
 }
 
 let groupingQueue = Promise.resolve();

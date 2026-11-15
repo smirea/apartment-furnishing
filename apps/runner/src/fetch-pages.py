@@ -8,6 +8,7 @@ import sys
 from camoufox.sync_api import Camoufox
 
 SETTLE_MS = 6000
+ATTEMPTS = 3
 
 EXTRACT = r"""async () => {
 	const html = document.documentElement.outerHTML;
@@ -146,7 +147,12 @@ EXTRACT = r"""async () => {
 		const current = new URLSearchParams(location.search).get('variant');
 		return {
 			dimensions: product.options.map((o) => (typeof o === 'string' ? o : o.name)),
-			combos: product.variants.map((v) => ({ url: url(v), values: v.options, price: v.price / 100 })),
+			combos: product.variants.map((v) => ({
+				url: url(v),
+				values: v.options,
+				price: v.price / 100,
+				image: v.featured_image?.src ? new URL(v.featured_image.src, location.href).href : null,
+			})),
 			current: url(product.variants.find((v) => String(v.id) === current) ?? product.variants[0]),
 			perLook: false,
 		};
@@ -180,11 +186,28 @@ EXTRACT = r"""async () => {
 	};
 }"""
 
+
+# Amazon often answers a fresh browser's first visit with a "Continue shopping" interstitial, or with a page that renders
+# everything but the product; the button leads on, and a reload gets the product. A product page always shows a photo.
+def capture(page, url):
+    for _ in range(ATTEMPTS):
+        page.goto(url, wait_until="domcontentloaded")
+        page.wait_for_timeout(SETTLE_MS)
+        proceed = page.get_by_text("Continue shopping", exact=True)
+        if proceed.count():
+            proceed.first.click()
+            page.wait_for_load_state("domcontentloaded")
+            page.wait_for_timeout(SETTLE_MS)
+        data = page.evaluate(EXTRACT)
+        if data["images"] or data["mainImage"] or data["ogImage"]:
+            return data
+        print(f"retrying {url}: the page rendered no product", file=sys.stderr)
+    return data
+
+
 pages = []
 with Camoufox(headless=True, humanize=True) as browser:
     page = browser.new_page()
     for url in sys.argv[1:]:
-        page.goto(url, wait_until="domcontentloaded")
-        page.wait_for_timeout(SETTLE_MS)
-        pages.append(page.evaluate(EXTRACT))
+        pages.append(capture(page, url))
 print(json.dumps(pages))

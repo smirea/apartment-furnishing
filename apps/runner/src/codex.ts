@@ -24,9 +24,13 @@ export async function codex(args: string[], prompt: string, env?: Record<string,
 	return { out, err, code };
 }
 
-// A single answer shaped by `schema`, from the prompt alone. The user config is skipped so its MCP servers don't start
-// for a call that runs no tools.
-export async function codexStructured<T>(prompt: string, schema: object): Promise<T> {
+// A single answer shaped by `schema`, from the prompt and any attached images alone. The user config is skipped so its
+// MCP servers don't start for a call that runs no tools.
+export async function codexStructured<T>(
+	prompt: string,
+	schema: object,
+	{ images = [], effort = 'low' }: { images?: string[]; effort?: 'low' | 'medium' | 'high' } = {},
+): Promise<T> {
 	const work = await mkdtemp(join(tmpdir(), 'codex-parse-'));
 	try {
 		await Bun.write(join(work, 'schema.json'), JSON.stringify(schema));
@@ -35,7 +39,7 @@ export async function codexStructured<T>(prompt: string, schema: object): Promis
 				'--ignore-user-config',
 				'--ignore-rules',
 				'-c',
-				'model_reasoning_effort="low"',
+				`model_reasoning_effort="${effort}"`,
 				'-c',
 				'web_search="disabled"',
 				'-s',
@@ -44,6 +48,8 @@ export async function codexStructured<T>(prompt: string, schema: object): Promis
 				work,
 				'--output-schema',
 				join(work, 'schema.json'),
+				// Before -o: -i takes several values and would swallow the `-` that reads the prompt from stdin.
+				...images.flatMap(image => ['-i', image]),
 				'-o',
 				join(work, 'answer.json'),
 			],

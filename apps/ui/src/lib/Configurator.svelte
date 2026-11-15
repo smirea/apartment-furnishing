@@ -5,8 +5,9 @@
 		id: string;
 		label: string;
 		detail?: string | null;
-		// Choices with pictures show as swatches, the rest as a menu.
+		// Choices with pictures or colors show as swatches, the rest as a menu. A color wins over a picture.
 		image?: string | null;
+		color?: string | null;
 		busy?: boolean;
 	};
 	export type ConfigAxis = {
@@ -25,7 +26,7 @@
 <div class="config" class:compact>
 	{#each axes as axis (axis.key)}
 		{@const picked = axis.choices.find(c => c.id === axis.selected)}
-		{#if axis.choices.some(c => c.image)}
+		{#if axis.choices.some(c => c.image || c.color)}
 			<div class="axis">
 				<span class="label">
 					{axis.label}{#if picked}: <strong>{picked.label}</strong>{#if picked.detail}
@@ -40,9 +41,10 @@
 							aria-label={choice.label}
 							title={[choice.label, choice.detail].filter(Boolean).join(' · ')}
 							class:busy={choice.busy}
+							style:background={choice.color}
 							onclick={() => choice.id !== axis.selected && axis.pick(choice.id)}
 						>
-							{#if choice.image}<img src={choice.image} alt="" loading="lazy" />{/if}
+							{#if !choice.color && choice.image}<img src={choice.image} alt="" loading="lazy" />{/if}
 						</button>
 					{/each}
 				</div>

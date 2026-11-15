@@ -1,4 +1,5 @@
 import {
+	placedModel,
 	tvDiagonal,
 	type CatalogItem,
 	type FinishSurface,
@@ -583,14 +584,16 @@ export function createViewer(
 	// Newly added items settle (floor, wall, ceiling) once their model has loaded and has a size.
 	const snapOnLoad = new Set<string>();
 	let catalogById: Record<string, CatalogItem> = {};
-	// A new mount rebuilds the item too, so it settles the new way once loaded.
-	const signature = (item: CatalogItem) => `${item.id}|${item.model}|${item.mount}|${item.removeNodes.join(',')}`;
+	// A new mount rebuilds the item too, so it settles the new way once loaded, and so does a copy switched to another
+	// look's model.
+	const signature = (item: CatalogItem, model = item.model) =>
+		`${item.id}|${model}|${item.mount}|${item.removeNodes.join(',')}`;
 
-	async function buildItem(item: CatalogItem): Promise<Object3D> {
+	async function buildItem(item: CatalogItem, model = item.model): Promise<Object3D> {
 		const dims = item.dimensions;
 		let object: Object3D;
-		if (item.model) {
-			object = (await gltf.loadAsync(item.model)).scene;
+		if (model) {
+			object = (await gltf.loadAsync(model)).scene;
 			for (const name of item.removeNodes) object.getObjectByName(name)?.removeFromParent();
 			const size = new Box3().setFromObject(object).getSize(new Vector3());
 			// Uniform scale keeps the model's proportions; listed width wins, otherwise assume glTF meters.
@@ -733,16 +736,17 @@ export function createViewer(
 			const item = catalog[p.itemId];
 			if (!item) continue;
 			let root = roots.get(p.key);
-			if (root && root.userData.signature !== signature(item)) {
+			const model = placedModel(item, p.variant);
+			if (root && root.userData.signature !== signature(item, model)) {
 				root.removeFromParent();
 				root = undefined;
 			}
 			if (!root) {
 				const fresh = new Group();
-				fresh.userData = { key: p.key, itemId: item.id, signature: signature(item) };
+				fresh.userData = { key: p.key, itemId: item.id, signature: signature(item, model) };
 				roots.set(p.key, fresh);
 				itemGroup.add(fresh);
-				void buildItem(item).then(object => {
+				void buildItem(item, model).then(object => {
 					// Unparented, so this is the item's own width, height and depth before it turns.
 					fresh.userData.size = new Box3().setFromObject(object).getSize(new Vector3());
 					fresh.add(object);

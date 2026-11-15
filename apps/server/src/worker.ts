@@ -47,11 +47,12 @@ const { catalog, placements, textures, carpets } = db;
 const plan = planGeometry();
 
 // The stored row without its layout, the shape clients know.
-const placementOf = ({ key, itemId, position, rotation }: Placement): Placement => ({
+const placementOf = ({ key, itemId, position, rotation, variant }: Placement): Placement => ({
 	key,
 	itemId,
 	position,
 	rotation,
+	variant,
 });
 
 const isVec3 = (v: unknown): v is [number, number, number] =>
@@ -129,9 +130,10 @@ const api = router({
 	},
 	'/api/catalog': {
 		GET: async request => {
-			const [items, jobs, importing, hidden] = await Promise.all([
+			const [items, jobs, variantJobs, importing, hidden] = await Promise.all([
 				catalog.all(),
 				db.jobs.states('buildModel'),
+				db.jobs.states('buildVariants'),
 				db.jobs.active('importItem'),
 				hiddenIn(await layoutOf(request), 'item'),
 			]);
@@ -141,6 +143,7 @@ const api = router({
 					.map((item): CatalogEntry => ({
 						...item,
 						modelJob: jobs.get(item.id) ?? null,
+						variantsJob: variantJobs.get(item.id) ?? null,
 						grouping: !item.group && importing,
 					})),
 			);
@@ -151,6 +154,17 @@ const api = router({
 			const item = await catalog.get(request.params.id!);
 			if (!item) return Response.json({ error: 'Unknown item' }, { status: 404 });
 			await startBuild('buildModel', item.id);
+			return Response.json({ ok: true });
+		},
+	},
+	// Recolors the model for every look again, say after a failed build.
+	'/api/catalog/:id/variants': {
+		POST: async request => {
+			const item = await catalog.get(request.params.id!);
+			if (!item) return Response.json({ error: 'Unknown item' }, { status: 404 });
+			if (item.variants.length < 2 || !item.model)
+				return Response.json({ error: `${item.name} has no looks to recolor a model for` }, { status: 400 });
+			await startBuild('buildVariants', item.id);
 			return Response.json({ ok: true });
 		},
 	},
@@ -373,20 +387,29 @@ const api = router({
 		GET: async request => Response.json((await placements.where('layoutId', await layoutOf(request))).map(placementOf)),
 	},
 	// Clients save only the items they changed, so a client holding an older copy of the rest can't revert edits
-	// another client (the web plan or the AR app) made meanwhile.
+	// another client (the web plan or the AR app) made meanwhile. A save without a variant, like the AR app's, keeps the
+	// look the copy has.
 	'/api/placements/:key': {
 		PUT: async request => {
 			const { key } = request.params as { key: string };
-			const { itemId, position, rotation } = await body<Placement>(request);
+			const sent = await body<Placement>(request);
+			const { position, rotation } = sent;
 			if (!isVec3(position) || !isVec3(rotation))
 				return Response.json({ error: 'Expected a finite position and rotation' }, { status: 400 });
 			const existing = await placements.get(key);
-			let saved: Placement & { layoutId: string };
-			if (existing) saved = { ...existing, position, rotation };
-			else if (!itemId) return Response.json({ error: 'Unknown placement' }, { status: 404 });
-			else if (!(await catalog.get(itemId)))
-				return Response.json({ error: `No catalog item ${itemId}` }, { status: 400 });
-			else saved = { key, layoutId: await layoutOf(request), itemId, position, rotation };
+			const itemId = existing?.itemId ?? sent.itemId;
+			if (!itemId) return Response.json({ error: 'Unknown placement' }, { status: 404 });
+			const variant = sent.variant === undefined ? (existing?.variant ?? null) : sent.variant;
+			// A look a reimport dropped stays saved, and shows the listing's own, so moving the copy still saves.
+			if (!existing || variant !== existing.variant) {
+				const item = await catalog.get(itemId);
+				if (!item) return Response.json({ error: `No catalog item ${itemId}` }, { status: 400 });
+				if (variant !== null && !item.variants.some(v => v.id === variant))
+					return Response.json({ error: `${item.name} has no look ${JSON.stringify(variant)}` }, { status: 400 });
+			}
+			const saved: Placement & { layoutId: string } = existing
+				? { ...existing, position, rotation, variant }
+				: { key, layoutId: await layoutOf(request), itemId, position, rotation, variant };
 			await placements.put(saved);
 			return Response.json(placementOf(saved));
 		},

@@ -43,8 +43,8 @@ export async function createLayout(name: string, from: string | null) {
 		...(from
 			? [
 					statement(
-						`INSERT INTO placements (key, layoutId, itemId, position, rotation)
-						SELECT lower(hex(randomblob(16))), ?1, itemId, position, rotation FROM placements WHERE layoutId = ?2`,
+						`INSERT INTO placements (key, layoutId, itemId, position, rotation, variant)
+						SELECT lower(hex(randomblob(16))), ?1, itemId, position, rotation, variant FROM placements WHERE layoutId = ?2`,
 						id,
 						from,
 					),

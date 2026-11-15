@@ -8,6 +8,7 @@ import { generateModel } from './generate-model';
 import { db } from './remote';
 import { generateTexture, importTexture } from './textures';
 import { importTv } from './tvs';
+import { buildVariants } from './variants';
 
 const POLL_MS = 10_000;
 // An import the Worker gave up waiting on leaves its finished row behind.
@@ -25,6 +26,7 @@ const RUN: Record<JobKind, (job: QueuedJob) => Promise<string | null>> = {
 	buildModel: async job => (await generateModel(await db.catalog.read(job.target), log), null),
 	buildTexture: async job => (await generateTexture(await db.textures.read(job.target), log), null),
 	buildCarpet: async job => (await generateCarpetTexture(job.target), null),
+	buildVariants: async job => (await buildVariants(job.target, log), null),
 };
 
 // Each Codex build is a long session and a store import can queue dozens, so each kind gets a few slots.
@@ -33,6 +35,7 @@ const POOLS: { kinds: JobKind[]; size: number; running: number }[] = [
 	{ kinds: ['buildModel'], size: 3, running: 0 },
 	{ kinds: ['buildTexture'], size: 3, running: 0 },
 	{ kinds: ['buildCarpet'], size: 3, running: 0 },
+	{ kinds: ['buildVariants'], size: 2, running: 0 },
 ];
 
 async function run(pool: (typeof POOLS)[number], job: QueuedJob) {

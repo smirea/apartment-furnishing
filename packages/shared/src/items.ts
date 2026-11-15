@@ -38,13 +38,41 @@ export type CatalogItem = {
 	model: string | null;
 	// `generated` models are procedural approximations Codex builds from the product photo when the listing has none.
 	modelSource: 'listing' | 'generated' | null;
+	// What the store calls the looks: Color, Finish, Fabric / Color.
+	variantLabel: string;
+	// Every look the listing sells in the size and configuration imported, the listing's own among them. Empty when it
+	// sells one.
+	variants: ItemVariant[];
+	// The listing's own look, which `image`, `price` and `model` show; null when it sells one.
+	variant: string | null;
 };
+
+// One color, fabric or finish of a product. Only the colors differ between looks, so each look's model is the item's
+// model with its materials recolored to match that look's photo.
+export type ItemVariant = {
+	id: string;
+	name: string;
+	url: string;
+	price: number | null;
+	image: string | null;
+	// `#rrggbb` of the look's main material; null until its colors are read.
+	swatch: string | null;
+	// The recolored model; null for the listing's own look and until it is built, which show the item's model.
+	model: string | null;
+};
+
+export const itemVariant = (item: Pick<CatalogItem, 'variants'>, id: string | null) =>
+	item.variants.find(v => v.id === id) ?? null;
+
+// The model a copy shows: its look's, else the item's own.
+export const placedModel = (item: Pick<CatalogItem, 'variants' | 'model'>, variant: string | null) =>
+	itemVariant(item, variant)?.model ?? item.model;
 
 export type Job = { state: 'queued' } | { state: 'running' } | { state: 'failed'; error: string };
 
-// What GET /api/catalog returns: the stored item plus any in-flight model generation, and whether the server is still
-// naming its group.
-export type CatalogEntry = CatalogItem & { modelJob: Job | null; grouping: boolean };
+// What GET /api/catalog returns: the stored item plus any in-flight model generation and recoloring of its looks, and
+// whether the server is still naming its group.
+export type CatalogEntry = CatalogItem & { modelJob: Job | null; variantsJob: Job | null; grouping: boolean };
 
 // One copy of a catalog item in the apartment. World units are feet, +x east, +z south,
 // y is the height of the item's bottom. The model's front is +z before rotation.
@@ -54,6 +82,8 @@ export type Placement = {
 	position: [x: number, y: number, z: number];
 	// Euler XYZ in degrees; y = 90 faces east, -90 west, 180 north.
 	rotation: [x: number, y: number, z: number];
+	// The look this copy shows, one of the item's variants; null shows the listing's own.
+	variant: string | null;
 };
 
 // A wall-panel product (wood slats and the like) imported for the living room's TV wall and column. Codex turns the

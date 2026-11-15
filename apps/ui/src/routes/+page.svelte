@@ -13,6 +13,7 @@
 		type CarpetSize,
 	} from '@repo/shared/carpets';
 	import {
+		itemVariant,
 		MOUNTS,
 		panelsNeeded,
 		TV_PLACEMENTS,
@@ -24,13 +25,14 @@
 		type CatalogEntry,
 		type CatalogItem,
 		type FinishSurface,
+		type ItemVariant,
 		type Job,
 		type Mount,
 		type Placement,
 		type WallTexture,
 		type WallTextureEntry,
 	} from '@repo/shared/items';
-	import { LAYOUT_HEADER, type LayoutList } from '@repo/shared/layouts';
+	import { LAYOUT_HEADER, productKey, type LayoutList } from '@repo/shared/layouts';
 	import { createMutation, createQuery, keepPreviousData, useQueryClient } from '@tanstack/svelte-query';
 	import { onMount, tick } from 'svelte';
 	import type { Attachment } from 'svelte/attachments';
@@ -98,7 +100,9 @@
 		// editing the last layout's copy would save it over the new one.
 		placeholderData: keepPreviousData,
 		refetchInterval: query =>
-			query.state.data?.some(item => item.modelJob?.state === 'running' || item.grouping) ? 3000 : false,
+			query.state.data?.some(item => building(item.modelJob) || building(item.variantsJob) || item.grouping)
+				? 3000
+				: false,
 	}));
 	const catalogList = $derived(catalogQuery.data ?? []);
 	const catalog = $derived(Object.fromEntries(catalogList.map(item => [item.id, item])));
@@ -255,7 +259,9 @@
 		image: item.image,
 		url: item.url,
 		facts: [
-			[money(item), item.brand].filter(Boolean).join(' · '),
+			[money(item), item.brand, item.variants.length > 1 ? plural(item.variants.length, item.variantLabel) : null]
+				.filter(Boolean)
+				.join(' · '),
 			item.dimensions
 				? `${inches(item.dimensions.width)} W × ${inches(item.dimensions.height)} H × ${inches(item.dimensions.depth)} D` +
 					(item.weightLb ? ` · ${item.weightLb} lb` : '')
@@ -662,10 +668,16 @@
 
 	// An import that finishes after the plan switched layouts lands in the layout it was pasted in, saved straight away
 	// since that room isn't on screen.
-	async function addToRoom(itemId: string, at = layout) {
+	async function addToRoom(itemId: string, at = layout, variant: string | null = null) {
 		const key = crypto.randomUUID();
 		const elevation = (catalog[itemId]?.defaultElevationIn ?? 0) / 12;
-		const placement: Placement = { key, itemId, position: [SPAWN.x, elevation, SPAWN.z], rotation: [0, 0, 0] };
+		const placement: Placement = {
+			key,
+			itemId,
+			position: [SPAWN.x, elevation, SPAWN.z],
+			rotation: [0, 0, 0],
+			variant,
+		};
 		if (at !== layout) {
 			await api(`/api/placements/${key}`, { method: 'PUT', body: JSON.stringify(placement) }, at);
 			return;
@@ -827,7 +839,13 @@
 		return axes;
 	}
 	// The selected product's configuration, shown over it in the plan.
-	const selectedAxes = $derived(selectedCarpet ? carpetAxes(selectedCarpet) : []);
+	const selectedAxes = $derived(
+		selectedCarpet
+			? carpetAxes(selectedCarpet)
+			: selected && selectedPlacement
+				? itemAxes(selected, selectedPlacement)
+				: [],
+	);
 
 	const carpetImport = createMutation(() => ({
 		mutationFn: (url: string) =>
@@ -857,14 +875,14 @@
 		mutationFn: (url: string) =>
 			api<CatalogItem>('/api/catalog/import', { method: 'POST', body: JSON.stringify({ url }) }),
 		onMutate: () => ({ at: layout }),
-		onSuccess: async (item: CatalogItem, _url: string, { at }: { at: string | null }) => {
+		onSuccess: async (item: CatalogItem, url: string, { at }: { at: string | null }) => {
 			importUrls.furniture = '';
 			await queryClient.invalidateQueries({ queryKey: ['catalog'] });
 			const fixture = fixtureCategories.get(item.category);
 			if (!fixture) {
 				// Codex can read a product as wall-mounted, which lists it under Wall.
 				if (item.mount === 'wall') open.wall = true;
-				return addToRoom(item.id, at);
+				return addToRoom(item.id, at, pastedLook(item, url));
 			}
 			// The server made it the fixture's pick.
 			open[fixture] = true;
@@ -876,10 +894,10 @@
 		mutationFn: (url: string) =>
 			api<CatalogItem>('/api/catalog/import', { method: 'POST', body: JSON.stringify({ url, mount: 'wall' }) }),
 		onMutate: () => ({ at: layout }),
-		onSuccess: async (item: CatalogItem, _url: string, { at }: { at: string | null }) => {
+		onSuccess: async (item: CatalogItem, url: string, { at }: { at: string | null }) => {
 			importUrls.wall = '';
 			await queryClient.invalidateQueries({ queryKey: ['catalog'] });
-			await addToRoom(item.id, at);
+			await addToRoom(item.id, at, pastedLook(item, url));
 		},
 	}));
 
@@ -900,6 +918,39 @@
 		mutationFn: (id: string) => api(`/api/catalog/${id}/model`, { method: 'POST' }),
 		onSuccess: () => queryClient.invalidateQueries({ queryKey: ['catalog'] }),
 	}));
+	const recolorMutation = createMutation(() => ({
+		mutationFn: (id: string) => api(`/api/catalog/${id}/variants`, { method: 'POST' }),
+		onSuccess: () => queryClient.invalidateQueries({ queryKey: ['catalog'] }),
+	}));
+
+	// A link to one of an item's looks puts that look in the room.
+	const pastedLook = (item: CatalogItem, url: string) =>
+		item.variants.find(v => productKey(v.url) === productKey(url))?.id ?? null;
+	const lookOf = (item: CatalogItem, placement: Placement | null) =>
+		itemVariant(item, placement?.variant ?? item.variant);
+	// A look whose model isn't recolored yet shows the listing's colors, so its swatch spins while the build runs.
+	const recolored = (item: CatalogItem, look: ItemVariant) =>
+		look.swatch !== null && (look.id === item.variant || look.model !== null);
+	function itemAxes(item: CatalogEntry, placement: Placement): ConfigAxis[] {
+		const look = lookOf(item, placement);
+		if (item.variants.length < 2 || !look) return [];
+		return [
+			{
+				key: 'look',
+				label: item.variantLabel,
+				selected: look.id,
+				pick: id => patchPlacement(placement.key, { variant: id }),
+				choices: item.variants.map(v => ({
+					id: v.id,
+					label: v.name,
+					detail: formatPrice(v.price, item.currency),
+					image: v.image,
+					color: v.swatch,
+					busy: building(item.variantsJob) && !recolored(item, v),
+				})),
+			},
+		];
+	}
 
 	const sections = $derived<Section[]>([
 		...fixtureList.map(fixtureSection),
@@ -1534,12 +1585,18 @@
 				{@const item = card.item}
 				{@const placement = card.placement}
 				{@const fixture = card.fixture}
-				{#if item.image}<img src={item.image} alt={item.name} />{/if}
+				{@const look = lookOf(item, placement)}
+				{@const price = look ? formatPrice(look.price, item.currency) : money(item)}
+				{@const image = look?.image ?? item.image}
+				{@const recoloring = item.variantsJob}
+				{#if image}<img src={image} alt={item.name} />{/if}
 				<h2>{item.name}</h2>
 				<p class="meta">
-					{#if money(item)}<strong>{money(item)}</strong>{/if}
+					{#if price}<strong>{price}</strong>{/if}
 					{#if item.brand}<span>{item.brand}</span>{/if}
 					{#if fixture}<span>{mountLabel[item.mount]}</span>{/if}
+					{#if item.variants.length > 1 && !placement}<span>{plural(item.variants.length, item.variantLabel)}</span
+						>{/if}
 				</p>
 				{#if item.dimensions}
 					<p class="dims">
@@ -1565,6 +1622,7 @@
 						{#if mountMutation.isError}<p class="error">{mountMutation.error.message}</p>{/if}
 					{/if}
 					{#if placement}
+						{#if itemAxes(item, placement).length}<Configurator axes={itemAxes(item, placement)} />{/if}
 						<!-- A wall piece faces out of the wall it hangs on. -->
 						{#if item.mount !== 'wall'}
 							<div class="row">
@@ -1628,8 +1686,18 @@
 						{/if}
 					{/if}
 				</p>
+				{#if item.variants.length > 1 && item.model}
+					<p class="model-status">
+						{#if building(recoloring)}
+							<span class="status busy">Coloring {plural(item.variants.length, item.variantLabel)} · 1–3 min</span>
+						{:else if recoloring?.state === 'failed'}
+							<span class="error">Coloring the looks failed: {recoloring.error}</span>
+							<button type="button" onclick={() => recolorMutation.mutate(item.id)}>Retry</button>
+						{/if}
+					</p>
+				{/if}
 
-				<a href={item.url} target="_blank" rel="noreferrer">View on {host(item.url)} ↗</a>
+				<a href={look?.url ?? item.url} target="_blank" rel="noreferrer">View on {host(look?.url ?? item.url)} ↗</a>
 			{:else if card.kind === 'carpet'}
 				{@const c = card.carpet}
 				{@const look = variantOf(c)}

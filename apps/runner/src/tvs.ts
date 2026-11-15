@@ -1,7 +1,8 @@
 // TV candidates: a pasted product link yields the TV's name, screen size, price and photo, which the TV panel can switch to.
 import { productKey } from '@repo/shared/layouts';
 import { tvSize, type TvModel } from '@repo/shared/items';
-import { downloadPhotos, fetchPages, pageContext, slug } from './catalog';
+import { downloadPhotos, fetchPages, pageContext } from './catalog';
+import { slug } from './slug';
 import { codexStructured } from './codex';
 import { db } from './remote';
 
