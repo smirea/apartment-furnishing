@@ -163,9 +163,13 @@ export async function fetchPages(urls: string[]): Promise<PageData[]> {
 	]);
 	if (code !== 0) throw new Error(`fetch-pages.py exited ${code}: ${err.slice(-2000)}`);
 	const pages: PageData[] = JSON.parse(out);
-	for (const page of pages)
+	for (const page of pages) {
 		if (/robot or human|captcha|access denied/i.test(page.title))
 			throw new Error(`Blocked by bot check on ${page.url} (page title "${page.title}")`);
+		// fetch-pages.py already reloaded it; saving what's left would give a product with no photo or facts.
+		if (!page.images.length && !page.mainImage && !page.ogImage)
+			throw new Error(`${page.url} rendered no product, even after reloading it. Try the import again.`);
+	}
 	return pages;
 }
 
