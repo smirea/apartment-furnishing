@@ -89,7 +89,9 @@ export function createViewer(
 	container: HTMLElement,
 	onMode: (mode: Mode) => void,
 	onSelect: (selection: Selection | null) => void,
-	onChange: (key: string, position: Placement['position'], rotation: Placement['rotation']) => void,
+	// `settled` marks a move the plan made on its own, like an added item landing once its model loads, rather than one
+	// the user made.
+	onChange: (key: string, position: Placement['position'], rotation: Placement['rotation'], settled: boolean) => void,
 	onCarpetChange: (id: string, pose: CarpetPose) => void,
 	onMeasure: (state: MeasureState) => void,
 ) {
@@ -750,12 +752,13 @@ export function createViewer(
 					// Unparented, so this is the item's own width, height and depth before it turns.
 					fresh.userData.size = new Box3().setFromObject(object).getSize(new Vector3());
 					fresh.add(object);
-					if (snapOnLoad.delete(p.key)) commit(fresh);
+					if (snapOnLoad.delete(p.key)) commit(fresh, true);
 					else if (item.mount === 'wall') {
 						// Saved while it was a placeholder box, or by the AR app: flush against its wall now that its size is known.
 						const [position, yaw] = [fresh.position.clone(), fresh.rotation.y];
 						hang(fresh);
-						if (fresh.position.distanceTo(position) > 0.01 || Math.abs(fresh.rotation.y - yaw) > 0.001) commit(fresh);
+						if (fresh.position.distanceTo(position) > 0.01 || Math.abs(fresh.rotation.y - yaw) > 0.001)
+							commit(fresh, true);
 					}
 					if (selectedRoot() === fresh) selection.setFromObject(fresh);
 				});
@@ -854,7 +857,7 @@ export function createViewer(
 		root.position.y += support - box.min.y;
 	}
 
-	function commit(root: Group) {
+	function commit(root: Group, settled = false) {
 		if (isCarpet(root)) {
 			constrainCarpet(root);
 			onCarpetChange(root.userData.carpetId, carpetViews.get(root.userData.carpetId)!.pose);
@@ -869,6 +872,7 @@ export function createViewer(
 			root.userData.key,
 			[round(root.position.x, 0.01), round(root.position.y, 0.01), round(root.position.z, 0.01)],
 			[0, round(yaw / DEG, 0.1), 0],
+			settled,
 		);
 	}
 

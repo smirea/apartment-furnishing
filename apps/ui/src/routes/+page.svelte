@@ -38,6 +38,7 @@
 	import type { Attachment } from 'svelte/attachments';
 	import type { MeasureState, MeasureTool } from '../lib/measure';
 	import Configurator, { type ConfigAxis } from '../lib/Configurator.svelte';
+	import { createHistory, type Change, type RecordMode } from '../lib/history';
 	import { createViewer, type Mode, type Selection } from '../lib/scene';
 
 	// Living room, clear of the island and the column.
@@ -503,10 +504,21 @@
 	// are neither overwritten by this tab's older copy nor reverted on screen.
 	const unsaved = new Set<string>();
 	let saving: Promise<unknown> = Promise.resolve();
-	function updatePlacements(next: Placement[]) {
-		for (const p of next) if (placements.find(old => old.key === p.key) !== p) unsaved.add(p.key);
-		for (const p of placements) if (!next.some(n => n.key === p.key)) unsaved.add(p.key);
+	function updatePlacements(next: Placement[], mode: RecordMode | null = 'new') {
+		const changes: Change<Undoable>[] = [];
+		for (const p of next) {
+			const old = placements.find(o => o.key === p.key);
+			if (old === p) continue;
+			unsaved.add(p.key);
+			changes.push({ key: placementKey(p.key), before: old ? $state.snapshot(old) : null, after: $state.snapshot(p) });
+		}
+		for (const p of placements)
+			if (!next.some(n => n.key === p.key)) {
+				unsaved.add(p.key);
+				changes.push({ key: placementKey(p.key), before: $state.snapshot(p), after: null });
+			}
 		placements = next;
+		if (mode) remember(changes, mode);
 		clearTimeout(saveTimer);
 		saveTimer = setTimeout(savePlacements, SAVE_DELAY_MS);
 	}
@@ -541,9 +553,52 @@
 			placementsLoaded = true;
 		});
 	});
-	function patchPlacement(key: string, patch: Partial<Placement>) {
-		updatePlacements(placements.map(p => (p.key === key ? { ...p, ...patch } : p)));
+	function patchPlacement(key: string, patch: Partial<Placement>, mode: RecordMode = 'new') {
+		updatePlacements(
+			placements.map(p => (p.key === key ? { ...p, ...patch } : p)),
+			mode,
+		);
 	}
+
+	// Undo covers what the plan edits by hand in this layout: adding, moving, turning and removing furniture and
+	// carpets, and their looks and sizes. Switching layouts starts over.
+	type CarpetState = Pick<CarpetEntry, 'variant' | 'size' | 'placement'>;
+	type Undoable = Placement | CarpetState;
+	const placementKey = (key: string) => `placement:${key}`;
+	const carpetKey = (id: string) => `carpet:${id}`;
+	const history = createHistory<Undoable>();
+	let canUndo = $state(false);
+	let canRedo = $state(false);
+	function remember(changes: Change<Undoable>[], mode: RecordMode) {
+		history.record(changes, mode);
+		canUndo = history.canUndo;
+		canRedo = history.canRedo;
+	}
+	function restore(values: { key: string; value: Undoable | null }[] | null) {
+		canUndo = history.canUndo;
+		canRedo = history.canRedo;
+		if (!values) return;
+		let next = placements;
+		for (const { key, value } of values) {
+			if (key.startsWith('carpet:')) {
+				void saveCarpet(key.slice('carpet:'.length), value as CarpetState, null);
+				continue;
+			}
+			const placementId = key.slice('placement:'.length);
+			const placement = value as Placement | null;
+			if (!placement) next = next.filter(p => p.key !== placementId);
+			else if (next.some(p => p.key === placementId)) next = next.map(p => (p.key === placementId ? placement : p));
+			else next = [...next, placement];
+		}
+		if (next !== placements) updatePlacements(next, null);
+	}
+	const undo = () => restore(history.undo());
+	const redo = () => restore(history.redo());
+	$effect(() => {
+		void layout;
+		history.clear();
+		canUndo = canRedo = false;
+	});
 
 	let selection = $state<Selection | null>(null);
 	const selectedKey = $derived(selection?.kind === 'item' ? selection.key : null);
@@ -644,14 +699,26 @@
 		};
 	}
 	const deleteMutation = createMutation(() => ({
-		mutationFn: ({ path }: { path: string; itemId: string | null }) => api(path, { method: 'DELETE' }),
-		onSuccess: async (_: unknown, { itemId }: { path: string; itemId: string | null }) => {
+		mutationFn: ({ path }: { path: string; itemId: string | null; carpetId: string | null }) =>
+			api(path, { method: 'DELETE' }),
+		onSuccess: async (
+			_: unknown,
+			{ itemId, carpetId }: { path: string; itemId: string | null; carpetId: string | null },
+		) => {
 			closeCard();
 			// The server dropped the item's placements; a save of one still pending would only fail.
 			if (itemId) {
 				for (const p of placements) if (p.itemId === itemId) unsaved.delete(p.key);
 				placements = placements.filter(p => p.itemId !== itemId);
 			}
+			// Gone from this layout, it can't be put back by undoing.
+			history.forget(
+				(key, value) =>
+					(!!itemId && !!value && 'itemId' in value && value.itemId === itemId) ||
+					(!!carpetId && key === carpetKey(carpetId)),
+			);
+			canUndo = history.canUndo;
+			canRedo = history.canRedo;
 			await Promise.all(
 				['catalog', 'carpets', 'textures', 'fixtures'].map(key => queryClient.invalidateQueries({ queryKey: [key] })),
 			);
@@ -660,7 +727,11 @@
 	function deleteCard(c: Card) {
 		const { name, path, also } = deletion(c);
 		if (!confirm(`Delete ${name}?${also ? ` ${also}` : ''} Layouts that still have it in the room keep it.`)) return;
-		deleteMutation.mutate({ path, itemId: c.kind === 'item' ? c.item.id : null });
+		deleteMutation.mutate({
+			path,
+			itemId: c.kind === 'item' ? c.item.id : null,
+			carpetId: c.kind === 'carpet' ? c.carpet.id : null,
+		});
 	}
 	const inches = (n: number) => `${Math.round(n * 10) / 10}"`;
 	const money = (item: CatalogItem) =>
@@ -727,9 +798,18 @@
 	);
 	let carpetError = $state<string | null>(null);
 	// Saved optimistically; a reply to an older save that lands after a newer one is dropped.
-	async function saveCarpet(id: string, patch: Partial<Pick<CarpetEntry, 'variant' | 'size' | 'placement'>>) {
+	async function saveCarpet(
+		id: string,
+		patch: Partial<Pick<CarpetEntry, 'variant' | 'size' | 'placement'>>,
+		mode: RecordMode | null = 'new',
+	) {
 		const n = ++carpetSaves;
 		const key = ['carpets', layout];
+		const current = queryClient.getQueryData<CarpetEntry[]>(key)?.find(c => c.id === id);
+		if (current && mode) {
+			const before = { variant: current.variant, size: current.size, placement: current.placement };
+			remember([{ key: carpetKey(id), before, after: { ...before, ...patch } }], mode);
+		}
 		carpetError = null;
 		carpetSavesPending++;
 		void queryClient.cancelQueries({ queryKey: key });
@@ -1115,7 +1195,15 @@
 
 	function onKey(e: KeyboardEvent) {
 		if (mode !== 'orbit' || (e.target as HTMLElement).closest('input, textarea, select')) return;
-		if (e.key === 'Escape' && card) closeCard();
+		const command = e.metaKey || e.ctrlKey;
+		if (command && e.key.toLowerCase() === 'z') {
+			e.preventDefault();
+			if (e.shiftKey) redo();
+			else undo();
+		} else if (command && e.key.toLowerCase() === 'y') {
+			e.preventDefault();
+			redo();
+		} else if (e.key === 'Escape' && card) closeCard();
 		else if (selection && (e.key === 'Delete' || e.key === 'Backspace')) {
 			if (selectedCarpet) removeCarpet(selectedCarpet);
 			else removeSelected();
@@ -1130,7 +1218,7 @@
 				selection = next;
 				if (next) opened = null;
 			},
-			(key, position, rotation) => patchPlacement(key, { position, rotation }),
+			(key, position, rotation, settled) => patchPlacement(key, { position, rotation }, settled ? 'settled' : 'new'),
 			(id, placement) => void saveCarpet(id, { placement }),
 			state => (measure = state),
 		);
@@ -1261,6 +1349,14 @@
 			<div class="toggles">
 				<label><input type="checkbox" bind:checked={cutaway} /> Cutaway walls</label>
 				<label><input type="checkbox" bind:checked={doors} /> Render doors</label>
+			</div>
+			<div class="history">
+				<button type="button" class="icon" aria-label="Undo" title="Undo (⌘Z)" disabled={!canUndo} onclick={undo}>
+					<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 3 2.5 6l3 3M2.5 6H10a3.5 3.5 0 0 1 0 7H7" /></svg>
+				</button>
+				<button type="button" class="icon" aria-label="Redo" title="Redo (⇧⌘Z)" disabled={!canRedo} onclick={redo}>
+					<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 3l3 3-3 3M13.5 6H6a3.5 3.5 0 0 0 0 7h3" /></svg>
+				</button>
 			</div>
 		{:else}
 			<p class="help">WASD or arrows to move, mouse to look, click to inspect, Shift to run, Esc to exit.</p>
@@ -1643,7 +1739,11 @@
 								value={Math.round(placement.position[1] * 12 * 10) / 10}
 								oninput={e => {
 									const [x, , z] = placement.position;
-									patchPlacement(placement.key, { position: [x, (Number(e.currentTarget.value) || 0) / 12, z] });
+									patchPlacement(
+										placement.key,
+										{ position: [x, (Number(e.currentTarget.value) || 0) / 12, z] },
+										'coalesce',
+									);
 								}}
 							/>
 							<span class="muted">in</span>
@@ -1936,6 +2036,12 @@
 	.toggles {
 		display: grid;
 		gap: 0.2rem;
+	}
+
+	.history {
+		display: flex;
+		gap: 0.4rem;
+		margin-left: auto;
 	}
 
 	.layouts {
