@@ -464,10 +464,19 @@
 		),
 	});
 
+	// Whether and how a panel's product shows in the plan, switched from the panel's header so it works while the panel
+	// is collapsed. Every panel with such a state puts it here rather than in its body.
+	type HeaderModes = {
+		label: string;
+		selected: string;
+		choices: { id: string; label: string; hint: string }[];
+		pick: (id: string) => void;
+	};
 	type Section = {
 		key: SectionKey;
 		title: string;
 		summary: string;
+		modes: HeaderModes | null;
 		groups: (readonly [string | null, Tile[]])[];
 		placeholder: string;
 		importer: {
@@ -480,10 +489,35 @@
 		errors: string[];
 		loading: boolean;
 	};
+	function fixtureModes(f: Fixture): HeaderModes | null {
+		if (f.kind === 'tv' && tv)
+			return {
+				label: 'TV',
+				selected: tv.visible ? 'on' : 'off',
+				choices: [
+					{ id: 'on', label: 'On', hint: 'Hang the TV' },
+					{ id: 'off', label: 'Off', hint: 'No TV' },
+				],
+				pick: id => updateTv({ visible: id === 'on' }),
+			};
+		if (f.kind === 'curtains' && curtains)
+			return {
+				label: 'Curtains',
+				selected: curtains.state,
+				choices: Object.entries(CURTAIN_STATES).map(([id, label]) => ({
+					id,
+					label,
+					hint: curtainHint[id as CurtainState],
+				})),
+				pick: id => curtainsMutation.mutate({ state: id as CurtainState }),
+			};
+		return null;
+	}
 	const fixtureSection = (f: Fixture): Section => ({
 		key: f.key,
 		title: f.kind === 'wallTexture' ? `${f.room} wall texture` : f.title,
 		summary: fixtureSummary(f),
+		modes: fixtureModes(f),
 		groups:
 			f.kind === 'wallTexture'
 				? textureGroups.map(([group, items]) => [group, items.map(textureTile)] as const)
@@ -1108,6 +1142,7 @@
 			key: 'furniture',
 			title: 'Furniture',
 			summary: String(furnitureList.length),
+			modes: null,
 			groups: grouped(furnitureList).map(([group, items]) => [group, items!.map(itemTile)] as const),
 			placeholder: 'Paste an Amazon or Walmart link',
 			importer: importMutation,
@@ -1118,6 +1153,7 @@
 			key: 'wall',
 			title: 'Wall',
 			summary: String(wallList.length),
+			modes: null,
 			groups: grouped(wallList).map(([group, items]) => [group, items!.map(itemTile)] as const),
 			placeholder: 'Paste a link to art, a mirror or a wall shelf',
 			importer: wallImport,
@@ -1128,6 +1164,7 @@
 			key: 'carpets',
 			title: 'Carpets',
 			summary: String(carpetList.length),
+			modes: null,
 			groups: [[null, carpetList.map(carpetTile)]],
 			placeholder: 'Paste a rug link',
 			importer: carpetImport,
@@ -1245,7 +1282,7 @@
 
 	const round1 = (n: number) => Math.round(n * 10) / 10;
 	function fixtureSummary(f: Fixture) {
-		if (f.kind === 'tv') return tv?.visible ? `${round1(tvDiagonal(tv))}″` : 'off';
+		if (f.kind === 'tv') return tv ? `${round1(tvDiagonal(tv))}″` : '';
 		if (f.kind === 'wallTexture') return String(f.options.length);
 		if (f.kind === 'curtains') return curtainItem ? (curtainLook?.name ?? '') : '';
 		const d = f.selected ? catalog[f.selected]?.dimensions : null;
@@ -1459,16 +1496,16 @@
 					>
 						{s.title} <span class="muted">{s.summary}</span>
 					</button>
-					{#if s.key === 'curtains' && curtains}
-						<div class="segmented" role="radiogroup" aria-label="Curtains">
-							{#each Object.entries(CURTAIN_STATES) as [state, label] (state)}
+					{#if s.modes}
+						{@const modes = s.modes}
+						<div class="segmented" role="radiogroup" aria-label={modes.label}>
+							{#each modes.choices as choice (choice.id)}
 								<button
 									type="button"
 									role="radio"
-									aria-checked={curtains.state === state}
-									title={curtainHint[state as CurtainState]}
-									onclick={() => curtains.state !== state && curtainsMutation.mutate({ state: state as CurtainState })}
-									>{label}</button
+									aria-checked={modes.selected === choice.id}
+									title={choice.hint}
+									onclick={() => modes.selected !== choice.id && modes.pick(choice.id)}>{choice.label}</button
 								>
 							{/each}
 						</div>
@@ -1476,14 +1513,6 @@
 				</div>
 				{#if open[s.key]}
 					{#if s.key === 'tv' && tv}
-						<label class="check"
-							><input
-								type="checkbox"
-								checked={tv.visible}
-								onchange={e => updateTv({ visible: e.currentTarget.checked })}
-							/>
-							Show the TV</label
-						>
 						<div class="tv-fields">
 							<label class="wide"
 								>Placement
@@ -2446,12 +2475,6 @@
 
 	.tv-fields .wide {
 		grid-column: 1 / -1;
-	}
-
-	.check {
-		display: flex;
-		gap: 0.4rem;
-		align-items: center;
 	}
 
 	.import {
