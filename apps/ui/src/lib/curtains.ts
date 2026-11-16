@@ -1,5 +1,5 @@
 import type { CurtainState } from '@repo/shared/fixtures';
-import { CEILING_FT, ft, type CurtainTrack } from '@repo/shared/floorplan';
+import { CEILING_FT, CURTAIN, ft, type CurtainTrack } from '@repo/shared/floorplan';
 import {
 	BufferGeometry,
 	CanvasTexture,
@@ -13,15 +13,10 @@ import {
 	SRGBColorSpace,
 } from 'three';
 
-// The fabric's middle hangs this far into the room from the glass, clear of the mullions at the deepest fold.
-const OFFSET_IN = 4.5;
-// Width of one pleat drawn closed, and fabric per width of glass covered (2× is the usual fullness).
-const PLEAT_IN = 4.5;
-const FULLNESS = 2;
+const { offsetIn: OFFSET_IN, pleatIn: PLEAT_IN, fullness: FULLNESS } = CURTAIN;
 // Gathered open, a panel's fabric folds into a stack about this fraction of its flat width.
 const STACK = 1 / 7;
 const STACK_MIN_IN = 6;
-const HEM_IN = 0.5;
 const ROD_IN = 2;
 const ROD_RADIUS_IN = 0.6;
 // The linen tile repeats every this many feet.
@@ -88,11 +83,21 @@ function linen() {
 export function buildCurtains(tracks: CurtainTrack[], state: Exclude<CurtainState, 'off'>, color: string) {
 	const group = new Group();
 	const parts: CurtainPart[] = [];
-	const fabric = new MeshStandardMaterial({ color, map: linen(), roughness: 0.95, side: DoubleSide });
+	// Pushed back in depth so the column's cut top wins where the panels' cut edge runs through it.
+	const fabric = new MeshStandardMaterial({
+		color,
+		map: linen(),
+		roughness: 0.95,
+		side: DoubleSide,
+		polygonOffset: true,
+		polygonOffsetFactor: 2,
+		polygonOffsetUnits: 2,
+	});
 	const metal = new MeshStandardMaterial({ color: 0x2f3438, roughness: 0.4, metalness: 0.6 });
 	const rodY = CEILING_FT - ROD_IN / 12;
-	const bottom = HEM_IN / 12;
-	const height = rodY - bottom;
+	// The panels reach the floor, so the cutaway cuts them level with the walls and the column they pass behind.
+	const bottom = 0;
+	const height = rodY;
 
 	for (const track of tracks) {
 		// World x/z of a point `along` the track, `out` feet into the room.

@@ -2,6 +2,8 @@ import {
 	balconyGlassFace,
 	CEILING_FT,
 	columns,
+	CURTAIN_FRONT_IN,
+	curtainTracks,
 	finishAreasIn,
 	fixtures,
 	ft,
@@ -72,20 +74,51 @@ export const tvSpots: Record<TvPlacement, TvSpot> = {
 	},
 };
 
+const CURTAIN_GAP_IN = 0.5;
+
+// How much farther into the room a TV centered at x/z, facing `yaw`, has to move for its back to clear the front of the
+// hung curtains behind it. Samples along the back edge, so a corner TV whose end overlaps a track clears it too.
+function curtainClearanceFt(x: number, z: number, yaw: number, widthIn: number) {
+	const face = { x: Math.sin(yaw), z: Math.cos(yaw) };
+	const back = TV_DEPTH_IN / 24;
+	let push = 0;
+	for (let i = 0; i <= 24; i++) {
+		const s = (i / 24 - 0.5) * (widthIn / 12);
+		const px = x - face.x * back + face.z * s;
+		const pz = z - face.z * back - face.x * s;
+		for (const track of curtainTracks) {
+			const along = track.axis === 'y' ? pz : px;
+			const across = track.axis === 'y' ? px : pz;
+			const toward = (track.axis === 'y' ? face.x : face.z) * track.into;
+			if (toward < 0.01 || along < ft(track.from) || along > ft(track.to)) continue;
+			const front = ft(track.at) + (track.into * (CURTAIN_FRONT_IN + CURTAIN_GAP_IN)) / 12;
+			push = Math.max(push, ((front - across) * track.into) / toward);
+		}
+	}
+	return push;
+}
+
 // The TV body's center in plan feet and its yaw in degrees. `backWallDepthFt` is how far a wall texture stands out from
 // the back wall. Tilting about the center swings the bottom edge toward the wall, so the mount holds it out by that much.
-export function tvPose(tv: TvSettings, backWallDepthFt: number) {
+// With `curtains` hung, the TV stands in front of them wherever they would pass between it and its wall.
+export function tvPose(tv: TvSettings, backWallDepthFt: number, curtains = false) {
 	const spot = tvSpots[tv.placement];
-	const out =
+	let out =
 		(TV_MOUNT_IN + TV_DEPTH_IN / 2 + (spot.corner ? tv.widthIn / 2 : 0)) / 12 +
 		(tv.heightIn / 24) * Math.sin((tv.tiltDeg * Math.PI) / 180);
 	const yaw = (spot.yaw * Math.PI) / 180;
-	return {
+	const at = () => ({
 		x: spot.x - (spot.onBackWall ? backWallDepthFt : 0) + out * Math.sin(yaw),
-		y: tv.centerIn / 12,
 		z: spot.z + out * Math.cos(yaw),
-		yaw: spot.yaw,
-	};
+	});
+	// A corner TV slides along the tracks as it moves out, so a second pass catches what the first move brought into
+	// range.
+	if (curtains)
+		for (let pass = 0; pass < 2; pass++) {
+			const { x, z } = at();
+			out += curtainClearanceFt(x, z, yaw, tv.widthIn);
+		}
+	return { ...at(), y: tv.centerIn / 12, yaw: spot.yaw };
 }
 
 export function planGeometry(): PlanGeometry {

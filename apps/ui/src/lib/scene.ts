@@ -388,6 +388,8 @@ export function createViewer(
 	const TV_BEZEL_IN = 0.3;
 	let tvWallDepthFt = 0;
 	let tvSettings: TvSettings | null = null;
+	// Hung curtains push a TV over the glass out in front of them.
+	let curtainParts: CurtainPart[] = [];
 	const tvGroup = new Group();
 	tvGroup.visible = false;
 	scene.add(tvGroup);
@@ -431,7 +433,7 @@ export function createViewer(
 		tvBody.scale.set(w, h, d);
 		tvScreen.scale.set(w - (2 * TV_BEZEL_IN) / 12, h - (2 * TV_BEZEL_IN) / 12, 1);
 		tvScreen.position.z = d / 2 + 0.002;
-		const pose = tvPose(tv, tvWallDepthFt);
+		const pose = tvPose(tv, tvWallDepthFt, curtainParts.length > 0);
 		tvGroup.position.set(pose.x, pose.y, pose.z);
 		// Turned to face out of its wall, then tipped about its own horizontal axis so the top leans out.
 		tvGroup.rotation.set(tv.tiltDeg * DEG, pose.yaw * DEG, 0, 'YXZ');
@@ -1027,7 +1029,6 @@ export function createViewer(
 
 	const curtainGroup = new Group();
 	scene.add(curtainGroup);
-	let curtainParts: CurtainPart[] = [];
 	let curtainsShown = '';
 	let curtainsVersion = 0;
 	// `swatch` is the look's color; without one the curtains take the color of `image`.
@@ -1044,11 +1045,13 @@ export function createViewer(
 		for (const { mesh } of curtainParts) mesh.geometry.dispose();
 		curtainGroup.clear();
 		curtainParts = [];
-		if (!curtains || curtains.state === 'off' || !color) return;
-		const built = buildCurtains(curtainTracks, curtains.state, color);
-		curtainGroup.add(built.group);
-		curtainParts = built.parts;
-		applyHeights();
+		if (curtains && curtains.state !== 'off' && color) {
+			const built = buildCurtains(curtainTracks, curtains.state, color);
+			curtainGroup.add(built.group);
+			curtainParts = built.parts;
+			applyHeights();
+		}
+		placeTv();
 	}
 
 	let mode: Mode = 'orbit';

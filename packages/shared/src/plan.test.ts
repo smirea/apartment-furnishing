@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { CURTAIN_FRONT_IN, ft } from './floorplan';
 import { DEFAULT_TV } from './items';
 import { planGeometry, TV_DEPTH_IN, tvPose } from './plan';
 
@@ -63,6 +64,21 @@ test('pulls a corner TV out until both back corners clear the walls by the same 
 		const towardPillarWall = 37.679 - (pose.z + back + half);
 		expect([towardBackWall, towardPillarWall].map(ft => Math.round(ft * 1200) / 100)).toEqual([1.77, 1.77]);
 	}
+});
+
+test('stands a TV in front of hung curtains, and back against its wall without them', () => {
+	const front = (CURTAIN_FRONT_IN + 0.5) / 12;
+	const balcony = tvPose({ ...DEFAULT_TV, placement: 'balconyWindow' }, 0, true);
+	expect(balcony.x - TV_DEPTH_IN / 24).toBeCloseTo(7.806 + front, 3);
+	const pillar = tvPose({ ...DEFAULT_TV, placement: 'pillarWall' }, 0, true);
+	expect(pillar.z + TV_DEPTH_IN / 24).toBeCloseTo(ft(900) - front, 6);
+	expect(tvPose({ ...DEFAULT_TV, placement: 'backWall' }, 0, true)).toEqual(
+		tvPose({ ...DEFAULT_TV, placement: 'backWall' }, 0),
+	);
+	expect(tvPose({ ...DEFAULT_TV, placement: 'balconyWindow' }, 0).x).toBeCloseTo(
+		7.806 + (2.5 + TV_DEPTH_IN / 2) / 12,
+		6,
+	);
 });
 
 test("lists the TV wall's switch, outlet and smoke alarm against its face, in feet", () => {
