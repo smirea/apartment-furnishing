@@ -35,7 +35,6 @@
 		"env:ios": "bun scripts/secrets.ts ios"
 	},
 	"devDependencies": {
-		"@stefan.inc/env-manager": "^1.0.0",
 		"@types/bun": "^1.4.4",
 		"@types/node": "^26.6.5",
 		"@typescript/native": "npm:typescript@^7.0.2",
