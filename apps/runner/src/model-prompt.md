@@ -13,7 +13,11 @@ The first photo is the main listing photo and shows the color being bought. The 
 
 ## 1. Work out the real size and shape
 
-Study every photo before writing code. Retail spec tables are often wrong. They give the seat depth as the product depth, list one module of a sectional, or swap width and depth. Dimension diagrams in the gallery are the most reliable source, so read every number on them and what it measures.
+Open and study every photo before writing code, not just the first few. Together they show the product from several angles, and each angle settles something the others can't: the front shows the width and the arrangement of parts, a side view the depth, the back's height and rake, and the profile of the arms and seat, a three-quarter view how those meet, a back view the rear panel and legs, and close-ups the shapes of legs, feet, seams and edges.
+
+Write `views.md` with one line per photo: its file name, the angle it shows (front, back, left or right side, three-quarter front or back, top, close-up, dimension diagram, or lifestyle scene), and what it shows about the shape that no other photo does. Then add a short paragraph per view (front, side, top) describing the silhouette you will build from it: the outline, where each part starts and ends, and how high or deep it reaches compared to the overall size. Where no photo shows an angle, say so and say what you infer it from.
+
+Retail spec tables are often wrong. They give the seat depth as the product depth, list one module of a sectional, or swap width and depth. Dimension diagrams in the gallery are the most reliable source, so read every number on them and what it measures.
 
 Work out:
 
@@ -40,12 +44,14 @@ Requirements:
 - The overall bounding box matches `dimensions.json` within 2%.
 - Match the layout and proportions from step 1. Getting the footprint and the arrangement of parts right matters more than surface detail.
 - Recognizable shape: compose many parts (cylinders, capsules, spheres, revolved profiles, extruded polygons, rounded boxes) for the silhouette, curves, cushions, legs, bases, frames and seams. Avoid a plain box unless the product is one.
+- Upholstered parts are thick padded volumes with rounded edges, as thick as the photos show: a back is a cushioned shell, not a flat board, and arms are padded rolls or wings that join the back and seat without gaps, not discs or plates. Cross-check each part's thickness on the side photos. Build a cushion, arm or back as the convex hull of spheres placed along its outline (`trimesh.convex.convex_hull` of their vertices), which gives a solid padded shape with soft edges; a bent or curved part is several such hulls chained together.
+- A printed or pieced pattern (patchwork, stripes, plaid blocks) is made of patches that follow the surface they sit on, each its own material, flush with it and inside its outline. Nothing sticks out of or floats off the upholstery.
 - Model the product in its normal resting state: recliners closed, drawers shut, extensions folded.
 - Each part gets a PBR material (`trimesh.visual.material.PBRMaterial`) with the base color, roughness and metalness seen in the first photo. Fabric is rough, metal is shiny, and screens are dark and glossy.
 - Keep it under 60k faces. Use watertight meshes where it is cheap to.
 
 ## 3. Check it
 
-After exporting, reload `model.glb` and print its bounds in inches. Render `preview.png` with matplotlib as three views side by side: front three-quarter, top-down, and side. Compare them to the photos and the dimension diagram: footprint shape, seat and module count, part positions, proportions and colors. Fix mismatches, then render again. Do at most three revisions.
+After exporting, reload `model.glb` and print its bounds in inches. Render `preview.png` with matplotlib, one panel per angle the photos show (front, side, three-quarter, back) plus top-down, each seen from the same direction and height as its photo. Compare each panel to its photos in `views.md` and to the dimension diagram: silhouette, part thicknesses, footprint shape, seat and module count, part positions, proportions and colors. Colors should be as saturated as in the photos, not washed toward gray. A side view that doesn't match the side photo's outline means the depth or the back, arms or seat are wrong, even when the front looks right. Fix mismatches, then render again. Do at most three revisions.
 
-Finish with one line that names the layout and the parts you modeled.
+Finish with one line that names the layout, the parts you modeled, and the photos each view was matched against.

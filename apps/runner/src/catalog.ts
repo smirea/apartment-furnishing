@@ -336,6 +336,35 @@ export async function importProducts(
 	return Promise.all(imported.map(item => catalog.read(item.id)));
 }
 
+// Gives items imported before looks existed every look their listing sells, without reimporting them: a reimport would
+// read the name, category and dimensions again and undo fixes made by hand since. Answers how many looks it found.
+export async function addLooks(item: CatalogItem, log: (line: string) => void = () => {}, dry = false) {
+	const [page] = await fetchPages([item.url]);
+	if (page!.variationsError) throw new Error(`could not read the listing's looks: ${page!.variationsError}`);
+	if (!page!.variations) return 0;
+	const { lookDimensions } = await codexStructured<{ lookDimensions: number[] }>(
+		`${item.name} (${item.category}) is listed at ${page!.url} as "${page!.title}". The listing sells these variation dimensions, with their values:
+
+${variationLines(page!.variations)}`,
+		{
+			type: 'object',
+			additionalProperties: false,
+			required: ['lookDimensions'],
+			properties: { lookDimensions: productSchema.properties.lookDimensions },
+		},
+	);
+	const looks = listedLooks(page!.variations, lookDimensions);
+	log(
+		`${item.id}: ${variationLines(page!.variations).replace(/\n/g, '; ')} → ${looks ? `${looks.looks.length} ${looks.label} looks, the model's ${looks.current.name}` : 'one look'}`,
+	);
+	if (!looks || dry) return looks?.looks.length ?? 0;
+	const variants = await lookVariants(item.id, looks, page!, item.image, item.price, [], log);
+	const current = await catalog.read(item.id);
+	await catalog.put({ ...current, variantLabel: looks.label, variants, variant: looks.current.id });
+	if (current.model) await db.jobs.enqueue('buildVariants', item.id);
+	return variants.length;
+}
+
 export const recolored = (item: Pick<CatalogItem, 'variant'>, look: ItemVariant) =>
 	look.swatch !== null && (look.id === item.variant || look.model !== null);
 
