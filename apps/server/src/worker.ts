@@ -1,3 +1,4 @@
+import { CURTAIN_STATES, isCurtainState } from '@repo/shared/fixtures';
 import { carpetSpawn, savedLook, textureTarget, type Carpet, type CarpetEntry } from '@repo/shared/carpets';
 import type { Statement } from '@repo/shared/db';
 import {
@@ -24,6 +25,7 @@ import {
 	listFixtures,
 	readFixture,
 	removeOption,
+	saveCurtains,
 	saveTv,
 	selectOption,
 } from './fixtures';
@@ -186,8 +188,9 @@ const api = router({
 				}
 				await unhide(layout, 'item', item.id);
 				if (!item.model) await startBuild('buildModel', item.id);
-				// A product that has a fixture, like a bed, becomes that fixture's pick instead of furniture to place.
-				const fixture = mount ? null : itemFixtureFor(item.category);
+				// A product that has a fixture, like a bed or curtains, becomes that fixture's pick instead of furniture to place,
+				// whichever panel its link was pasted in.
+				const fixture = itemFixtureFor(item.category);
 				if (fixture) await selectOption(fixture, item.id, layout);
 				return Response.json(item);
 			} catch (error) {
@@ -380,6 +383,28 @@ const api = router({
 				layout,
 			);
 			return Response.json(await readFixture('tv', layout));
+		},
+	},
+	// Whether the curtains are drawn, gathered or off, and which look of the picked listing hangs; picking the listing
+	// goes through /api/fixtures/curtains.
+	'/api/curtains': {
+		PATCH: async request => {
+			const { state, look } = await body<{ state: unknown; look: unknown }>(request);
+			if (
+				(state !== undefined && !isCurtainState(state)) ||
+				(look !== undefined && look !== null && typeof look !== 'string')
+			)
+				return Response.json(
+					{ error: `Expected state (${Object.keys(CURTAIN_STATES).join(', ')}) and/or look: a look id or null` },
+					{ status: 400 },
+				);
+			try {
+				const layout = await layoutOf(request);
+				await saveCurtains({ ...(state !== undefined && { state }), ...(look !== undefined && { look }) }, layout);
+				return Response.json(await readFixture('curtains', layout));
+			} catch (error) {
+				return failure(error);
+			}
 		},
 	},
 	'/api/plan': () => Response.json(plan),

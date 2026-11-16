@@ -45,7 +45,22 @@ const productSchema = {
 		currency: { type: 'string' },
 		category: {
 			type: 'string',
-			enum: ['tv', 'sofa', 'chair', 'table', 'desk', 'bed', 'storage', 'lamp', 'rug', 'decor', 'appliance', 'other'],
+			enum: [
+				'tv',
+				'sofa',
+				'chair',
+				'table',
+				'desk',
+				'bed',
+				'storage',
+				'lamp',
+				'rug',
+				'curtain',
+				'decor',
+				'appliance',
+				'other',
+			],
+			description: 'curtain covers curtains and drapes of any kind, including sheers and blackout panels',
 		},
 		dimensions: {
 			type: ['object', 'null'],

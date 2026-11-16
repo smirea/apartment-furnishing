@@ -1,6 +1,14 @@
 <script lang="ts">
-	import { finishAreasIn } from '@repo/shared/floorplan';
-	import { FIXTURE_KEYS, type Fixture, type FixtureKey, type FixtureOption } from '@repo/shared/fixtures';
+	import { curtainTracks, finishAreasIn, ft } from '@repo/shared/floorplan';
+	import {
+		CURTAIN_STATES,
+		FIXTURE_KEYS,
+		type CurtainSettings,
+		type CurtainState,
+		type Fixture,
+		type FixtureKey,
+		type FixtureOption,
+	} from '@repo/shared/fixtures';
 	import { planGeometry, TV_MOUNT_IN } from '@repo/shared/plan';
 	import {
 		carpetHitsWalls,
@@ -121,9 +129,11 @@
 	const fixtures = $derived(
 		Object.fromEntries(fixtureList.map(f => [f.key, f])) as Partial<Record<FixtureKey, Fixture>>,
 	);
-	// Products that belong to an item fixture, like beds, are picked in its panel rather than placed as furniture.
+	// Products that belong to a fixture, like beds and curtains, are picked in its panel rather than placed as furniture.
 	const fixtureCategories = $derived(
-		new Map(fixtureList.flatMap(f => (f.kind === 'item' ? [[f.category, f.key] as const] : []))),
+		new Map(
+			fixtureList.flatMap(f => (f.kind === 'item' || f.kind === 'curtains' ? [[f.category, f.key] as const] : [])),
+		),
 	);
 	const placeable = $derived(catalogList.filter(item => !fixtureCategories.has(item.category)));
 	// Wall pieces (art, mirrors, shelves) have a list of their own and only ever hang on a wall.
@@ -146,7 +156,7 @@
 	$effect(() => {
 		for (const f of fixtureList) {
 			const textures = f.kind === 'wallTexture';
-			if (!textures && f.kind !== 'item') continue;
+			if (!textures && f.kind !== 'item' && f.kind !== 'curtains') continue;
 			const known = textures
 				? texturesQuery.data?.map(t => ({ id: t.id, job: t.textureJob }))
 				: catalogQuery.data?.map(item => ({ id: item.id, job: item.modelJob }));
@@ -222,6 +232,61 @@
 		ReturnType<typeof fixtureMutations>
 	>;
 
+	let latestCurtains = 0;
+	const curtainsMutation = createMutation(() => ({
+		mutationFn: (change: Partial<CurtainSettings>) =>
+			api<Fixture>('/api/curtains', { method: 'PATCH', body: JSON.stringify(change) }),
+		onMutate: async (change: Partial<CurtainSettings>) => {
+			picksSaving++;
+			const at = layout;
+			await queryClient.cancelQueries({ queryKey: ['fixtures', at] });
+			queryClient.setQueryData<Fixture[]>(['fixtures', at], list =>
+				list?.map(f => (f.key === 'curtains' && f.curtains ? { ...f, curtains: { ...f.curtains, ...change } } : f)),
+			);
+			return { at, save: ++latestCurtains };
+		},
+		onSuccess: (next: Fixture, _: Partial<CurtainSettings>, context: { at: string | null; save: number }) => {
+			if (context.save === latestCurtains) storeFixture(next, context.at);
+		},
+		onError: () => queryClient.invalidateQueries({ queryKey: ['fixtures'] }),
+		onSettled: () => picksSaving--,
+	}));
+	const curtainHint: Record<CurtainState, string> = {
+		closed: 'Drawn across the windows',
+		open: 'Gathered at the sides of the windows',
+		off: 'No curtains',
+	};
+	const curtainTrackSummary = `Rods: ${Object.entries(Object.groupBy(curtainTracks, t => t.room))
+		.map(([room, tracks]) => {
+			const totalIn = Math.round(tracks!.reduce((sum, t) => sum + ft(t.to - t.from), 0) * 12);
+			return `${Math.floor(totalIn / 12)}′ ${totalIn % 12}″ in the ${room.toLowerCase()}`;
+		})
+		.join(', ')}`;
+	const curtains = $derived(fixtures.curtains?.curtains ?? null);
+	const curtainItem = $derived(fixtures.curtains?.selected ? (catalog[fixtures.curtains.selected] ?? null) : null);
+	const curtainLook = $derived(
+		curtainItem && (itemVariant(curtainItem, curtains?.look ?? null) ?? itemVariant(curtainItem, curtainItem.variant)),
+	);
+	const curtainAxes = $derived.by((): ConfigAxis[] => {
+		const item = curtainItem;
+		if (!item || item.variants.length < 2 || !curtainLook) return [];
+		return [
+			{
+				key: 'look',
+				label: item.variantLabel,
+				selected: curtainLook.id,
+				pick: look => curtainsMutation.mutate({ look }),
+				choices: item.variants.map(v => ({
+					id: v.id,
+					label: v.name,
+					detail: formatPrice(v.price, item.currency),
+					image: v.image,
+					color: v.swatch,
+				})),
+			},
+		];
+	});
+
 	const ideasQuery = createQuery(() => ({
 		queryKey: ['ideas'],
 		queryFn: async () => {
@@ -285,7 +350,7 @@
 		warning,
 	});
 	function optionProduct(f: Fixture, option: FixtureOption): Product | null {
-		const item = f.kind === 'item' ? catalog[option.id] : undefined;
+		const item = f.kind === 'item' || f.kind === 'curtains' ? catalog[option.id] : undefined;
 		if (item) return itemProduct(item, option.warning);
 		// The hand-sized TV has no listing to show.
 		if (!option.url) return null;
@@ -642,7 +707,7 @@
 		const fixture = o && fixtures[o.key];
 		const option = fixture?.options.find(x => x.id === o!.id);
 		if (!fixture || !option) return null;
-		if (fixture.kind === 'item') {
+		if (fixture.kind === 'item' || fixture.kind === 'curtains') {
 			const item = catalog[option.id];
 			return item ? { kind: 'item', item, placement: null, fixture } : null;
 		}
@@ -671,7 +736,12 @@
 				return {
 					name: c.item.name,
 					path: option(c.fixture),
-					also: c.fixture.selected === c.item.id ? `The ${c.fixture.title.toLowerCase()} spot goes empty.` : null,
+					also:
+						c.fixture.selected !== c.item.id
+							? null
+							: c.fixture.kind === 'curtains'
+								? 'The windows go bare.'
+								: `The ${c.fixture.title.toLowerCase()} spot goes empty.`,
 				};
 			const n = placedCount(c.item.id);
 			return {
@@ -1177,6 +1247,7 @@
 	function fixtureSummary(f: Fixture) {
 		if (f.kind === 'tv') return tv?.visible ? `${round1(tvDiagonal(tv))}″` : 'off';
 		if (f.kind === 'wallTexture') return String(f.options.length);
+		if (f.kind === 'curtains') return curtainItem ? (curtainLook?.name ?? '') : '';
 		const d = f.selected ? catalog[f.selected]?.dimensions : null;
 		return d ? `${round1(d.width)}″ × ${round1(d.depth)}″` : '';
 	}
@@ -1240,6 +1311,16 @@
 		if (!viewer || !catalogQuery.data) return;
 		for (const f of fixtureList)
 			if (f.kind === 'item') viewer.setWallItem(f.key, f.spot, f.selected ? (catalog[f.selected] ?? null) : null);
+	});
+	$effect(() => {
+		if (!viewer || !curtains) return;
+		viewer.setCurtains(
+			curtainItem && {
+				state: curtains.state,
+				swatch: curtainLook?.swatch ?? null,
+				image: curtainLook?.image ?? curtainItem.image,
+			},
+		);
 	});
 	$effect(() => {
 		if (viewer && (placementsLoaded || placements.length)) viewer.setPlacements($state.snapshot(placements), catalog);
@@ -1369,14 +1450,30 @@
 		{/if}
 		{#each sections as s (s.key)}
 			<section>
-				<button
-					type="button"
-					class="section-toggle"
-					aria-expanded={open[s.key]}
-					onclick={() => (open[s.key] = !open[s.key])}
-				>
-					{s.title} <span class="muted">{s.summary}</span>
-				</button>
+				<div class="section-head">
+					<button
+						type="button"
+						class="section-toggle"
+						aria-expanded={open[s.key]}
+						onclick={() => (open[s.key] = !open[s.key])}
+					>
+						{s.title} <span class="muted">{s.summary}</span>
+					</button>
+					{#if s.key === 'curtains' && curtains}
+						<div class="segmented" role="radiogroup" aria-label="Curtains">
+							{#each Object.entries(CURTAIN_STATES) as [state, label] (state)}
+								<button
+									type="button"
+									role="radio"
+									aria-checked={curtains.state === state}
+									title={curtainHint[state as CurtainState]}
+									onclick={() => curtains.state !== state && curtainsMutation.mutate({ state: state as CurtainState })}
+									>{label}</button
+								>
+							{/each}
+						</div>
+					{/if}
+				</div>
 				{#if open[s.key]}
 					{#if s.key === 'tv' && tv}
 						<label class="check"
@@ -1512,6 +1609,11 @@
 						</div>
 					{:else if s.loading}
 						<p class="muted">Loading…</p>
+					{/if}
+					{#if s.key === 'curtains'}
+						{#if curtainAxes.length}<Configurator axes={curtainAxes} />{/if}
+						<p class="muted">{curtainTrackSummary}</p>
+						{#if curtainsMutation.isError}<p class="error">{curtainsMutation.error.message}</p>{/if}
 					{/if}
 					{#each s.errors as error (error)}<p class="error">{error}</p>{/each}
 					<form
@@ -2100,8 +2202,34 @@
 		border-top: 1px solid var(--app-border);
 	}
 
-	.left section:has(> .section-toggle[aria-expanded='false']) {
+	.left section:has(> .section-head > .section-toggle[aria-expanded='false']) {
 		padding-bottom: 0.6rem;
+	}
+
+	.section-head {
+		display: flex;
+		gap: 0.6rem;
+		align-items: center;
+	}
+
+	.segmented {
+		display: flex;
+		flex: none;
+		border: 1px solid var(--app-border);
+		border-radius: 999px;
+		overflow: hidden;
+	}
+
+	.segmented button {
+		padding: 0.1rem 0.55rem;
+		border: none;
+		border-radius: 0;
+		font-size: 0.75rem;
+	}
+
+	.segmented button[aria-checked='true'] {
+		background: var(--app-accent);
+		color: var(--app-accent-ink);
 	}
 
 	.section-toggle.group-toggle {

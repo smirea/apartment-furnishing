@@ -85,7 +85,7 @@ Walmart products with "View in 3D" come with a real GLB model. When a listing ha
 
 ## Fixtures
 
-The TV, the bed and the living-room wall texture are fixtures: built-in spots that each hold one of several imported options. They share one API, so the web plan and the AR app list, switch and import them the same way:
+The TV, the bed, the living-room wall texture and the curtains are fixtures: built-in spots that each hold one of several imported options. They share one API, so the web plan and the AR app list, switch and import them the same way:
 
 - `GET /api/fixtures` lists every fixture with its options, each with a name, a one-line `detail`, an optional red `warning`, a build `job` and whether it is `ready` to pick.
 - `PUT /api/fixtures/:key` with `{ "selected": <option id or null> }` switches it, or leaves the spot empty.
@@ -105,6 +105,10 @@ Paste a TV's product link under it to keep that TV as a candidate: Codex reads o
 The **Bed** panel picks the primary bedroom's bed from the imported beds (catalog items Codex files under `bed`). The bed is not placed by hand. Its headboard sits flush to the bedroom's north wall, and it is centered on that wall's measured 162", so both sides keep the same room for a nightstand. Each bed in the list shows its size, its price and the room left on each side (red under 18"). The bed in the plan has its width, length, height and side room written across its top. Click a bed to switch to it, or click it again to leave the room empty. The bed is the `bed` item fixture (see Fixtures).
 
 Paste a bed link at the bottom of the panel to import it the same way as furniture (photos, dimensions, a generated 3D model) and switch to it. That box refuses anything Codex doesn't read as a bed. A bed link pasted in the Furniture box lands in the Bed panel too.
+
+## Curtains
+
+The **Curtains** panel hangs one curtain listing at every full-height window: the living room's west glass (one rod that parts over the balcony door), its south glass on each side of the column, and the primary bedroom's west window, with the rod running a foot past the window on each side. Curtains are catalog items of category `curtain`; a curtain link pasted in the panel, the Furniture box or the Wall box imports there. Curtains are drawn, not modeled: each rod carries two pleated panels at the ceiling, in the color of the look picked from the swatches under the list (the middle of the listing photo when it sells one look), with 2× fullness, so drawn closed they cover the glass and gathered open their folds stack at the ends of the rod (`apps/ui/src/lib/curtains.ts`, rods in `curtainTracks` in `packages/shared/src/floorplan.ts`). The header's **On** draws them closed, **Open** gathers them and **Off** leaves the windows bare while keeping the pick. The pick is the `curtains` fixture; the state and look save per layout to the `curtains` row of the `settings` table through `PATCH /api/curtains`. The AR app lists and switches curtains but doesn't draw them yet.
 
 ## Living room wall texture
 

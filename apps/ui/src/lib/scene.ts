@@ -7,7 +7,7 @@ import {
 	type TvSettings,
 	type WallTexture,
 } from '@repo/shared/items';
-import type { WallSpot } from '@repo/shared/fixtures';
+import type { CurtainState, WallSpot } from '@repo/shared/fixtures';
 import { moveCarpet, variantOf, type CarpetEntry, type CarpetPose } from '@repo/shared/carpets';
 import { hangOnWall, indoorRooms, wallFaces, type WallFace } from '@repo/shared/walls';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
@@ -47,6 +47,7 @@ import { CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
 import {
 	CEILING_FT,
 	columns,
+	curtainTracks,
 	doors,
 	fixtures,
 	footprint,
@@ -60,6 +61,7 @@ import {
 	type Wall,
 } from '@repo/shared/floorplan';
 import { planGeometry, TV_DEPTH_IN, tvPose } from '@repo/shared/plan';
+import { buildCurtains, photoColor, type CurtainPart } from './curtains';
 import { createMeasurer, type MeasureState, type MeasureTool } from './measure';
 import type { Box, Segment } from '@repo/shared/obstacles';
 
@@ -1023,12 +1025,39 @@ export function createViewer(
 		addBox(ceilingGroup, room.rect, CEILING_FT, 0.1, ceilingMat);
 	}
 
+	const curtainGroup = new Group();
+	scene.add(curtainGroup);
+	let curtainParts: CurtainPart[] = [];
+	let curtainsShown = '';
+	let curtainsVersion = 0;
+	// `swatch` is the look's color; without one the curtains take the color of `image`.
+	async function setCurtains(curtains: { state: CurtainState; swatch: string | null; image: string | null } | null) {
+		const shown = JSON.stringify(curtains?.state === 'off' ? null : curtains);
+		if (shown === curtainsShown) return;
+		curtainsShown = shown;
+		const version = ++curtainsVersion;
+		const color =
+			curtains && curtains.state !== 'off'
+				? (curtains.swatch ?? (curtains.image && (await photoColor(curtains.image).catch(() => null))) ?? '#d9d3c7')
+				: null;
+		if (version !== curtainsVersion) return;
+		for (const { mesh } of curtainParts) mesh.geometry.dispose();
+		curtainGroup.clear();
+		curtainParts = [];
+		if (!curtains || curtains.state === 'off' || !color) return;
+		const built = buildCurtains(curtainTracks, curtains.state, color);
+		curtainGroup.add(built.group);
+		curtainParts = built.parts;
+		applyHeights();
+	}
+
 	let mode: Mode = 'orbit';
 	let cutaway = true;
 
 	function applyHeights() {
 		const low = mode === 'orbit' && cutaway;
-		for (const w of cutawayWalls) {
+		const parts: (CurtainPart & { onHeight?: (height: number) => void })[] = [...cutawayWalls, ...curtainParts];
+		for (const w of parts) {
 			const target = low ? Math.min(w.fullHeight, CUTAWAY_FT) : w.fullHeight;
 			w.mesh.visible = !(low && w.y >= CUTAWAY_FT);
 			const scale = target / w.fullHeight;
@@ -1170,6 +1199,8 @@ export function createViewer(
 		setPlacements,
 		setCarpets,
 		setTv,
+		setCurtains: (curtains: Parameters<typeof setCurtains>[0]) =>
+			setCurtains(curtains).catch(error => console.error('curtain color failed to load', error)),
 		setWallItem: (key: string, spot: WallSpot, item: CatalogItem | null) =>
 			setWallItem(key, spot, item).catch(error => console.error(`${key} model failed to load`, error)),
 		// One texture dresses both the TV wall and the column.

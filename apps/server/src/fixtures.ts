@@ -4,17 +4,19 @@
 // spot.
 import { bedWallFace, ft } from '@repo/shared/floorplan';
 import {
+	DEFAULT_CURTAINS,
 	FIXTURE_KEYS,
 	type Fixture,
 	type FixtureKey,
 	type FixtureOption,
+	type CurtainSettings,
 	type FixtureSpec,
 	type WallSpot,
 } from '@repo/shared/fixtures';
 import { tvDiagonal, type CatalogItem, type Job, type TvSettings } from '@repo/shared/items';
 import { db } from './db';
 import { runImport, startBuild } from './jobs';
-import { hiddenIn, picksOf, tvOf, unhide, type ProductKind } from './layouts';
+import { curtainsOf, hiddenIn, picksOf, tvOf, unhide, type ProductKind } from './layouts';
 import { findImported, removeProduct } from './products';
 
 const { catalog, textures, tvs } = db;
@@ -46,15 +48,22 @@ export const FIXTURES: Record<FixtureKey, FixtureSpec> = {
 		room: 'Living room',
 		importLabel: 'Paste a wall panel link',
 	},
+	curtains: {
+		kind: 'curtains',
+		title: 'Curtains',
+		room: 'Living room',
+		importLabel: 'Paste a curtain link',
+		category: 'curtain',
+	},
 };
 
 export const isFixtureKey = (key: string): key is FixtureKey => Object.hasOwn(FIXTURES, key);
 
-// The item fixture an imported product belongs to, so a bed pasted among the furniture becomes the bed.
+// The fixture an imported product belongs to, so a bed pasted among the furniture becomes the bed.
 export const itemFixtureFor = (category: string) =>
 	FIXTURE_KEYS.find(key => {
 		const spec = FIXTURES[key];
-		return spec.kind === 'item' && spec.category === category;
+		return (spec.kind === 'item' || spec.kind === 'curtains') && spec.category === category;
 	}) ?? null;
 
 // Every method that reads or changes the room takes the layout it acts on; options leave out the layout's deleted
@@ -71,7 +80,7 @@ type Source = {
 	owns?(id: string): Promise<boolean>;
 	// Restarts a failed or missing model or texture build.
 	build?(id: string): Promise<void>;
-	extra?(layout: string): Promise<Pick<Fixture, 'tv'>>;
+	extra?(layout: string): Promise<Pick<Fixture, 'tv' | 'curtains'>>;
 };
 
 const stored = (key: FixtureKey) => ({
@@ -216,6 +225,61 @@ const wallTextureSource: Source = {
 	build: async id => void (await startBuild('buildTexture', (await textures.read(id)).id)),
 };
 
+export async function saveCurtains(change: Partial<CurtainSettings>, layout: string) {
+	if (change.look) {
+		const picked = (await picksOf(layout).get()).curtains;
+		const item = picked ? await catalog.get(picked) : null;
+		if (!item) throw new FixtureError('Pick curtains before their look');
+		if (!item.variants.some(v => v.id === change.look))
+			throw new FixtureError(`${item.name} doesn't come in ${change.look}`);
+	}
+	await curtainsOf(layout).patch(change);
+}
+
+const readCurtains = async (layout: string) => ({ ...DEFAULT_CURTAINS, ...(await curtainsOf(layout).get()) });
+
+// Curtains are drawn from their look's color rather than a model, so a listing is ready as soon as it is imported. The
+// model is still built, since recoloring it is what reads each look's swatch color.
+function curtainSource(key: FixtureKey, category: string): Source {
+	return {
+		kind: 'item',
+		options: async layout => {
+			const [items, hidden] = await Promise.all([catalog.all(), hiddenIn(layout, 'item')]);
+			return items
+				.filter(item => item.category === category && !hidden.has(item.id))
+				.map(item => ({
+					id: item.id,
+					name: item.name,
+					url: item.url,
+					image: item.image,
+					detail: facts(
+						money(item.price, item.currency),
+						item.brand,
+						item.variants.length > 1 && `${item.variants.length} ${item.variantLabel.toLowerCase()}s`,
+					),
+					warning: null,
+					group: null,
+					job: null,
+					ready: true,
+				}));
+		},
+		selected: stored(key).selected,
+		// Another listing doesn't sell the last one's look.
+		select: async (id, layout) => {
+			const before = (await picksOf(layout).get())[key] ?? null;
+			await picksOf(layout).patch({ [key]: id });
+			if (id !== before) await curtainsOf(layout).patch({ look: null });
+		},
+		import: async url => {
+			const item = await catalog.read(await runImport('importItem', url, category, 'wall'));
+			if (!item.model) await startBuild('buildModel', item.id);
+			return item.id;
+		},
+		owns: async id => (await catalog.get(id))?.category === category,
+		extra: async layout => ({ curtains: await readCurtains(layout) }),
+	};
+}
+
 const SOURCES: Record<FixtureKey, Source> = Object.fromEntries(
 	FIXTURE_KEYS.map(key => {
 		const spec = FIXTURES[key];
@@ -223,9 +287,11 @@ const SOURCES: Record<FixtureKey, Source> = Object.fromEntries(
 			key,
 			spec.kind === 'item'
 				? itemSource(key, spec.category, spec.spot)
-				: spec.kind === 'tv'
-					? tvSource
-					: wallTextureSource,
+				: spec.kind === 'curtains'
+					? curtainSource(key, spec.category)
+					: spec.kind === 'tv'
+						? tvSource
+						: wallTextureSource,
 		];
 	}),
 ) as Record<FixtureKey, Source>;

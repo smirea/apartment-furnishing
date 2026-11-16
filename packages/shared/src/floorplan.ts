@@ -177,3 +177,24 @@ export const finishAreasIn = {
 	tvWall: { width: 122, height: CEILING_FT * 12 },
 	column: { width: Math.round(Math.PI * 33), height: CEILING_FT * 12 },
 };
+
+// Curtain tracks, in plan px, running from `from` to `to` along the room side of a window face (`at` on the other axis)
+// and hanging into the room toward `into`. The panels meet at `part` when closed and gather back to the track's ends
+// when open. The living room's west track parts over the balcony door so the door opens between the panels; the column
+// stands against the south glass, so that glass gets one track on each side of it, the corner one drawing from the
+// corner alone. The bedroom track runs a foot past the window on each side so the open curtains clear the glass.
+export type CurtainTrack = {
+	room: string;
+	axis: 'x' | 'y';
+	at: number;
+	from: number;
+	to: number;
+	part: number;
+	into: 1 | -1;
+};
+export const curtainTracks: CurtainTrack[] = [
+	{ room: 'Living room', axis: 'y', at: 185, from: 502, to: 900, part: 580, into: 1 },
+	{ room: 'Living room', axis: 'x', at: 900, from: 185, to: 273, part: 273, into: -1 },
+	{ room: 'Living room', axis: 'x', at: 900, from: 341, to: 469, part: 405, into: -1 },
+	{ room: 'Bedroom', axis: 'y', at: 58, from: 134, to: 280, part: 207, into: 1 },
+];

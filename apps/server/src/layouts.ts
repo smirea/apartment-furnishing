@@ -1,6 +1,6 @@
 import type { CarpetPose, CarpetSize } from '@repo/shared/carpets';
 import { statement, type Row } from '@repo/shared/db';
-import type { FixtureKey } from '@repo/shared/fixtures';
+import { DEFAULT_CURTAINS, type CurtainSettings, type FixtureKey } from '@repo/shared/fixtures';
 import { DEFAULT_TV, type TvSettings } from '@repo/shared/items';
 import { FIRST_LAYOUT, LAYOUT_HEADER, type Layout, type LayoutList } from '@repo/shared/layouts';
 import { db } from './db';
@@ -62,7 +62,7 @@ export async function createLayout(name: string, from: string | null) {
 					),
 					statement(
 						`INSERT INTO settings (key, value)
-						SELECT substr(key, 1, instr(key, ':')) || ?1, value FROM settings WHERE key IN ('fixtures:' || ?2, 'tv:' || ?2)`,
+						SELECT substr(key, 1, instr(key, ':')) || ?1, value FROM settings WHERE key IN ('fixtures:' || ?2, 'tv:' || ?2, 'curtains:' || ?2)`,
 						id,
 						from,
 					),
@@ -84,7 +84,7 @@ export async function deleteLayout(id: string) {
 		statement('DELETE FROM placements WHERE layoutId = ?1', id),
 		statement('DELETE FROM layout_carpets WHERE layoutId = ?1', id),
 		statement('DELETE FROM layout_hidden WHERE layoutId = ?1', id),
-		statement(`DELETE FROM settings WHERE key IN ('fixtures:' || ?1, 'tv:' || ?1)`, id),
+		statement(`DELETE FROM settings WHERE key IN ('fixtures:' || ?1, 'tv:' || ?1, 'curtains:' || ?1)`, id),
 		statement('DELETE FROM layouts WHERE id = ?1', id),
 		...(current === id
 			? [
@@ -98,10 +98,12 @@ export async function deleteLayout(id: string) {
 	]);
 }
 
-// The pick of every fixture but the TV, whose size and mount live in the layout's `tv` setting.
+// The pick of every fixture but the TV, whose size and mount live in the layout's `tv` setting. Whether the curtains
+// are drawn, gathered or off, and their look, live in its `curtains` setting.
 export const picksOf = (layout: string) =>
 	db.setting<Partial<Record<FixtureKey, string | null>>>(`fixtures:${layout}`, () => ({}));
 export const tvOf = (layout: string) => db.setting<TvSettings>(`tv:${layout}`, () => DEFAULT_TV);
+export const curtainsOf = (layout: string) => db.setting<CurtainSettings>(`curtains:${layout}`, () => DEFAULT_CURTAINS);
 
 // A pick naming a deleted product already reads as nothing picked, but would come back if the same link were imported
 // again under the same id.
