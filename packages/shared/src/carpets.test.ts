@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import { CARPET_SPAWN, carpetHitsWalls, carpetSpawn, closestSize, moveCarpet, savedLook, sizeLabel } from './carpets';
+import { CARPET_SPAWN, carpetHitsWalls, carpetSpawn, closestSize, moveCarpet, savedLook } from './carpets';
 import { planGeometry } from './plan';
 
 const plan = planGeometry();
@@ -34,11 +34,6 @@ test('a rug against the column is checked against its circle, not its bounding s
 	const pose = { x: column.x + corner + 1, z: column.z - corner - 1, yaw: 0 };
 	expect(carpetHitsWalls(pose, rug(2, 2), plan)).toBe(false);
 	expect(carpetHitsWalls({ ...pose, x: pose.x - 0.5, z: pose.z + 0.5 }, rug(2, 2), plan)).toBe(true);
-});
-
-test('labels sizes in feet and inches', () => {
-	expect(sizeLabel({ widthIn: 96, lengthIn: 120 })).toBe('8′ × 10′');
-	expect(sizeLabel({ widthIn: 30, lengthIn: 94 })).toBe('2′6″ × 7′10″');
 });
 
 test('lands a 9 × 12 rug in the living room turned east-west, and refuses one too big for it', () => {

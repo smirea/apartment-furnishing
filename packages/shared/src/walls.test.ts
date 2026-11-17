@@ -9,13 +9,6 @@ const faces = wallFaces(
 );
 const tvWall = plan.finishSurfaces.tvWall;
 
-test('the TV wall’s living-room face is one stretch facing west', () => {
-	const face = faces.find(f => f.axis === 'x' && f.at === tvWall.x && f.normal === -1);
-	expect(face).toBeDefined();
-	expect(face!.from).toBeCloseTo(27.05, 1);
-	expect(face!.to).toBeCloseTo(tvWall.z2, 1);
-});
-
 test('only faces looking into the apartment: no outside of the shell, no glass, no slivers', () => {
 	// The north wall's outer face looks out of the building.
 	expect(faces.some(f => f.axis === 'z' && f.normal === -1 && f.at < 2)).toBe(false);

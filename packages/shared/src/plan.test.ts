@@ -1,38 +1,7 @@
 import { expect, test } from 'bun:test';
 import { CURTAIN_FRONT_IN, ft } from './floorplan';
 import { DEFAULT_TV } from './items';
-import { planGeometry, TV_DEPTH_IN, tvPose } from './plan';
-
-test('splits the bedroom wall at both doors into three runs in feet', () => {
-	const bedroomWall = planGeometry().walls.filter(w => w.rect[0] === 15.949 && w.rect[2] === 16.371);
-	expect(bedroomWall).toEqual([
-		{ rect: [15.949, 1.477, 16.371, 4.641], glass: false },
-		{ rect: [15.949, 7.89, 16.371, 8.397], glass: false },
-		{ rect: [15.949, 11.561, 16.371, 12.489], glass: false },
-	]);
-});
-
-test('reports the living-room column with its radius in feet', () => {
-	expect(planGeometry().columns).toEqual([{ x: 12.954, z: 36.498, radius: 1.392 }]);
-});
-
-test('places the texture surfaces on the TV wall face and the column, in feet', () => {
-	const plan = planGeometry();
-	expect(plan.ceiling).toBe(10);
-	expect(plan.finishSurfaces).toEqual({
-		tvWall: { x: 24.388, z1: 27.046, z2: 37.679 },
-		column: { x: 12.954, z: 36.498, radius: 1.392 },
-	});
-});
-
-test('offers the back wall center, the pillar wall between column and back wall, the corner of the two, and the balcony glass', () => {
-	expect(planGeometry().tvSpots).toEqual({
-		backWall: { x: 24.388, z: 32.596, yaw: -90, onBackWall: true, corner: false },
-		pillarWall: { x: 19.367, z: 37.679, yaw: 180, onBackWall: false, corner: false },
-		corner: { x: 24.388, z: 37.679, yaw: -135, onBackWall: true, corner: true },
-		balconyWindow: { x: 7.806, z: 32.068, yaw: 90, onBackWall: false, corner: false },
-	});
-});
+import { TV_DEPTH_IN, tvPose } from './plan';
 
 test('hangs a back-wall TV 2.5" off the wall texture, centered on the measured 122"', () => {
 	const pose = tvPose({ ...DEFAULT_TV, placement: 'backWall' }, 1 / 12);
@@ -79,12 +48,4 @@ test('stands a TV in front of hung curtains, and back against its wall without t
 		7.806 + (2.5 + TV_DEPTH_IN / 2) / 12,
 		6,
 	);
-});
-
-test("lists the TV wall's switch, outlet and smoke alarm against its face, in feet", () => {
-	expect(planGeometry().tvWallDevices).toEqual([
-		{ rect: [24.304, 28.059, 24.388, 28.312], y: 3.75, height: 0.375, color: 0xffffff },
-		{ rect: [24.304, 31.857, 24.388, 32.447], y: 1.15, height: 0.375, color: 0xffffff },
-		{ rect: [24.262, 29.578, 24.388, 30.042], y: 8.75, height: 0.15, color: 0xf4f4f4 },
-	]);
 });

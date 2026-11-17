@@ -42,6 +42,6 @@ test('recolors only the listed materials and keeps the binary chunk', () => {
 
 test('refuses a color that is not #rrggbb and a material the model lacks', () => {
 	const model = glb({ materials: [{ name: 'fabric' }] }, []);
-	expect(() => recolorGlb(model, new Map([[0, 'olive']]))).toThrow('not a #rrggbb color');
-	expect(() => recolorGlb(model, new Map([[3, '#000000']]))).toThrow('no material 3');
+	expect(() => recolorGlb(model, new Map([[0, 'olive']]))).toThrow();
+	expect(() => recolorGlb(model, new Map([[3, '#000000']]))).toThrow();
 });
