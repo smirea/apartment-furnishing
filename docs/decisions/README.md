@@ -5,4 +5,4 @@ apartment-furnishing's concepts, goals, paradigms, and high-level system decisio
 - [Product goals](product.md): what apartment-furnishing is and who it is for.
 - [Stack](stack.md): tooling, frameworks, and shared code.
 - [Environment](environment.md): env-manager, local mode and AWS environments, and failing early on missing settings.
-- [Workflow](workflow.md): git hooks, environments, and which tests run where.
+- [Workflow](workflow.md): git hooks, CI, environments, and which checks run where.
