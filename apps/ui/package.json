@@ -4,7 +4,7 @@
 	"type": "module",
 	"scripts": {
 		"build": "bun ../../scripts/build-ideas.ts && bun --env-file=../../.env --env-file=../../.env.local --bun vite build",
-		"check": "bun --env-file=../../.env --env-file=../../.env.local svelte-kit sync && bun --env-file=../../.env --env-file=../../.env.local svelte-check --tsgo --tsconfig ./tsconfig.json",
+		"check": "bun --env-file=../../.env --env-file=../../.env.local svelte-kit sync && svelte-check-native --tsconfig ./tsconfig.json",
 		"dev": "bun ../../scripts/build-ideas.ts && bun --env-file=../../.env --env-file=../../.env.local --bun vite",
 		"preview": "bun --env-file=../../.env --env-file=../../.env.local --bun vite preview"
 	},
@@ -22,7 +22,7 @@
 	"devDependencies": {
 		"@tailwindcss/vite": "^4.3.3",
 		"@types/three": "^0.187.0",
-		"svelte-check": "^4.7.6",
+		"svelte-check-native": "^1.12.1",
 		"tailwindcss": "^4.3.3",
 		"typescript": "^6.0.3"
 	}
