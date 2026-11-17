@@ -10,12 +10,8 @@ pre-commit:
     typecheck:
       glob: '*.{js,mjs,mts,ts,tsx,svelte,json,jsonc}'
       run: bun run typecheck
+    # Git exports GIT_DIR and GIT_INDEX_FILE to hooks, so a test that runs git in a temp directory would act on this
+    # repository unless they are unset first.
     test:
       glob: '*.{js,mjs,mts,ts,tsx}'
-      run: bun run test
-
-pre-push:
-  commands:
-    test:
-      glob: '*.{js,mjs,mts,ts,tsx}'
-      run: bun run test
+      run: unset $(git rev-parse --local-env-vars); bun run test

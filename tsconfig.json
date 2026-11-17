@@ -20,5 +20,6 @@
 		"target": "ESNext",
 		"types": ["bun"],
 		"verbatimModuleSyntax": true
-	}
+	},
+	"include": ["packages/shared/src", "scripts"]
 }

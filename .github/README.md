@@ -1,13 +1,13 @@
 # Continuous integration
 
-`workflows/ci.yml` runs checks, tests, and builds on pull requests, default-branch pushes, and manual dispatches. Each task reports success when its stack has no relevant changes. Manual dispatches and initial pushes run every configured task. Documentation changes are ignored; workflow changes run every task. Edit `scripts/changes.ts` when adding a new component or changing the layout. All CI helpers run with Bun, pinned by `.bun-version`, including Swift and empty scaffolds.
+`workflows/ci.yml` runs on pull requests, pushes to master, and manual dispatches. Each of the root scripts `lint:ci`, `typecheck`, `test` and `build` is its own job, and they run in parallel on every change with a 5-minute timeout. The pre-commit hook calls the same scripts. A newer push cancels a pull request's run in progress; a push to master is never cancelled, because it deploys.
 
-Actions are pinned to commit SHAs. Dependabot checks for action updates weekly. A failure in change detection fails the task jobs too.
+`deploy` needs every check and runs only on pushes to master. It builds the UI, applies new D1 migrations and deploys the Worker. Add its `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets with `bun run secrets:github`.
 
-Bun tasks run the root `lint:ci` and `typecheck`, `test`, and `build` scripts. Keep CI checks read-only. Tests pass until tests are added, and failures then fail CI. `.bun-version` and `packageManager` pin Bun to the version used during scaffolding; update them together. Commit `bun.lock` after changing dependencies. CI caches package downloads, then always installs with `--frozen-lockfile`.
+Actions are pinned to commit SHAs. Dependabot checks for action updates weekly.
+
+Keep CI checks read-only. `.bun-version` and `packageManager` pin Bun; update them together. Commit `bun.lock` after changing dependencies. CI caches package downloads, then always installs with `--frozen-lockfile`.
 
 Apps using env-manager never install or run it in CI. The committed reader (`packages/shared/src/env.ts`) validates the environment, and Bun loads the tracked `.env` defaults for the scripts CI runs from the repository root. Keep defaults harmless and complete enough for CI. If a test needs a credential, supply it explicitly through GitHub Actions secrets. Never commit `.env.local` or native local secrets, and never cache environment outputs.
 
-Swift checks compile the package for macOS. Builds compile the shared `App` Xcode scheme for a generic iOS simulator without signing. Tests run Swift package test targets and Xcode testables or test plans when configured; no test targets passes. Xcode tests use an available iPhone simulator. Native jobs use the macOS runner's installed Xcode and Swift, and cache only package dependencies with a key including both toolchain versions. Commit `Package.resolved` when adding dependencies.
-
-Empty scaffolds have successful placeholder tasks. Replace them with real commands when choosing a stack. Configure branch protection to require the generated task names you need. After renaming the default branch, update the workflow's push branch.
+`app-ios` has no CI job.
