@@ -3,6 +3,7 @@ import { CARPET_SPAWN, carpetHitsWalls, carpetSpawn, closestSize, moveCarpet, sa
 import { planGeometry } from './plan';
 
 const plan = planGeometry();
+const tvWallX = plan.finishSurfaces.tvWall.x;
 const rug = (widthFt: number, lengthFt: number) => ({ widthIn: widthFt * 12, lengthIn: lengthFt * 12 });
 
 test('an 8 × 10 rug fits in the middle of the living room either way round', () => {
@@ -16,14 +17,13 @@ test('a 9 × 12 rug running north-south reaches the column; turned east-west it 
 });
 
 test('a rug can lie flush against the TV wall but not cross into it', () => {
-	const tvWallX = 24.388;
 	const flush = { x: tvWallX - 4, z: 30, yaw: 0 };
 	expect(carpetHitsWalls(flush, rug(8, 10), plan)).toBe(false);
 	expect(carpetHitsWalls({ ...flush, x: flush.x + 0.05 }, rug(8, 10), plan)).toBe(true);
 });
 
 test('turning a rug that fits square to the wall can swing its corner into it', () => {
-	const flush = { x: 24.388 - 4, z: 30, yaw: 0 };
+	const flush = { x: tvWallX - 4, z: 30, yaw: 0 };
 	expect(carpetHitsWalls({ ...flush, yaw: 15 }, rug(8, 10), plan)).toBe(true);
 });
 
@@ -44,23 +44,23 @@ test('lands a 9 × 12 rug in the living room turned east-west, and refuses one t
 test('dragging a rug into the TV wall stops it flush and keeps the slide along the wall', () => {
 	const from = { x: 18, z: 30, yaw: 0 };
 	const moved = moveCarpet(from, { x: 30, z: 31, yaw: 0 }, rug(8, 10), plan);
-	expect(moved.x).toBeCloseTo(24.388 - 4, 2);
+	expect(moved.x).toBeCloseTo(tvWallX - 4, 2);
 	expect(moved.z).toBe(31);
 	expect(carpetHitsWalls(moved, rug(8, 10), plan)).toBe(false);
 });
 
 test('a turn that would swing a rug into a wall leaves it where it was', () => {
-	const flush = { x: 24.388 - 4, z: 30, yaw: 0 };
+	const flush = { x: tvWallX - 4, z: 30, yaw: 0 };
 	expect(moveCarpet(flush, { ...flush, yaw: 15 }, rug(8, 10), plan)).toEqual(flush);
 });
 
 test('a drag that jumps a small rug clean past the TV wall stops it flush on this side', () => {
 	const moved = moveCarpet({ x: 22, z: 30, yaw: 0 }, { x: 27, z: 30, yaw: 0 }, rug(2, 2), plan);
-	expect(moved.x).toBeCloseTo(24.388 - 1, 2);
+	expect(moved.x).toBeCloseTo(tvWallX - 1, 2);
 });
 
 test('a big turn that would sweep a corner through a wall is refused even if it ends clear', () => {
-	const flush = { x: 24.388 - 4, z: 30, yaw: 0 };
+	const flush = { x: tvWallX - 4, z: 30, yaw: 0 };
 	expect(moveCarpet(flush, { ...flush, yaw: 180 }, rug(8, 10), plan)).toEqual(flush);
 });
 
