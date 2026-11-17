@@ -80,11 +80,6 @@ jobs:
       - name: Install dependencies
         if: needs.changes.outputs.bun == 'true'
         run: bun install --frozen-lockfile
-      - name: Generate environment from tracked defaults
-        if: needs.changes.outputs.bun == 'true'
-        run: |
-          bun add -g @stefan.inc/env-manager@^1
-          bun run env:generate
       - name: Checks
         if: needs.changes.outputs.bun == 'true' && matrix.task == 'checks'
         run: bun run lint:ci && bun run typecheck
@@ -114,10 +109,6 @@ jobs:
           bun-version-file: .bun-version
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Generate environment from tracked defaults
-        run: |
-          bun add -g @stefan.inc/env-manager@^1
-          bun run env:generate
       - name: Cloudflare credentials
         run: |
           if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
