@@ -1,19 +1,20 @@
 import { expect, test } from 'bun:test';
-import { CARPET_SPAWN, carpetHitsWalls, carpetSpawn, closestSize, moveCarpet, savedLook } from './carpets';
+import { carpetHitsWalls, carpetSpawn, closestSize, moveCarpet, savedLook } from './carpets';
 import { planGeometry } from './plan';
 
 const plan = planGeometry();
 const tvWallX = plan.finishSurfaces.tvWall.x;
 const rug = (widthFt: number, lengthFt: number) => ({ widthIn: widthFt * 12, lengthIn: lengthFt * 12 });
+const spawn = carpetSpawn(rug(2, 2), plan)!;
 
 test('an 8 × 10 rug fits in the middle of the living room either way round', () => {
-	expect(carpetHitsWalls({ ...CARPET_SPAWN, yaw: 0 }, rug(8, 10), plan)).toBe(false);
-	expect(carpetHitsWalls({ ...CARPET_SPAWN, yaw: 90 }, rug(8, 10), plan)).toBe(false);
+	expect(carpetHitsWalls({ ...spawn, yaw: 0 }, rug(8, 10), plan)).toBe(false);
+	expect(carpetHitsWalls({ ...spawn, yaw: 90 }, rug(8, 10), plan)).toBe(false);
 });
 
 test('a 9 × 12 rug running north-south reaches the column; turned east-west it clears it', () => {
-	expect(carpetHitsWalls({ ...CARPET_SPAWN, yaw: 0 }, rug(9, 12), plan)).toBe(true);
-	expect(carpetHitsWalls({ ...CARPET_SPAWN, yaw: 90 }, rug(9, 12), plan)).toBe(false);
+	expect(carpetHitsWalls({ ...spawn, yaw: 0 }, rug(9, 12), plan)).toBe(true);
+	expect(carpetHitsWalls({ ...spawn, yaw: 90 }, rug(9, 12), plan)).toBe(false);
 });
 
 test('a rug can lie flush against the TV wall but not cross into it', () => {
@@ -37,7 +38,7 @@ test('a rug against the column is checked against its circle, not its bounding s
 });
 
 test('lands a 9 × 12 rug in the living room turned east-west, and refuses one too big for it', () => {
-	expect(carpetSpawn(rug(9, 12), plan)).toEqual({ ...CARPET_SPAWN, yaw: 90 });
+	expect(carpetSpawn(rug(9, 12), plan)).toEqual({ ...spawn, yaw: 90 });
 	expect(carpetSpawn(rug(18, 20), plan)).toBeNull();
 });
 

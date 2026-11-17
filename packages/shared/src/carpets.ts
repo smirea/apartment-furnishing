@@ -77,7 +77,7 @@ export const sizeLabel = ({ widthIn, lengthIn }: Pick<CarpetSize, 'widthIn' | 'l
 
 const livingRoom = rooms.find(r => r.name === 'Living room')!.rect;
 // Center of the living room: where a carpet lands when it is added.
-export const CARPET_SPAWN = { x: ft((livingRoom[0] + livingRoom[2]) / 2), z: ft((livingRoom[1] + livingRoom[3]) / 2) };
+const CARPET_SPAWN = { x: ft((livingRoom[0] + livingRoom[2]) / 2), z: ft((livingRoom[1] + livingRoom[3]) / 2) };
 
 type Obstacles = Pick<PlanGeometry, 'walls' | 'columns'>;
 

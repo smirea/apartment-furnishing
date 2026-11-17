@@ -12,10 +12,10 @@ pre-commit:
       run: bun run typecheck
     test:
       glob: '*.{js,mjs,mts,ts,tsx}'
-      run: bun --no-env-file scripts/test-changed.ts {staged_files}
+      run: bun run test
 
 pre-push:
   commands:
     test:
       glob: '*.{js,mjs,mts,ts,tsx}'
-      run: bun --no-env-file scripts/test-changed.ts {push_files}
+      run: bun run test
