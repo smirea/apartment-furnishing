@@ -18,7 +18,7 @@ export function readGlb(bytes: Uint8Array): Gltf {
 	return JSON.parse(new TextDecoder().decode(bytes.subarray(20, 20 + view.getUint32(12, true))));
 }
 
-export function writeGlb(original: Uint8Array, gltf: Gltf): Uint8Array {
+function writeGlb(original: Uint8Array, gltf: Gltf): Uint8Array {
 	const view = new DataView(original.buffer, original.byteOffset, original.byteLength);
 	const rest = original.subarray(20 + view.getUint32(12, true));
 	const text = new TextEncoder().encode(JSON.stringify(gltf));

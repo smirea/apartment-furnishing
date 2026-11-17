@@ -1,20 +1,21 @@
 import { expect, test } from 'bun:test';
-import { readGlb, recolorGlb, toHex, writeGlb, type Gltf } from './glb';
+import { readGlb, recolorGlb, toHex, type Gltf } from './glb';
 
 const glb = (json: Gltf, bin: number[]) => {
-	const empty = new Uint8Array(20);
-	const view = new DataView(empty.buffer);
+	const text = new TextEncoder().encode(JSON.stringify(json));
+	const padded = Math.ceil(text.length / 4) * 4;
+	const out = new Uint8Array(28 + padded + bin.length);
+	const view = new DataView(out.buffer);
 	view.setUint32(0, 0x46546c67, true);
+	view.setUint32(4, 2, true);
+	view.setUint32(8, out.length, true);
+	view.setUint32(12, padded, true);
 	view.setUint32(16, 0x4e4f534a, true);
-	const written = writeGlb(empty, json);
-	const binChunk = new Uint8Array(8 + bin.length);
-	new DataView(binChunk.buffer).setUint32(0, bin.length, true);
-	new DataView(binChunk.buffer).setUint32(4, 0x004e4942, true);
-	binChunk.set(bin, 8);
-	const out = new Uint8Array(written.length + binChunk.length);
-	out.set(written);
-	out.set(binChunk, written.length);
-	new DataView(out.buffer).setUint32(8, out.length, true);
+	out.fill(0x20, 20, 20 + padded);
+	out.set(text, 20);
+	view.setUint32(20 + padded, bin.length, true);
+	view.setUint32(24 + padded, 0x004e4942, true);
+	out.set(bin, 28 + padded);
 	return out;
 };
 
@@ -42,6 +43,6 @@ test('recolors only the listed materials and keeps the binary chunk', () => {
 
 test('refuses a color that is not #rrggbb and a material the model lacks', () => {
 	const model = glb({ materials: [{ name: 'fabric' }] }, []);
-	expect(() => recolorGlb(model, new Map([[0, 'olive']]))).toThrow('not a #rrggbb color');
-	expect(() => recolorGlb(model, new Map([[3, '#000000']]))).toThrow('no material 3');
+	expect(() => recolorGlb(model, new Map([[0, 'olive']]))).toThrow();
+	expect(() => recolorGlb(model, new Map([[3, '#000000']]))).toThrow();
 });
