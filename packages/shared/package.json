@@ -1,22 +1,22 @@
 {
-	"name": "@repo/shared",
-	"private": true,
-	"type": "module",
-	"exports": {
-		".": "./src/index.ts",
-		"./env": "./src/env.ts",
-		"./items": "./src/items.ts",
-		"./fixtures": "./src/fixtures.ts",
-		"./carpets": "./src/carpets.ts",
-		"./layouts": "./src/layouts.ts",
-		"./floorplan": "./src/floorplan.ts",
-		"./plan": "./src/plan.ts",
-		"./obstacles": "./src/obstacles.ts",
-		"./walls": "./src/walls.ts",
-		"./package.json": "./package.json"
-	},
-	"dependencies": {
-		"es-toolkit": "^1.52.0",
-		"zod": "^4.6.6"
-	}
+  "name": "@repo/shared",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./env": "./src/env.ts",
+    "./items": "./src/items.ts",
+    "./fixtures": "./src/fixtures.ts",
+    "./carpets": "./src/carpets.ts",
+    "./layouts": "./src/layouts.ts",
+    "./floorplan": "./src/floorplan.ts",
+    "./plan": "./src/plan.ts",
+    "./obstacles": "./src/obstacles.ts",
+    "./walls": "./src/walls.ts",
+    "./package.json": "./package.json"
+  },
+  "dependencies": {
+    "es-toolkit": "^1.52.0",
+    "zod": "^4.6.6"
+  }
 }

@@ -6,15 +6,16 @@ export type Layout = { id: string; name: string };
 export type LayoutList = { active: string; layouts: Layout[] };
 
 // The web plan names its layout on every request, so a save still in flight when it switches lands where it was made.
-export const LAYOUT_HEADER = 'x-layout';
+export const LAYOUT_HEADER = "x-layout";
 
 // The first migration put the apartment as it was into this layout.
-export const FIRST_LAYOUT = 'main';
+export const FIRST_LAYOUT = "main";
 
 // Two links to the same listing, like an Amazon URL with or without its slug and tracking query, share a key.
 export function productKey(url: string) {
-	const u = new URL(url);
-	const id =
-		u.pathname.match(/\/(?:dp|gp\/product)\/([A-Z0-9]{10})/)?.[1] ?? u.pathname.match(/\/ip\/(?:[^/]+\/)?(\d+)/)?.[1];
-	return `${u.hostname.replace(/^www\./, '')}:${id ?? u.pathname}`;
+  const u = new URL(url);
+  const id =
+    u.pathname.match(/\/(?:dp|gp\/product)\/([A-Z0-9]{10})/)?.[1] ??
+    u.pathname.match(/\/ip\/(?:[^/]+\/)?(\d+)/)?.[1];
+  return `${u.hostname.replace(/^www\./, "")}:${id ?? u.pathname}`;
 }
