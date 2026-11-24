@@ -1,29 +1,29 @@
 {
-	"name": "@repo/ui",
-	"private": true,
-	"type": "module",
-	"scripts": {
-		"build": "bun ../../scripts/build-ideas.ts && bun --env-file=../../.env --env-file=../../.env.local --bun vite build",
-		"check": "bun --env-file=../../.env --env-file=../../.env.local svelte-kit sync && svelte-check-native --tsconfig ./tsconfig.json",
-		"dev": "bun ../../scripts/build-ideas.ts && bun --env-file=../../.env --env-file=../../.env.local --bun vite",
-		"preview": "bun --env-file=../../.env --env-file=../../.env.local --bun vite preview"
-	},
-	"dependencies": {
-		"@repo/shared": "workspace:*",
-		"@sveltejs/adapter-static": "^4.0.0",
-		"@sveltejs/kit": "^3.0.1",
-		"@sveltejs/vite-plugin-svelte": "^7.3.1",
-		"@tanstack/svelte-query": "^6.3.2",
-		"es-toolkit": "^1.52.0",
-		"svelte": "^5.57.2",
-		"three": "^0.187.0",
-		"vite": "^8.3.4"
-	},
-	"devDependencies": {
-		"@tailwindcss/vite": "^4.3.3",
-		"@types/three": "^0.187.0",
-		"svelte-check-native": "^1.12.1",
-		"tailwindcss": "^4.3.3",
-		"typescript": "^6.0.3"
-	}
+  "name": "@repo/ui",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun ../../scripts/build-ideas.ts && bun --env-file=../../.env --env-file=../../.env.local --bun vite build",
+    "check": "bun --env-file=../../.env --env-file=../../.env.local svelte-kit sync && svelte-check-native --tsconfig ./tsconfig.json",
+    "dev": "bun ../../scripts/build-ideas.ts && bun --env-file=../../.env --env-file=../../.env.local --bun vite",
+    "preview": "bun --env-file=../../.env --env-file=../../.env.local --bun vite preview"
+  },
+  "dependencies": {
+    "@repo/shared": "workspace:*",
+    "@sveltejs/adapter-static": "^4.0.0",
+    "@sveltejs/kit": "^3.0.1",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@tanstack/svelte-query": "^6.3.2",
+    "es-toolkit": "^1.52.0",
+    "svelte": "^5.57.2",
+    "three": "^0.187.0",
+    "vite": "^8.3.4"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/three": "^0.187.0",
+    "svelte-check-native": "^1.12.1",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^6.0.3"
+  }
 }

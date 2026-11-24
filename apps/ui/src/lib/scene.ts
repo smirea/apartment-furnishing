@@ -1,72 +1,72 @@
 import {
-	placedModel,
-	tvDiagonal,
-	type CatalogItem,
-	type FinishSurface,
-	type Placement,
-	type TvSettings,
-	type WallTexture,
-} from '@repo/shared/items';
-import type { CurtainState, WallSpot } from '@repo/shared/fixtures';
-import { moveCarpet, variantOf, type CarpetEntry, type CarpetPose } from '@repo/shared/carpets';
-import { hangOnWall, indoorRooms, wallFaces, type WallFace } from '@repo/shared/walls';
-import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+  placedModel,
+  tvDiagonal,
+  type CatalogItem,
+  type FinishSurface,
+  type Placement,
+  type TvSettings,
+  type WallTexture,
+} from "@repo/shared/items";
+import type { CurtainState, WallSpot } from "@repo/shared/fixtures";
+import { moveCarpet, variantOf, type CarpetEntry, type CarpetPose } from "@repo/shared/carpets";
+import { hangOnWall, indoorRooms, wallFaces, type WallFace } from "@repo/shared/walls";
+import { TransformControls } from "three/examples/jsm/controls/TransformControls.js";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import {
-	AmbientLight,
-	Box3,
-	BoxGeometry,
-	BoxHelper,
-	CanvasTexture,
-	CylinderGeometry,
-	Color,
-	DirectionalLight,
-	Euler,
-	Group,
-	HemisphereLight,
-	Mesh,
-	MeshBasicMaterial,
-	Object3D,
-	MeshStandardMaterial,
-	PerspectiveCamera,
-	Plane,
-	PlaneGeometry,
-	Raycaster,
-	RepeatWrapping,
-	Scene,
-	SRGBColorSpace,
-	Texture,
-	TextureLoader,
-	Vector2,
-	Vector3,
-	WebGLRenderer,
-} from 'three';
-import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
-import { CSS2DRenderer } from 'three/examples/jsm/renderers/CSS2DRenderer.js';
+  AmbientLight,
+  Box3,
+  BoxGeometry,
+  BoxHelper,
+  CanvasTexture,
+  CylinderGeometry,
+  Color,
+  DirectionalLight,
+  Euler,
+  Group,
+  HemisphereLight,
+  Mesh,
+  MeshBasicMaterial,
+  Object3D,
+  MeshStandardMaterial,
+  PerspectiveCamera,
+  Plane,
+  PlaneGeometry,
+  Raycaster,
+  RepeatWrapping,
+  Scene,
+  SRGBColorSpace,
+  Texture,
+  TextureLoader,
+  Vector2,
+  Vector3,
+  WebGLRenderer,
+} from "three";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { PointerLockControls } from "three/examples/jsm/controls/PointerLockControls.js";
+import { CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import {
-	CEILING_FT,
-	columns,
-	curtainTracks,
-	doors,
-	fixtures,
-	footprint,
-	ft,
-	PX_PER_FT,
-	rooms,
-	tvWallFace,
-	walls,
-	type FloorKind,
-	type Rect,
-	type Wall,
-} from '@repo/shared/floorplan';
-import { planGeometry, TV_DEPTH_IN, tvPose } from '@repo/shared/plan';
-import { buildCurtains, photoColor, type CurtainPart } from './curtains';
-import { createMeasurer, type MeasureState, type MeasureTool } from './measure';
-import type { Box, Segment } from '@repo/shared/obstacles';
+  CEILING_FT,
+  columns,
+  curtainTracks,
+  doors,
+  fixtures,
+  footprint,
+  ft,
+  PX_PER_FT,
+  rooms,
+  tvWallFace,
+  walls,
+  type FloorKind,
+  type Rect,
+  type Wall,
+} from "@repo/shared/floorplan";
+import { planGeometry, TV_DEPTH_IN, tvPose } from "@repo/shared/plan";
+import { buildCurtains, photoColor, type CurtainPart } from "./curtains";
+import { createMeasurer, type MeasureState, type MeasureTool } from "./measure";
+import type { Box, Segment } from "@repo/shared/obstacles";
 
-export type Mode = 'orbit' | 'walk';
-export type Selection = { kind: 'item'; key: string } | { kind: 'carpet'; id: string };
+export type Mode = "orbit" | "walk";
+export type Selection = { kind: "item"; key: string } | { kind: "carpet"; id: string };
 
 const EYE_FT = 5.5;
 const PLAYER_RADIUS_FT = 0.9;
@@ -83,1154 +83,1276 @@ const round1 = (n: number) => Math.round(n * 10) / 10;
 // Floor-plan pieces overlap where they meet, and the cutaway cuts them all to one height, so pieces that share a face
 // z-fight there. Pushing a piece back in depth lets the other win the shared face: walls and window frames stay in
 // front, then fixtures and doors, then glass.
-const recessed = (rank: number) => ({ polygonOffset: true, polygonOffsetFactor: rank, polygonOffsetUnits: rank });
+const recessed = (rank: number) => ({
+  polygonOffset: true,
+  polygonOffsetFactor: rank,
+  polygonOffsetUnits: rank,
+});
 
-const floorColors: Record<FloorKind, number> = { wood: 0xc9a672, tile: 0xe6e6e2, concrete: 0x9a9a98 };
+const floorColors: Record<FloorKind, number> = {
+  wood: 0xc9a672,
+  tile: 0xe6e6e2,
+  concrete: 0x9a9a98,
+};
 
 export function createViewer(
-	container: HTMLElement,
-	onMode: (mode: Mode) => void,
-	onSelect: (selection: Selection | null) => void,
-	// `settled` marks a move the plan made on its own, like an added item landing once its model loads, rather than one
-	// the user made.
-	onChange: (key: string, position: Placement['position'], rotation: Placement['rotation'], settled: boolean) => void,
-	onCarpetChange: (id: string, pose: CarpetPose) => void,
-	onMeasure: (state: MeasureState) => void,
+  container: HTMLElement,
+  onMode: (mode: Mode) => void,
+  onSelect: (selection: Selection | null) => void,
+  // `settled` marks a move the plan made on its own, like an added item landing once its model loads, rather than one
+  // the user made.
+  onChange: (
+    key: string,
+    position: Placement["position"],
+    rotation: Placement["rotation"],
+    settled: boolean,
+  ) => void,
+  onCarpetChange: (id: string, pose: CarpetPose) => void,
+  onMeasure: (state: MeasureState) => void,
 ) {
-	const renderer = new WebGLRenderer({ antialias: true });
-	renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-	container.append(renderer.domElement);
-	const woodTexture = new TextureLoader().load('/wood-floor.jpg');
-	woodTexture.colorSpace = SRGBColorSpace;
-	woodTexture.wrapS = woodTexture.wrapT = RepeatWrapping;
-	woodTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
-
-	const labelRenderer = new CSS2DRenderer();
-	Object.assign(labelRenderer.domElement.style, { position: 'absolute', inset: '0', pointerEvents: 'none' });
-	container.append(labelRenderer.domElement);
-
-	const scene = new Scene();
-	scene.background = new Color(0x1c1f24);
-	scene.add(new HemisphereLight(0xffffff, 0x6a6f77, 1.4), new AmbientLight(0xffffff, 0.5));
-	const sun = new DirectionalLight(0xfff2dd, 1.6);
-	sun.position.set(-20, 40, 30);
-	scene.add(sun);
-
-	const camera = new PerspectiveCamera(60, 1, 0.1, 400);
-	const cx = ft((footprint[0] + footprint[2]) / 2);
-	const cz = ft((footprint[1] + footprint[3]) / 2);
-
-	const orbit = new OrbitControls(camera, renderer.domElement);
-	orbit.target.set(cx, 0, cz);
-	orbit.maxPolarAngle = Math.PI / 2 - 0.02;
-	orbit.enableDamping = true;
-	camera.position.set(cx, 36, cz + 22);
-
-	const look = new PointerLockControls(camera, renderer.domElement);
-
-	const wallGroup = new Group();
-	const ceilingGroup = new Group();
-	scene.add(wallGroup, ceilingGroup);
-	const colliders: Box[] = [];
-	// Snap targets: wall faces for flush placement, fixture tops (counters, vanities) for surface items.
-	const wallBoxes: Box[] = [];
-	// The solid walls wall pieces hang on; the TV wall's box grows out to the face of any panels on it.
-	const hangBoxes: Box[] = [];
-	let hangFaces: WallFace[] | null = null;
-	const surfaces: (Box & { top: number })[] = [];
-	const cutawayWalls: {
-		mesh: Mesh;
-		fullHeight: number;
-		y: number;
-		glass: boolean;
-		lintel?: boolean;
-		onHeight?: (height: number) => void;
-	}[] = [];
-
-	function addBox(parent: Object3D, rect: Rect, y: number, height: number, material: MeshStandardMaterial) {
-		const [x1, z1, x2, z2] = rect.map(ft) as Rect;
-		const mesh = new Mesh(new BoxGeometry(x2 - x1, height, z2 - z1), material);
-		mesh.position.set((x1 + x2) / 2, y + height / 2, (z1 + z2) / 2);
-		parent.add(mesh);
-		return mesh;
-	}
-
-	for (const room of rooms) {
-		const wood = room.floor === 'wood';
-		const mat = new MeshStandardMaterial({
-			color: wood ? 0xffffff : floorColors[room.floor],
-			map: wood ? woodTexture : null,
-			roughness: 0.8,
-		});
-		const floor = addBox(scene, room.rect, -0.1, 0.1, mat);
-		if (wood) {
-			const positions = floor.geometry.attributes.position;
-			const uvs = floor.geometry.attributes.uv;
-			for (let i = 0; i < positions.count; i++) {
-				uvs.setXY(i, (positions.getX(i) + floor.position.x) / 7.2, (positions.getZ(i) + floor.position.z) / 7.2);
-			}
-		}
-	}
-
-	const plaster = new MeshStandardMaterial({ color: 0xf1efea, roughness: 0.95 });
-	const glassMat = new MeshStandardMaterial({
-		color: 0x9fd0e8,
-		transparent: true,
-		opacity: 0.35,
-		roughness: 0.1,
-		depthWrite: false,
-		...recessed(2),
-	});
-	const frameMat = new MeshStandardMaterial({ color: 0x2f3438, roughness: 0.5 });
-	const inchPx = PX_PER_FT / 12;
-
-	function buildWall({ line, thickness = 10, gaps = [], glass = false, height = CEILING_FT }: Wall) {
-		const [x1, y1, x2, y2] = line;
-		const horizontal = y1 === y2;
-		const start = horizontal ? Math.min(x1, x2) : Math.min(y1, y2);
-		const end = horizontal ? Math.max(x1, x2) : Math.max(y1, y2);
-		const fixed = horizontal ? y1 : x1;
-		const half = thickness / 2;
-		const sorted = [...gaps].sort((a, b) => a[0] - b[0]);
-
-		const span = (a: number, b: number, y: number, h: number, mat: MeshStandardMaterial, solid: boolean) => {
-			if (b - a < 1) return;
-			const rect: Rect = horizontal ? [a, fixed - half, b, fixed + half] : [fixed - half, a, fixed + half, b];
-			const mesh = addBox(wallGroup, rect, y, h, mat);
-			cutawayWalls.push({ mesh, fullHeight: h, y, glass, lintel: y > 0 });
-			if (solid) {
-				const [bx1, bz1, bx2, bz2] = rect.map(ft) as Rect;
-				colliders.push({ x1: bx1, z1: bz1, x2: bx2, z2: bz2 });
-				if (h >= 3) {
-					const box = { x1: bx1, z1: bz1, x2: bx2, z2: bz2 };
-					wallBoxes.push(box);
-					if (!glass) hangBoxes.push(box);
-				}
-			}
-		};
-
-		const frame = (a: number, b: number, y: number, h: number) => {
-			const depth = half + inchPx;
-			const rect: Rect = horizontal ? [a, fixed - depth, b, fixed + depth] : [fixed - depth, a, fixed + depth, b];
-			const mesh = addBox(wallGroup, rect, y, h, frameMat);
-			cutawayWalls.push({ mesh, fullHeight: h, y, glass: false });
-		};
-		// Full-height glass reads as a window: sill, head and evenly spaced mullions. Railings stay plain glass.
-		const windowFrames = (a: number, b: number) => {
-			if (!glass || height < CEILING_FT || b - a < 1) return;
-			const bar = FRAME_IN * inchPx;
-			const bays = Math.max(1, Math.round((b - a) / (WINDOW_BAY_IN * inchPx)));
-			for (let i = 0; i <= bays; i++) {
-				const c = a + ((b - a) * i) / bays;
-				frame(Math.max(a, c - bar / 2), Math.min(b, c + bar / 2), 0, height);
-			}
-			frame(a, b, 0, FRAME_IN / 12);
-			frame(a, b, height - FRAME_IN / 12, FRAME_IN / 12);
-		};
-
-		let cursor = start;
-		for (const [from, to] of sorted) {
-			span(cursor, from, 0, height, glass ? glassMat : plaster, true);
-			windowFrames(cursor, from);
-			span(from, to, 7, height - 7, plaster, false);
-			cursor = to;
-		}
-		span(cursor, end, 0, height, glass ? glassMat : plaster, true);
-		windowFrames(cursor, end);
-	}
-
-	walls.forEach(wall => {
-		const h = wall.height ?? CEILING_FT;
-		buildWall({ ...wall, height: h });
-	});
-
-	const tvWallFixtures: { mesh: Mesh; x: number }[] = [];
-	for (const f of fixtures) {
-		const y = f.y ?? 0;
-		const mesh = addBox(
-			wallGroup,
-			f.rect,
-			y,
-			f.height,
-			new MeshStandardMaterial({ color: f.color, roughness: 0.6, ...recessed(1) }),
-		);
-		cutawayWalls.push({ mesh, fullHeight: f.height, y, glass: false });
-		if (f.tvWall) tvWallFixtures.push({ mesh, x: mesh.position.x });
-		if (f.solid || (y === 0 && f.height > 1)) {
-			const [x1, z1, x2, z2] = f.rect.map(ft) as Rect;
-			colliders.push({ x1, z1, x2, z2 });
-		}
-		if (y === 0) {
-			const [x1, z1, x2, z2] = f.rect.map(ft) as Rect;
-			surfaces.push({ x1, z1, x2, z2, top: f.height });
-		}
-	}
-
-	const doorMat = new MeshStandardMaterial({ color: 0x9a9ea3, roughness: 0.7, ...recessed(1) });
-	const doorLeaves = doors.map(door => door.map(ft) as Segment);
-	// Measuring reads this list on every step, so hidden doors stop blocking a measurement too.
-	const doorObstacles = [...doorLeaves];
-	const doorGroup = new Group();
-	wallGroup.add(doorGroup);
-	for (const [hx, hy, ex, ey] of doors) {
-		const length = ft(Math.hypot(ex - hx, ey - hy));
-		const mesh = new Mesh(new BoxGeometry(length, 7, 0.15), doorMat);
-		mesh.position.set(ft((hx + ex) / 2), 3.5, ft((hy + ey) / 2));
-		mesh.rotation.y = -Math.atan2(ey - hy, ex - hx);
-		doorGroup.add(mesh);
-		cutawayWalls.push({ mesh, fullHeight: 7, y: 0, glass: false });
-	}
-	// Hidden doors come out of the scene rather than turning invisible, since clicks would still hit an invisible one.
-	function setDoors(shown: boolean) {
-		if (shown) wallGroup.add(doorGroup);
-		else doorGroup.removeFromParent();
-		doorObstacles.splice(0, doorObstacles.length, ...(shown ? doorLeaves : []));
-	}
-
-	// Walking treats the column as its bounding square; measuring uses the true circle.
-	const columnBoxes = new Set<Box>();
-	for (const c of columns) {
-		const mesh = new Mesh(new CylinderGeometry(ft(c.r), ft(c.r), CEILING_FT, 32), plaster);
-		mesh.position.set(ft(c.x), CEILING_FT / 2, ft(c.y));
-		wallGroup.add(mesh);
-		cutawayWalls.push({ mesh, fullHeight: CEILING_FT, y: 0, glass: false });
-		const box = { x1: ft(c.x - c.r), z1: ft(c.y - c.r), x2: ft(c.x + c.r), z2: ft(c.y + c.r) };
-		colliders.push(box);
-		columnBoxes.add(box);
-	}
-
-	// Wall textures cover the TV wall's living-room face and sleeve the column, standing out from them by the panel
-	// thickness. Each surface keeps its own copy of the tile so it can repeat at real scale for its width and for the
-	// height the cutaway currently shows.
-	type Finish = {
-		group: Group;
-		material: MeshStandardMaterial;
-		widthFt: () => number;
-		setDepth: (ft: number) => void;
-		heightFt: number;
-		repeat: { width: number; height: number } | null;
-		version: number;
-	};
-	const finishes = {} as Record<FinishSurface, Finish>;
-	function addFinish(surface: FinishSurface, mesh: Mesh, widthFt: () => number, setDepth: (ft: number) => void) {
-		const group = new Group();
-		group.visible = false;
-		group.add(mesh);
-		wallGroup.add(group);
-		const finish: Finish = {
-			group,
-			material: mesh.material as MeshStandardMaterial,
-			widthFt,
-			setDepth,
-			heightFt: CEILING_FT,
-			repeat: null,
-			version: 0,
-		};
-		finishes[surface] = finish;
-		cutawayWalls.push({
-			mesh,
-			fullHeight: CEILING_FT,
-			y: 0,
-			glass: false,
-			onHeight: height => {
-				finish.heightFt = height;
-				tileFinish(finish);
-			},
-		});
-	}
-	function tileFinish({ material, widthFt, heightFt, repeat }: Finish) {
-		if (!repeat || !material.map || !material.normalMap) return;
-		const across = widthFt() / (repeat.width / 12);
-		const up = heightFt / (repeat.height / 12);
-		for (const map of [material.map, material.normalMap]) map.repeat.set(across, up);
-	}
-
-	const tvWallSnap = wallBoxes.find(b => b.x1 === ft(tvWallFace.x) && b.z1 === ft(tvWallFace.y1));
-	if (!tvWallSnap) throw new Error('TV wall face does not match a wall run in the floor plan');
-	const wallFinish = new Mesh(
-		new PlaneGeometry(ft(tvWallFace.y2 - tvWallFace.y1), CEILING_FT),
-		new MeshStandardMaterial(),
-	);
-	// Faces west, into the living room, with the tile's left edge at the north end.
-	wallFinish.rotation.y = -Math.PI / 2;
-	wallFinish.position.z = ft((tvWallFace.y1 + tvWallFace.y2) / 2);
-	addFinish(
-		'tvWall',
-		wallFinish,
-		() => ft(tvWallFace.y2 - tvWallFace.y1),
-		depth => {
-			wallFinish.position.x = ft(tvWallFace.x) - depth;
-			// Wall-mounted items snap to the panels' face instead of the plaster behind them.
-			tvWallSnap.x1 = ft(tvWallFace.x) - depth;
-			hangFaces = null;
-			tvWallDepthFt = depth;
-			placeTv();
-			for (const f of tvWallFixtures) f.mesh.position.x = f.x - depth;
-		},
-	);
-
-	const column = columns[0]!;
-	const columnFinish = new Mesh(new CylinderGeometry(1, 1, CEILING_FT, 64, 1, true), new MeshStandardMaterial());
-	columnFinish.position.set(ft(column.x), CEILING_FT / 2, ft(column.y));
-	addFinish(
-		'column',
-		columnFinish,
-		// Whole tiles around, so the seam where the sleeve closes matches.
-		() => {
-			const repeat = finishes.column.repeat;
-			const around = 2 * Math.PI * columnFinish.scale.x;
-			return repeat ? Math.max(1, Math.round(around / (repeat.width / 12))) * (repeat.width / 12) : around;
-		},
-		depth => columnFinish.scale.set(ft(column.r) + depth, columnFinish.scale.y, ft(column.r) + depth),
-	);
-
-	// The TV hangs on a tilting mount at one of its spots, out from any wall texture on the back wall.
-	const TV_BEZEL_IN = 0.3;
-	let tvWallDepthFt = 0;
-	let tvSettings: TvSettings | null = null;
-	// Hung curtains push a TV over the glass out in front of them.
-	let curtainParts: CurtainPart[] = [];
-	const tvGroup = new Group();
-	tvGroup.visible = false;
-	scene.add(tvGroup);
-	const tvBody = new Mesh(
-		new BoxGeometry(1, 1, 1),
-		new MeshStandardMaterial({ color: 0x141518, roughness: 0.4, metalness: 0.3 }),
-	);
-	const tvScreenMat = new MeshStandardMaterial({ color: 0xffffff, roughness: 0.25, metalness: 0.1 });
-	const tvScreen = new Mesh(new PlaneGeometry(1, 1), tvScreenMat);
-	tvGroup.add(tvBody, tvScreen);
-
-	function tvLabel({ widthIn, heightIn }: TvSettings) {
-		const canvas = document.createElement('canvas');
-		canvas.width = 1024;
-		canvas.height = Math.round((1024 * heightIn) / widthIn);
-		const ctx = canvas.getContext('2d')!;
-		const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-		gradient.addColorStop(0, '#1d2633');
-		gradient.addColorStop(1, '#0b0e13');
-		ctx.fillStyle = gradient;
-		ctx.fillRect(0, 0, canvas.width, canvas.height);
-		ctx.fillStyle = '#e8edf3';
-		ctx.textAlign = 'center';
-		ctx.textBaseline = 'middle';
-		const unit = canvas.height / 10;
-		ctx.font = `600 ${unit * 2.4}px system-ui, sans-serif`;
-		ctx.fillText(`${round1(tvDiagonal({ widthIn, heightIn }))}″`, canvas.width / 2, canvas.height * 0.42);
-		ctx.font = `400 ${unit * 0.9}px system-ui, sans-serif`;
-		ctx.fillStyle = '#9aa7b6';
-		ctx.fillText(`${round1(widthIn)}″ × ${round1(heightIn)}″`, canvas.width / 2, canvas.height * 0.66);
-		const texture = new CanvasTexture(canvas);
-		texture.colorSpace = SRGBColorSpace;
-		return texture;
-	}
-
-	function placeTv() {
-		const tv = tvSettings;
-		tvGroup.visible = !!tv?.visible;
-		if (!tv) return;
-		const [w, h, d] = [tv.widthIn / 12, tv.heightIn / 12, TV_DEPTH_IN / 12];
-		tvBody.scale.set(w, h, d);
-		tvScreen.scale.set(w - (2 * TV_BEZEL_IN) / 12, h - (2 * TV_BEZEL_IN) / 12, 1);
-		tvScreen.position.z = d / 2 + 0.002;
-		const pose = tvPose(tv, tvWallDepthFt, curtainParts.length > 0);
-		tvGroup.position.set(pose.x, pose.y, pose.z);
-		// Turned to face out of its wall, then tipped about its own horizontal axis so the top leans out.
-		tvGroup.rotation.set(tv.tiltDeg * DEG, pose.yaw * DEG, 0, 'YXZ');
-	}
-
-	function setTv(tv: TvSettings) {
-		const resized = tv.widthIn !== tvSettings?.widthIn || tv.heightIn !== tvSettings?.heightIn;
-		tvSettings = tv;
-		if (resized) {
-			tvScreenMat.map?.dispose();
-			tvScreenMat.map = tvLabel(tv);
-			tvScreenMat.needsUpdate = true;
-		}
-		placeTv();
-	}
-
-	const textureLoader = new TextureLoader();
-	const textureCache = new Map<string, Promise<Texture>>();
-	const loadTexture = (url: string) => {
-		if (!textureCache.has(url)) textureCache.set(url, textureLoader.loadAsync(url));
-		return textureCache.get(url)!;
-	};
-
-	async function setFinish(surface: FinishSurface, texture: WallTexture | null) {
-		const finish = finishes[surface];
-		const version = ++finish.version;
-		const tile = texture?.texture;
-		if (!tile) {
-			finish.group.visible = false;
-			finish.setDepth(0);
-			return;
-		}
-		const [map, normalMap] = await Promise.all([loadTexture(tile.map), loadTexture(tile.normalMap)]);
-		if (version !== finish.version) return;
-		const copy = (source: Texture, color: boolean) => {
-			const t = source.clone();
-			t.wrapS = t.wrapT = RepeatWrapping;
-			if (color) t.colorSpace = SRGBColorSpace;
-			t.needsUpdate = true;
-			return t;
-		};
-		finish.material.map?.dispose();
-		finish.material.normalMap?.dispose();
-		finish.material.map = copy(map, true);
-		finish.material.normalMap = copy(normalMap, false);
-		finish.material.roughness = 0.75;
-		finish.material.needsUpdate = true;
-		finish.repeat = tile.repeat;
-		finish.setDepth(tile.depthIn / 12);
-		tileFinish(finish);
-		finish.group.visible = true;
-	}
-
-	const itemGroup = new Group();
-	scene.add(itemGroup);
-
-	// Carpets lie on their own layer between the floor and everything else. Rugs that overlap stack in list order.
-	const carpetGroup = new Group();
-	scene.add(carpetGroup);
-	const carpetPlan = planGeometry();
-	type CarpetView = {
-		root: Group;
-		mesh: Mesh<PlaneGeometry, MeshStandardMaterial>;
-		carpet: CarpetEntry;
-		// The last pose that cleared the walls, which a drag or a turn falls back to.
-		pose: CarpetPose;
-		map: string | null;
-	};
-	const carpetViews = new Map<string, CarpetView>();
-	const carpetGeometry = new PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
-	const placeCarpet = (root: Group, pose: CarpetPose) => {
-		root.position.set(pose.x, 0, pose.z);
-		root.rotation.set(0, pose.yaw * DEG, 0);
-	};
-
-	function setCarpets(list: CarpetEntry[]) {
-		const placed = list.filter(c => c.placement);
-		for (const [id, view] of carpetViews) {
-			if (placed.some(c => c.id === id)) continue;
-			view.root.removeFromParent();
-			view.mesh.material.map?.dispose();
-			view.mesh.material.dispose();
-			carpetViews.delete(id);
-			if (selected?.kind === 'carpet' && selected.id === id) select(null);
-		}
-		placed.forEach((carpet, layer) => {
-			let view = carpetViews.get(carpet.id);
-			if (!view) {
-				const mesh = new Mesh(
-					carpetGeometry,
-					new MeshStandardMaterial({ color: 0xb7aa96, roughness: 0.95, alphaTest: 0.5, polygonOffset: true }),
-				);
-				const root = new Group();
-				root.userData = { carpetId: carpet.id };
-				root.add(mesh);
-				carpetGroup.add(root);
-				view = { root, mesh, carpet, pose: carpet.placement!, map: null };
-				carpetViews.set(carpet.id, view);
-			}
-			view.carpet = carpet;
-			const { mesh } = view;
-			mesh.scale.set(carpet.size.widthIn / 12, 1, carpet.size.lengthIn / 12);
-			// The later of two overlapping rugs lies on top: a hair higher so clicks pick it, and pulled forward in depth
-			// because that hair alone z-fights from across the apartment.
-			mesh.position.y = CARPET_FT + layer * 0.001;
-			mesh.material.polygonOffsetFactor = -1 - layer;
-			mesh.material.polygonOffsetUnits = -4 * (layer + 1);
-			if (!isBeingMoved(view.root)) {
-				view.pose = carpet.placement!;
-				placeCarpet(view.root, view.pose);
-			}
-			const map = variantOf(carpet).texture?.map ?? null;
-			if (map !== view.map) {
-				view.map = map;
-				const target = view;
-				const { material } = mesh;
-				if (!map) {
-					material.map?.dispose();
-					material.map = null;
-					material.color.set(0xb7aa96);
-					material.needsUpdate = true;
-				} else
-					void loadTexture(map).then(source => {
-						if (target.map !== map) return;
-						const texture = source.clone();
-						texture.colorSpace = SRGBColorSpace;
-						texture.needsUpdate = true;
-						material.map?.dispose();
-						material.map = texture;
-						material.color.set(0xffffff);
-						material.needsUpdate = true;
-					});
-			}
-		});
-		const root = selectedRoot();
-		if (root) selection.setFromObject(root);
-	}
-
-	const poseOf = (root: Group): CarpetPose => ({
-		x: root.position.x,
-		z: root.position.z,
-		yaw: Math.round((new Euler().setFromQuaternion(root.quaternion, 'YXZ').y / DEG) * 10) / 10,
-	});
-
-	// Called on every drag or gizmo step: the carpet goes as far toward the pointer as the walls allow.
-	function constrainCarpet(root: Group) {
-		const view = carpetViews.get(root.userData.carpetId)!;
-		view.pose = moveCarpet(view.pose, poseOf(root), view.carpet.size, carpetPlan);
-		placeCarpet(root, view.pose);
-	}
-	const gltf = new GLTFLoader();
-	const fallbackMat = new MeshStandardMaterial({ color: 0x8a8f98, roughness: 0.6 });
-	const roots = new Map<string, Group>();
-	// Newly added items settle (floor, wall, ceiling) once their model has loaded and has a size.
-	const snapOnLoad = new Set<string>();
-	let catalogById: Record<string, CatalogItem> = {};
-	// A new mount rebuilds the item too, so it settles the new way once loaded, and so does a copy switched to another
-	// look's model.
-	const signature = (item: CatalogItem, model = item.model) =>
-		`${item.id}|${model}|${item.mount}|${item.removeNodes.join(',')}`;
-
-	async function buildItem(item: CatalogItem, model = item.model): Promise<Object3D> {
-		const dims = item.dimensions;
-		let object: Object3D;
-		if (model) {
-			object = (await gltf.loadAsync(model)).scene;
-			for (const name of item.removeNodes) object.getObjectByName(name)?.removeFromParent();
-			const size = new Box3().setFromObject(object).getSize(new Vector3());
-			// Uniform scale keeps the model's proportions; listed width wins, otherwise assume glTF meters.
-			object.scale.setScalar(dims ? dims.width / 12 / size.x : 3.28084);
-		} else {
-			const { width, height, depth } = dims ?? { width: 24, height: 24, depth: 24 };
-			object = new Mesh(new BoxGeometry(width / 12, height / 12, depth / 12), fallbackMat);
-		}
-		// Re-center so the root's origin is the footprint center at the item's bottom; rotation spins in place.
-		const box = new Box3().setFromObject(object);
-		const center = box.getCenter(new Vector3());
-		object.position.sub(new Vector3(center.x, box.min.y, center.z));
-		return object;
-	}
-
-	// Item fixtures (the bed) are built in like the TV: the model's back (-z) flush to the fixture's wall face and
-	// centered on it, with the size and the room left to either side written across the top.
-	type WallItem = {
-		group: Group;
-		label: Mesh<PlaneGeometry, MeshBasicMaterial>;
-		version: number;
-		shown: string | null;
-	};
-	const wallItems = new Map<string, WallItem>();
-	const wallItemModels = new Map<string, Promise<Object3D>>();
-
-	function wallItemLabelTexture(lines: [string, string]) {
-		const canvas = document.createElement('canvas');
-		canvas.width = 1024;
-		canvas.height = 400;
-		const ctx = canvas.getContext('2d')!;
-		ctx.fillStyle = 'rgba(15, 18, 24, 0.72)';
-		ctx.beginPath();
-		ctx.roundRect(0, 0, canvas.width, canvas.height, 48);
-		ctx.fill();
-		ctx.textAlign = 'center';
-		ctx.textBaseline = 'middle';
-		ctx.fillStyle = '#f2f5f8';
-		ctx.font = '600 150px system-ui, sans-serif';
-		ctx.fillText(lines[0], canvas.width / 2, 150);
-		ctx.fillStyle = '#b4bfcc';
-		ctx.font = '400 64px system-ui, sans-serif';
-		ctx.fillText(lines[1], canvas.width / 2, 300);
-		const texture = new CanvasTexture(canvas);
-		texture.colorSpace = SRGBColorSpace;
-		return texture;
-	}
-
-	function wallItem(key: string) {
-		let entry = wallItems.get(key);
-		if (!entry) {
-			const label = new Mesh(new PlaneGeometry(1, 1), new MeshBasicMaterial({ transparent: true, depthWrite: false }));
-			// Lies flat with the text's top toward the wall, so it reads from the front of the item.
-			label.rotation.x = -Math.PI / 2;
-			entry = { group: new Group(), label, version: 0, shown: null };
-			scene.add(entry.group);
-			wallItems.set(key, entry);
-		}
-		return entry;
-	}
-
-	async function setWallItem(key: string, spot: WallSpot, item: CatalogItem | null) {
-		const entry = wallItem(key);
-		const { group, label } = entry;
-		const version = ++entry.version;
-		if (!item) {
-			group.clear();
-			entry.shown = null;
-			return;
-		}
-		const shown = `${signature(item)}|${JSON.stringify(item.dimensions)}|${JSON.stringify(spot)}`;
-		if (shown === entry.shown) return;
-		const modelKey = `${signature(item)}|${JSON.stringify(item.dimensions)}`;
-		if (!wallItemModels.has(modelKey)) wallItemModels.set(modelKey, buildItem(item));
-		const model = await wallItemModels.get(modelKey)!.catch(error => {
-			wallItemModels.delete(modelKey);
-			if (version === entry.version) {
-				group.clear();
-				entry.shown = null;
-			}
-			throw error;
-		});
-		if (version !== entry.version) return;
-		group.clear();
-		group.add(model, label);
-		entry.shown = shown;
-		// Measured unturned, so a turned spot doesn't swap width and depth.
-		group.position.set(0, 0, 0);
-		group.rotation.y = 0;
-		group.updateMatrixWorld(true);
-		const size = new Box3().setFromObject(model).getSize(new Vector3());
-		const yaw = spot.yaw * DEG;
-		group.rotation.y = yaw;
-		group.position.set(spot.x + Math.sin(yaw) * (size.z / 2), 0, spot.z + Math.cos(yaw) * (size.z / 2));
-		group.updateMatrixWorld(true);
-
-		const { width, height, depth } = item.dimensions ?? { width: size.x * 12, height: size.y * 12, depth: size.z * 12 };
-		label.material.map?.dispose();
-		label.material.map = wallItemLabelTexture([
-			`${round1(width)}″ × ${round1(depth)}″`,
-			`${round1(height)}″ high · ${round1((spot.span * 12 - size.x * 12) / 2)}″ each side`,
-		]);
-		label.material.needsUpdate = true;
-		const labelWidth = Math.min(size.x * 0.8, size.z * 0.45 * (1024 / 400));
-		const labelDepth = (labelWidth * 400) / 1024;
-		label.scale.set(labelWidth, labelDepth, 1);
-
-		// The label rests on the highest thing under it (mattress, slats or platform); one ray down the middle can pass
-		// between slats and leave the text buried under them.
-		const ray = new Raycaster();
-		const down = new Vector3(0, -1, 0);
-		let top = 0;
-		const STEP_FT = 2 / 12;
-		for (let dx = -labelWidth / 2; dx <= labelWidth / 2; dx += STEP_FT)
-			for (let dz = -labelDepth / 2; dz <= labelDepth / 2; dz += STEP_FT) {
-				ray.set(group.localToWorld(new Vector3(dx, CEILING_FT, dz)), down);
-				top = Math.max(top, ray.intersectObject(model, true)[0]?.point.y ?? 0);
-			}
-		label.position.y = (top || size.y) + 0.03;
-	}
-
-	function placeRoot(root: Group, p: Placement) {
-		root.position.set(...p.position);
-		root.rotation.set(p.rotation[0] * DEG, p.rotation[1] * DEG, p.rotation[2] * DEG);
-	}
-
-	const isBeingMoved = (root: Group) => dragging?.root === root || gizmos.some(g => g.dragging && g.object === root);
-	const isCarpet = (root: Object3D) => 'carpetId' in root.userData;
-
-	function setPlacements(placements: Placement[], catalog: Record<string, CatalogItem>) {
-		catalogById = catalog;
-		const keys = new Set(placements.map(p => p.key));
-		for (const [key, root] of roots) {
-			if (keys.has(key)) continue;
-			root.removeFromParent();
-			roots.delete(key);
-			if (selected?.kind === 'item' && selected.key === key) select(null);
-		}
-		for (const p of placements) {
-			const item = catalog[p.itemId];
-			if (!item) continue;
-			let root = roots.get(p.key);
-			const model = placedModel(item, p.variant);
-			if (root && root.userData.signature !== signature(item, model)) {
-				root.removeFromParent();
-				root = undefined;
-			}
-			if (!root) {
-				const fresh = new Group();
-				fresh.userData = { key: p.key, itemId: item.id, signature: signature(item, model) };
-				roots.set(p.key, fresh);
-				itemGroup.add(fresh);
-				void buildItem(item, model).then(object => {
-					// Unparented, so this is the item's own width, height and depth before it turns.
-					fresh.userData.size = new Box3().setFromObject(object).getSize(new Vector3());
-					fresh.add(object);
-					if (snapOnLoad.delete(p.key)) commit(fresh, true);
-					else if (item.mount === 'wall') {
-						// Saved while it was a placeholder box, or by the AR app: flush against its wall now that its size is known.
-						const [position, yaw] = [fresh.position.clone(), fresh.rotation.y];
-						hang(fresh);
-						if (fresh.position.distanceTo(position) > 0.01 || Math.abs(fresh.rotation.y - yaw) > 0.001)
-							commit(fresh, true);
-					}
-					if (selectedRoot() === fresh) selection.setFromObject(fresh);
-				});
-				root = fresh;
-				if (selected?.kind === 'item' && selected.key === p.key) select(selected);
-			}
-			if (!isBeingMoved(root)) placeRoot(root, p);
-		}
-	}
-
-	type WallHit = { wall: Box; shift: number; axis: 'x' | 'z'; normal: [x: number, z: number] };
-	// Shift that puts the item's box against the given face of a wall, measured from the box as it is now.
-	function flushShift(box: Box3, w: Box, normal: [number, number]) {
-		if (normal[0] === 1) return w.x2 - box.min.x;
-		if (normal[0] === -1) return w.x1 - box.max.x;
-		if (normal[1] === 1) return w.z2 - box.min.z;
-		return w.z1 - box.max.z;
-	}
-	function nearestWall(box: Box3, threshold: number, axis: WallHit['axis']): WallHit | null {
-		let best: WallHit | null = null;
-		const consider = (wall: Box, normal: [number, number]) => {
-			if ((normal[0] ? 'x' : 'z') !== axis) return;
-			const shift = flushShift(box, wall, normal);
-			if (Math.abs(shift) < threshold && (!best || Math.abs(shift) < Math.abs(best.shift)))
-				best = { wall, shift, axis: normal[0] ? 'x' : 'z', normal };
-		};
-		for (const w of wallBoxes) {
-			if (box.min.z < w.z2 && box.max.z > w.z1) {
-				if (box.max.x > w.x2) consider(w, [1, 0]);
-				if (box.min.x < w.x1) consider(w, [-1, 0]);
-			}
-			if (box.min.x < w.x2 && box.max.x > w.x1) {
-				if (box.max.z > w.z2) consider(w, [0, 1]);
-				if (box.min.z < w.z1) consider(w, [0, -1]);
-			}
-		}
-		return best;
-	}
-
-	// Wall pieces always hang on the nearest wall face they fit on, flush and facing into the room, and never leave the
-	// walls: a drag or the move arrows only slide them along a wall, up and down, or over onto another one.
-	function wallSpot(root: Group) {
-		const size = root.userData.size as Vector3 | undefined;
-		if (!size) return null;
-		hangFaces ??= wallFaces(hangBoxes, indoorRooms);
-		return { size, ...hangOnWall(hangFaces, root.position.x, root.position.z, size.x) };
-	}
-	// The one move arrow that runs along the wall.
-	function showWallArrow(root: Group, axis: WallFace['axis']) {
-		if (move.object !== root) return;
-		move.showX = axis === 'z';
-		move.showZ = axis === 'x';
-	}
-	function hang(root: Group) {
-		const spot = wallSpot(root);
-		if (!spot) return;
-		const { size, face } = spot;
-		const out = (face.normal * size.z) / 2;
-		root.rotation.set(0, spot.yaw * DEG, 0);
-		root.position.x = spot.x + (face.axis === 'x' ? out : 0);
-		root.position.z = spot.z + (face.axis === 'z' ? out : 0);
-		root.position.y = Math.min(Math.max(root.position.y, 0), CEILING_FT - size.y);
-		showWallArrow(root, face.axis);
-	}
-
-	// Pull items flush to nearby walls, once along each axis so one dropped near a corner sits square in it, then settle
-	// them onto the floor or the highest surface under their center. Wall pieces hang on a wall instead.
-	function snap(root: Group) {
-		const mount = catalogById[root.userData.itemId]?.mount ?? 'floor';
-		if (mount === 'wall') return hang(root);
-		root.updateMatrixWorld(true);
-		let box = new Box3().setFromObject(root);
-		if (box.isEmpty()) return;
-
-		for (const axis of ['x', 'z'] as const) {
-			const wall = nearestWall(box, SNAP_FT, axis);
-			if (!wall) continue;
-			root.position[axis] += flushShift(box, wall.wall, wall.normal);
-			root.updateMatrixWorld(true);
-			box = new Box3().setFromObject(root);
-		}
-
-		if (mount === 'ceiling') {
-			root.position.y += CEILING_FT - box.max.y;
-			return;
-		}
-		const center = box.getCenter(new Vector3());
-		const under = (b: Box) => center.x > b.x1 && center.x < b.x2 && center.z > b.z1 && center.z < b.z2;
-		const tops = [0, ...surfaces.filter(under).map(s => s.top)];
-		for (const other of roots.values()) {
-			if (other === root) continue;
-			const ob = new Box3().setFromObject(other);
-			if (!ob.isEmpty() && under({ x1: ob.min.x, z1: ob.min.z, x2: ob.max.x, z2: ob.max.z })) tops.push(ob.max.y);
-		}
-		const support = Math.max(0, ...tops.filter(t => t <= box.min.y + SNAP_FT));
-		root.position.y += support - box.min.y;
-	}
-
-	function commit(root: Group, settled = false) {
-		if (isCarpet(root)) {
-			constrainCarpet(root);
-			onCarpetChange(root.userData.carpetId, carpetViews.get(root.userData.carpetId)!.pose);
-			return;
-		}
-		snap(root);
-		// Items only turn about Y. Reading yaw in YXZ order avoids the gizmo's equivalent
-		// [180, y, 180] XYZ decomposition, which would make the card's turn buttons spin backwards.
-		const yaw = new Euler().setFromQuaternion(root.quaternion, 'YXZ').y;
-		const round = (n: number, step: number) => Math.round(n / step) * step;
-		onChange(
-			root.userData.key,
-			[round(root.position.x, 0.01), round(root.position.y, 0.01), round(root.position.z, 0.01)],
-			[0, round(yaw / DEG, 0.1), 0],
-			settled,
-		);
-	}
-
-	// Three move arrows and a single turn ring; plane handles and tilting are left out on purpose.
-	const move = new TransformControls(camera, renderer.domElement);
-	move.setSize(0.8);
-	move.showXY = move.showYZ = move.showXZ = false;
-	const turn = new TransformControls(camera, renderer.domElement);
-	turn.setMode('rotate');
-	turn.setSize(1.1);
-	turn.showX = turn.showZ = false;
-	turn.setRotationSnap(15 * DEG);
-	const gizmos = [move, turn];
-	for (const g of gizmos) {
-		scene.add(g.getHelper());
-		g.addEventListener('dragging-changed', e => {
-			orbit.enabled = !e.value && mode === 'orbit';
-			if (!e.value && g.object) commit(g.object as Group);
-		});
-	}
-	const settle = (root: Group) => (isCarpet(root) ? constrainCarpet(root) : snap(root));
-	move.addEventListener('objectChange', () => {
-		if (move.object) settle(move.object as Group);
-	});
-	turn.addEventListener('objectChange', () => {
-		if (turn.object && isCarpet(turn.object)) constrainCarpet(turn.object as Group);
-	});
-
-	let selected: Selection | null = null;
-	const rootOf = (s: Selection | null) =>
-		s?.kind === 'item' ? roots.get(s.key) : s?.kind === 'carpet' ? carpetViews.get(s.id)?.root : undefined;
-	const selectedRoot = () => rootOf(selected);
-	const selection = new BoxHelper(new Object3D(), 0x5eead4);
-	selection.visible = false;
-	scene.add(selection);
-	function select(next: Selection | null) {
-		const root = rootOf(next);
-		selected = root ? next : null;
-		selection.visible = !!root;
-		if (root) {
-			// Measuring and a selection share Backspace and Escape, so selecting furniture ends the measuring.
-			measurer.setTool(null);
-			selection.setFromObject(root);
-			move.attach(root);
-			// The up arrow only where height sticks: snap() sets floor and ceiling items back down or up, and carpets lie
-			// on the floor. Wall items keep any height, and surface ones are lifted onto the table or shelf they sit on.
-			const mount = isCarpet(root) ? null : (catalogById[root.userData.itemId]?.mount ?? 'floor');
-			move.showY = mount === 'wall' || mount === 'surface';
-			move.showX = move.showZ = true;
-			// Wall pieces take their facing from the wall they hang on, and slide only along it.
-			if (mount === 'wall') {
-				turn.detach();
-				const spot = wallSpot(root);
-				if (spot) showWallArrow(root, spot.face.axis);
-			} else turn.attach(root);
-		} else for (const g of gizmos) g.detach();
-		onSelect(selected);
-	}
-	const selectionOf = (root: Group): Selection =>
-		isCarpet(root) ? { kind: 'carpet', id: root.userData.carpetId } : { kind: 'item', key: root.userData.key };
-
-	const raycaster = new Raycaster();
-	const pointer = new Vector2();
-	const floor = new Plane(new Vector3(0, 1, 0), 0);
-	const floorHit = new Vector3();
-	let downAt: [number, number] | null = null;
-	let dragging: { root: Group; offset: Vector3; moved: boolean } | null = null;
-
-	function setPointer(e: PointerEvent) {
-		const rect = renderer.domElement.getBoundingClientRect();
-		if (mode === 'walk') pointer.set(0, 0);
-		else pointer.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
-		raycaster.setFromCamera(pointer, camera);
-	}
-
-	// The nearest thing under the pointer, so furniture standing on a carpet is picked before the carpet.
-	function pickItem(e: PointerEvent): Group | null {
-		setPointer(e);
-		const hit = raycaster.intersectObjects([...itemGroup.children, wallGroup, carpetGroup], true)[0];
-		let node: Object3D | null = hit?.object ?? null;
-		while (node && node.parent !== itemGroup && node.parent !== carpetGroup) node = node.parent;
-		return node as Group | null;
-	}
-
-	const onGizmo = () => gizmos.some(g => g.dragging || g.axis !== null);
-
-	const measurer = createMeasurer(
-		scene,
-		camera,
-		renderer.domElement,
-		e => {
-			setPointer(e);
-			return raycaster;
-		},
-		{
-			boxes: colliders.filter(b => !columnBoxes.has(b)),
-			circles: columns.map(c => ({ x: ft(c.x), z: ft(c.y), r: ft(c.r) })),
-			segments: doorObstacles,
-		},
-		onMeasure,
-	);
-	function setMeasureTool(tool: MeasureTool | null) {
-		if (tool) select(null);
-		measurer.setTool(tool);
-	}
-
-	// Dragging an item's body slides it along the floor plane; the gizmo handles precise axes.
-	renderer.domElement.addEventListener('pointerdown', e => {
-		downAt = [e.clientX, e.clientY];
-		if (mode !== 'orbit' || e.button !== 0 || onGizmo() || measurer.active) return;
-		const root = pickItem(e);
-		if (!root) return;
-		floor.constant = -root.position.y;
-		if (!raycaster.ray.intersectPlane(floor, floorHit)) return;
-		select(selectionOf(root));
-		dragging = { root, offset: root.position.clone().sub(floorHit), moved: false };
-		orbit.enabled = false;
-		renderer.domElement.setPointerCapture(e.pointerId);
-	});
-	renderer.domElement.addEventListener('pointermove', e => {
-		if (measurer.active && !e.buttons) measurer.hover(e);
-		if (!dragging) return;
-		setPointer(e);
-		if (!raycaster.ray.intersectPlane(floor, floorHit)) return;
-		dragging.root.position.x = floorHit.x + dragging.offset.x;
-		dragging.root.position.z = floorHit.z + dragging.offset.z;
-		settle(dragging.root);
-		dragging.moved = true;
-	});
-	renderer.domElement.addEventListener('pointerup', e => {
-		if (dragging) {
-			const { root, moved } = dragging;
-			dragging = null;
-			orbit.enabled = mode === 'orbit';
-			if (moved) commit(root);
-			return;
-		}
-		if (onGizmo() || !downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 4) return;
-		if (measurer.active) return measurer.click(e);
-		if (mode === 'walk' && !look.isLocked) return;
-		const picked = pickItem(e);
-		select(picked ? selectionOf(picked) : null);
-	});
-
-	const ceilingMat = new MeshStandardMaterial({ color: 0xffffff, roughness: 1 });
-	for (const room of rooms) {
-		if (room.floor === 'concrete' && room.name === 'Balcony') continue;
-		addBox(ceilingGroup, room.rect, CEILING_FT, 0.1, ceilingMat);
-	}
-
-	const curtainGroup = new Group();
-	scene.add(curtainGroup);
-	let curtainsShown = '';
-	let curtainsVersion = 0;
-	// `swatch` is the look's color; without one the curtains take the color of `image`.
-	async function setCurtains(curtains: { state: CurtainState; swatch: string | null; image: string | null } | null) {
-		const shown = JSON.stringify(curtains?.state === 'off' ? null : curtains);
-		if (shown === curtainsShown) return;
-		curtainsShown = shown;
-		const version = ++curtainsVersion;
-		const color =
-			curtains && curtains.state !== 'off'
-				? (curtains.swatch ?? (curtains.image && (await photoColor(curtains.image).catch(() => null))) ?? '#d9d3c7')
-				: null;
-		if (version !== curtainsVersion) return;
-		for (const { mesh } of curtainParts) mesh.geometry.dispose();
-		curtainGroup.clear();
-		curtainParts = [];
-		if (curtains && curtains.state !== 'off' && color) {
-			const built = buildCurtains(curtainTracks, curtains.state, color);
-			curtainGroup.add(built.group);
-			curtainParts = built.parts;
-			applyHeights();
-		}
-		placeTv();
-	}
-
-	let mode: Mode = 'orbit';
-	let cutaway = true;
-
-	function applyHeights() {
-		const low = mode === 'orbit' && cutaway;
-		const parts: (CurtainPart & { onHeight?: (height: number) => void })[] = [...cutawayWalls, ...curtainParts];
-		for (const w of parts) {
-			const target = low ? Math.min(w.fullHeight, CUTAWAY_FT) : w.fullHeight;
-			w.mesh.visible = !(low && w.y >= CUTAWAY_FT);
-			const scale = target / w.fullHeight;
-			w.mesh.scale.y = scale;
-			w.mesh.position.y = w.y + (w.fullHeight * scale) / 2;
-			w.onHeight?.(target);
-		}
-		ceilingGroup.visible = mode === 'walk';
-	}
-
-	function setMode(next: Mode) {
-		mode = next;
-		orbit.enabled = next === 'orbit';
-		if (next === 'walk') {
-			select(null);
-			measurer.setTool(null);
-			camera.position.set(ft(380), EYE_FT, ft(780));
-			camera.lookAt(ft(380), EYE_FT, ft(400));
-			look.lock();
-		} else {
-			if (look.isLocked) look.unlock();
-			camera.position.set(cx, 36, cz + 22);
-			orbit.target.set(cx, 0, cz);
-		}
-		applyHeights();
-		onMode(next);
-	}
-
-	function setCutaway(value: boolean) {
-		cutaway = value;
-		applyHeights();
-	}
-
-	look.addEventListener('unlock', () => {
-		if (mode === 'walk') setMode('orbit');
-	});
-
-	const keys = new Set<string>();
-	const onKeyDown = (e: KeyboardEvent) => keys.add(e.code);
-	const onKeyUp = (e: KeyboardEvent) => keys.delete(e.code);
-	addEventListener('keydown', onKeyDown);
-	addEventListener('keyup', onKeyUp);
-
-	function collides(x: number, z: number) {
-		return colliders.some(
-			b =>
-				x > b.x1 - PLAYER_RADIUS_FT &&
-				x < b.x2 + PLAYER_RADIUS_FT &&
-				z > b.z1 - PLAYER_RADIUS_FT &&
-				z < b.z2 + PLAYER_RADIUS_FT,
-		);
-	}
-
-	const forward = new Vector3();
-	const right = new Vector3();
-	function step(dt: number) {
-		const run = keys.has('ShiftLeft') || keys.has('ShiftRight') ? 2 : 1;
-		const f = Number(keys.has('KeyW') || keys.has('ArrowUp')) - Number(keys.has('KeyS') || keys.has('ArrowDown'));
-		const r = Number(keys.has('KeyD') || keys.has('ArrowRight')) - Number(keys.has('KeyA') || keys.has('ArrowLeft'));
-		if (!f && !r) return;
-		camera.getWorldDirection(forward);
-		forward.y = 0;
-		forward.normalize();
-		right.crossVectors(forward, camera.up).normalize();
-		const dist = WALK_FT_PER_S * run * dt;
-		const dx = (forward.x * f + right.x * r) * dist;
-		const dz = (forward.z * f + right.z * r) * dist;
-		if (!collides(camera.position.x + dx, camera.position.z)) camera.position.x += dx;
-		if (!collides(camera.position.x, camera.position.z + dz)) camera.position.z += dz;
-	}
-
-	function resize() {
-		const { clientWidth: w, clientHeight: h } = container;
-		renderer.setSize(w, h);
-		labelRenderer.setSize(w, h);
-		camera.aspect = w / h;
-		camera.updateProjectionMatrix();
-	}
-	const observer = new ResizeObserver(resize);
-	observer.observe(container);
-	resize();
-	applyHeights();
-
-	// The page's element that floats just above the selected thing, kept on screen: its configuration choices.
-	let overlay: HTMLElement | null = null;
-	const overlayBox = new Box3();
-	const corner = new Vector3();
-	function placeOverlay() {
-		if (!overlay) return;
-		const root = selectedRoot();
-		if (!root || mode !== 'orbit' || !overlay.offsetWidth) {
-			overlay.style.visibility = 'hidden';
-			return;
-		}
-		overlayBox.setFromObject(root);
-		const { clientWidth: w, clientHeight: h } = container;
-		let top = Infinity;
-		let left = Infinity;
-		let right = -Infinity;
-		for (let i = 0; i < 8; i++) {
-			corner
-				.set(
-					i & 1 ? overlayBox.max.x : overlayBox.min.x,
-					i & 2 ? overlayBox.max.y : overlayBox.min.y,
-					i & 4 ? overlayBox.max.z : overlayBox.min.z,
-				)
-				.project(camera);
-			top = Math.min(top, ((1 - corner.y) / 2) * h);
-			left = Math.min(left, ((corner.x + 1) / 2) * w);
-			right = Math.max(right, ((corner.x + 1) / 2) * w);
-		}
-		const margin = 8;
-		const x = Math.min(
-			Math.max((left + right) / 2 - overlay.offsetWidth / 2, margin),
-			w - overlay.offsetWidth - margin,
-		);
-		const y = Math.min(Math.max(top - overlay.offsetHeight - 12, margin), h - overlay.offsetHeight - margin);
-		overlay.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
-		overlay.style.visibility = 'visible';
-	}
-
-	let last = performance.now();
-	renderer.setAnimationLoop(now => {
-		const dt = Math.min((now - last) / 1000, 0.1);
-		last = now;
-		if (mode === 'walk') step(dt);
-		else orbit.update();
-		const root = selectedRoot();
-		if (root) selection.setFromObject(root);
-		renderer.render(scene, camera);
-		labelRenderer.render(scene, camera);
-		placeOverlay();
-	});
-
-	return {
-		setMode,
-		setCutaway,
-		setDoors,
-		setPlacements,
-		setCarpets,
-		setTv,
-		setCurtains: (curtains: Parameters<typeof setCurtains>[0]) =>
-			setCurtains(curtains).catch(error => console.error('curtain color failed to load', error)),
-		setWallItem: (key: string, spot: WallSpot, item: CatalogItem | null) =>
-			setWallItem(key, spot, item).catch(error => console.error(`${key} model failed to load`, error)),
-		// One texture dresses both the TV wall and the column.
-		setWallTexture: (texture: WallTexture | null) => {
-			void setFinish('tvWall', texture);
-			void setFinish('column', texture);
-		},
-		select,
-		setOverlay: (el: HTMLElement) => (overlay = el),
-		setMeasureTool,
-		finishMeasurement: () => measurer.finish(),
-		removeMeasurement: (id: number) => measurer.remove(id),
-		clearMeasurements: () => measurer.clear(),
-		snapWhenLoaded: (key: string) => snapOnLoad.add(key),
-		dispose() {
-			woodTexture.dispose();
-			renderer.setAnimationLoop(null);
-			observer.disconnect();
-			removeEventListener('keydown', onKeyDown);
-			removeEventListener('keyup', onKeyUp);
-			measurer.dispose();
-			look.dispose();
-			orbit.dispose();
-			renderer.dispose();
-			// The container also holds the page's overlay, which outlives this viewer.
-			renderer.domElement.remove();
-			labelRenderer.domElement.remove();
-		},
-	};
+  const renderer = new WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  container.append(renderer.domElement);
+  const woodTexture = new TextureLoader().load("/wood-floor.jpg");
+  woodTexture.colorSpace = SRGBColorSpace;
+  woodTexture.wrapS = woodTexture.wrapT = RepeatWrapping;
+  woodTexture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+  const labelRenderer = new CSS2DRenderer();
+  Object.assign(labelRenderer.domElement.style, {
+    position: "absolute",
+    inset: "0",
+    pointerEvents: "none",
+  });
+  container.append(labelRenderer.domElement);
+
+  const scene = new Scene();
+  scene.background = new Color(0x1c1f24);
+  scene.add(new HemisphereLight(0xffffff, 0x6a6f77, 1.4), new AmbientLight(0xffffff, 0.5));
+  const sun = new DirectionalLight(0xfff2dd, 1.6);
+  sun.position.set(-20, 40, 30);
+  scene.add(sun);
+
+  const camera = new PerspectiveCamera(60, 1, 0.1, 400);
+  const cx = ft((footprint[0] + footprint[2]) / 2);
+  const cz = ft((footprint[1] + footprint[3]) / 2);
+
+  const orbit = new OrbitControls(camera, renderer.domElement);
+  orbit.target.set(cx, 0, cz);
+  orbit.maxPolarAngle = Math.PI / 2 - 0.02;
+  orbit.enableDamping = true;
+  camera.position.set(cx, 36, cz + 22);
+
+  const look = new PointerLockControls(camera, renderer.domElement);
+
+  const wallGroup = new Group();
+  const ceilingGroup = new Group();
+  scene.add(wallGroup, ceilingGroup);
+  const colliders: Box[] = [];
+  // Snap targets: wall faces for flush placement, fixture tops (counters, vanities) for surface items.
+  const wallBoxes: Box[] = [];
+  // The solid walls wall pieces hang on; the TV wall's box grows out to the face of any panels on it.
+  const hangBoxes: Box[] = [];
+  let hangFaces: WallFace[] | null = null;
+  const surfaces: (Box & { top: number })[] = [];
+  const cutawayWalls: {
+    mesh: Mesh;
+    fullHeight: number;
+    y: number;
+    glass: boolean;
+    lintel?: boolean;
+    onHeight?: (height: number) => void;
+  }[] = [];
+
+  function addBox(
+    parent: Object3D,
+    rect: Rect,
+    y: number,
+    height: number,
+    material: MeshStandardMaterial,
+  ) {
+    const [x1, z1, x2, z2] = rect.map(ft) as Rect;
+    const mesh = new Mesh(new BoxGeometry(x2 - x1, height, z2 - z1), material);
+    mesh.position.set((x1 + x2) / 2, y + height / 2, (z1 + z2) / 2);
+    parent.add(mesh);
+    return mesh;
+  }
+
+  for (const room of rooms) {
+    const wood = room.floor === "wood";
+    const mat = new MeshStandardMaterial({
+      color: wood ? 0xffffff : floorColors[room.floor],
+      map: wood ? woodTexture : null,
+      roughness: 0.8,
+    });
+    const floor = addBox(scene, room.rect, -0.1, 0.1, mat);
+    if (wood) {
+      const positions = floor.geometry.attributes.position;
+      const uvs = floor.geometry.attributes.uv;
+      for (let i = 0; i < positions.count; i++) {
+        uvs.setXY(
+          i,
+          (positions.getX(i) + floor.position.x) / 7.2,
+          (positions.getZ(i) + floor.position.z) / 7.2,
+        );
+      }
+    }
+  }
+
+  const plaster = new MeshStandardMaterial({ color: 0xf1efea, roughness: 0.95 });
+  const glassMat = new MeshStandardMaterial({
+    color: 0x9fd0e8,
+    transparent: true,
+    opacity: 0.35,
+    roughness: 0.1,
+    depthWrite: false,
+    ...recessed(2),
+  });
+  const frameMat = new MeshStandardMaterial({ color: 0x2f3438, roughness: 0.5 });
+  const inchPx = PX_PER_FT / 12;
+
+  function buildWall({
+    line,
+    thickness = 10,
+    gaps = [],
+    glass = false,
+    height = CEILING_FT,
+  }: Wall) {
+    const [x1, y1, x2, y2] = line;
+    const horizontal = y1 === y2;
+    const start = horizontal ? Math.min(x1, x2) : Math.min(y1, y2);
+    const end = horizontal ? Math.max(x1, x2) : Math.max(y1, y2);
+    const fixed = horizontal ? y1 : x1;
+    const half = thickness / 2;
+    const sorted = [...gaps].sort((a, b) => a[0] - b[0]);
+
+    const span = (
+      a: number,
+      b: number,
+      y: number,
+      h: number,
+      mat: MeshStandardMaterial,
+      solid: boolean,
+    ) => {
+      if (b - a < 1) return;
+      const rect: Rect = horizontal
+        ? [a, fixed - half, b, fixed + half]
+        : [fixed - half, a, fixed + half, b];
+      const mesh = addBox(wallGroup, rect, y, h, mat);
+      cutawayWalls.push({ mesh, fullHeight: h, y, glass, lintel: y > 0 });
+      if (solid) {
+        const [bx1, bz1, bx2, bz2] = rect.map(ft) as Rect;
+        colliders.push({ x1: bx1, z1: bz1, x2: bx2, z2: bz2 });
+        if (h >= 3) {
+          const box = { x1: bx1, z1: bz1, x2: bx2, z2: bz2 };
+          wallBoxes.push(box);
+          if (!glass) hangBoxes.push(box);
+        }
+      }
+    };
+
+    const frame = (a: number, b: number, y: number, h: number) => {
+      const depth = half + inchPx;
+      const rect: Rect = horizontal
+        ? [a, fixed - depth, b, fixed + depth]
+        : [fixed - depth, a, fixed + depth, b];
+      const mesh = addBox(wallGroup, rect, y, h, frameMat);
+      cutawayWalls.push({ mesh, fullHeight: h, y, glass: false });
+    };
+    // Full-height glass reads as a window: sill, head and evenly spaced mullions. Railings stay plain glass.
+    const windowFrames = (a: number, b: number) => {
+      if (!glass || height < CEILING_FT || b - a < 1) return;
+      const bar = FRAME_IN * inchPx;
+      const bays = Math.max(1, Math.round((b - a) / (WINDOW_BAY_IN * inchPx)));
+      for (let i = 0; i <= bays; i++) {
+        const c = a + ((b - a) * i) / bays;
+        frame(Math.max(a, c - bar / 2), Math.min(b, c + bar / 2), 0, height);
+      }
+      frame(a, b, 0, FRAME_IN / 12);
+      frame(a, b, height - FRAME_IN / 12, FRAME_IN / 12);
+    };
+
+    let cursor = start;
+    for (const [from, to] of sorted) {
+      span(cursor, from, 0, height, glass ? glassMat : plaster, true);
+      windowFrames(cursor, from);
+      span(from, to, 7, height - 7, plaster, false);
+      cursor = to;
+    }
+    span(cursor, end, 0, height, glass ? glassMat : plaster, true);
+    windowFrames(cursor, end);
+  }
+
+  walls.forEach((wall) => {
+    const h = wall.height ?? CEILING_FT;
+    buildWall({ ...wall, height: h });
+  });
+
+  const tvWallFixtures: { mesh: Mesh; x: number }[] = [];
+  for (const f of fixtures) {
+    const y = f.y ?? 0;
+    const mesh = addBox(
+      wallGroup,
+      f.rect,
+      y,
+      f.height,
+      new MeshStandardMaterial({ color: f.color, roughness: 0.6, ...recessed(1) }),
+    );
+    cutawayWalls.push({ mesh, fullHeight: f.height, y, glass: false });
+    if (f.tvWall) tvWallFixtures.push({ mesh, x: mesh.position.x });
+    if (f.solid || (y === 0 && f.height > 1)) {
+      const [x1, z1, x2, z2] = f.rect.map(ft) as Rect;
+      colliders.push({ x1, z1, x2, z2 });
+    }
+    if (y === 0) {
+      const [x1, z1, x2, z2] = f.rect.map(ft) as Rect;
+      surfaces.push({ x1, z1, x2, z2, top: f.height });
+    }
+  }
+
+  const doorMat = new MeshStandardMaterial({ color: 0x9a9ea3, roughness: 0.7, ...recessed(1) });
+  const doorLeaves = doors.map((door) => door.map(ft) as Segment);
+  // Measuring reads this list on every step, so hidden doors stop blocking a measurement too.
+  const doorObstacles = [...doorLeaves];
+  const doorGroup = new Group();
+  wallGroup.add(doorGroup);
+  for (const [hx, hy, ex, ey] of doors) {
+    const length = ft(Math.hypot(ex - hx, ey - hy));
+    const mesh = new Mesh(new BoxGeometry(length, 7, 0.15), doorMat);
+    mesh.position.set(ft((hx + ex) / 2), 3.5, ft((hy + ey) / 2));
+    mesh.rotation.y = -Math.atan2(ey - hy, ex - hx);
+    doorGroup.add(mesh);
+    cutawayWalls.push({ mesh, fullHeight: 7, y: 0, glass: false });
+  }
+  // Hidden doors come out of the scene rather than turning invisible, since clicks would still hit an invisible one.
+  function setDoors(shown: boolean) {
+    if (shown) wallGroup.add(doorGroup);
+    else doorGroup.removeFromParent();
+    doorObstacles.splice(0, doorObstacles.length, ...(shown ? doorLeaves : []));
+  }
+
+  // Walking treats the column as its bounding square; measuring uses the true circle.
+  const columnBoxes = new Set<Box>();
+  for (const c of columns) {
+    const mesh = new Mesh(new CylinderGeometry(ft(c.r), ft(c.r), CEILING_FT, 32), plaster);
+    mesh.position.set(ft(c.x), CEILING_FT / 2, ft(c.y));
+    wallGroup.add(mesh);
+    cutawayWalls.push({ mesh, fullHeight: CEILING_FT, y: 0, glass: false });
+    const box = { x1: ft(c.x - c.r), z1: ft(c.y - c.r), x2: ft(c.x + c.r), z2: ft(c.y + c.r) };
+    colliders.push(box);
+    columnBoxes.add(box);
+  }
+
+  // Wall textures cover the TV wall's living-room face and sleeve the column, standing out from them by the panel
+  // thickness. Each surface keeps its own copy of the tile so it can repeat at real scale for its width and for the
+  // height the cutaway currently shows.
+  type Finish = {
+    group: Group;
+    material: MeshStandardMaterial;
+    widthFt: () => number;
+    setDepth: (ft: number) => void;
+    heightFt: number;
+    repeat: { width: number; height: number } | null;
+    version: number;
+  };
+  const finishes = {} as Record<FinishSurface, Finish>;
+  function addFinish(
+    surface: FinishSurface,
+    mesh: Mesh,
+    widthFt: () => number,
+    setDepth: (ft: number) => void,
+  ) {
+    const group = new Group();
+    group.visible = false;
+    group.add(mesh);
+    wallGroup.add(group);
+    const finish: Finish = {
+      group,
+      material: mesh.material as MeshStandardMaterial,
+      widthFt,
+      setDepth,
+      heightFt: CEILING_FT,
+      repeat: null,
+      version: 0,
+    };
+    finishes[surface] = finish;
+    cutawayWalls.push({
+      mesh,
+      fullHeight: CEILING_FT,
+      y: 0,
+      glass: false,
+      onHeight: (height) => {
+        finish.heightFt = height;
+        tileFinish(finish);
+      },
+    });
+  }
+  function tileFinish({ material, widthFt, heightFt, repeat }: Finish) {
+    if (!repeat || !material.map || !material.normalMap) return;
+    const across = widthFt() / (repeat.width / 12);
+    const up = heightFt / (repeat.height / 12);
+    for (const map of [material.map, material.normalMap]) map.repeat.set(across, up);
+  }
+
+  const tvWallSnap = wallBoxes.find((b) => b.x1 === ft(tvWallFace.x) && b.z1 === ft(tvWallFace.y1));
+  if (!tvWallSnap) throw new Error("TV wall face does not match a wall run in the floor plan");
+  const wallFinish = new Mesh(
+    new PlaneGeometry(ft(tvWallFace.y2 - tvWallFace.y1), CEILING_FT),
+    new MeshStandardMaterial(),
+  );
+  // Faces west, into the living room, with the tile's left edge at the north end.
+  wallFinish.rotation.y = -Math.PI / 2;
+  wallFinish.position.z = ft((tvWallFace.y1 + tvWallFace.y2) / 2);
+  addFinish(
+    "tvWall",
+    wallFinish,
+    () => ft(tvWallFace.y2 - tvWallFace.y1),
+    (depth) => {
+      wallFinish.position.x = ft(tvWallFace.x) - depth;
+      // Wall-mounted items snap to the panels' face instead of the plaster behind them.
+      tvWallSnap.x1 = ft(tvWallFace.x) - depth;
+      hangFaces = null;
+      tvWallDepthFt = depth;
+      placeTv();
+      for (const f of tvWallFixtures) f.mesh.position.x = f.x - depth;
+    },
+  );
+
+  const column = columns[0]!;
+  const columnFinish = new Mesh(
+    new CylinderGeometry(1, 1, CEILING_FT, 64, 1, true),
+    new MeshStandardMaterial(),
+  );
+  columnFinish.position.set(ft(column.x), CEILING_FT / 2, ft(column.y));
+  addFinish(
+    "column",
+    columnFinish,
+    // Whole tiles around, so the seam where the sleeve closes matches.
+    () => {
+      const repeat = finishes.column.repeat;
+      const around = 2 * Math.PI * columnFinish.scale.x;
+      return repeat
+        ? Math.max(1, Math.round(around / (repeat.width / 12))) * (repeat.width / 12)
+        : around;
+    },
+    (depth) =>
+      columnFinish.scale.set(ft(column.r) + depth, columnFinish.scale.y, ft(column.r) + depth),
+  );
+
+  // The TV hangs on a tilting mount at one of its spots, out from any wall texture on the back wall.
+  const TV_BEZEL_IN = 0.3;
+  let tvWallDepthFt = 0;
+  let tvSettings: TvSettings | null = null;
+  // Hung curtains push a TV over the glass out in front of them.
+  let curtainParts: CurtainPart[] = [];
+  const tvGroup = new Group();
+  tvGroup.visible = false;
+  scene.add(tvGroup);
+  const tvBody = new Mesh(
+    new BoxGeometry(1, 1, 1),
+    new MeshStandardMaterial({ color: 0x141518, roughness: 0.4, metalness: 0.3 }),
+  );
+  const tvScreenMat = new MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 0.25,
+    metalness: 0.1,
+  });
+  const tvScreen = new Mesh(new PlaneGeometry(1, 1), tvScreenMat);
+  tvGroup.add(tvBody, tvScreen);
+
+  function tvLabel({ widthIn, heightIn }: TvSettings) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1024;
+    canvas.height = Math.round((1024 * heightIn) / widthIn);
+    const ctx = canvas.getContext("2d")!;
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    gradient.addColorStop(0, "#1d2633");
+    gradient.addColorStop(1, "#0b0e13");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#e8edf3";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    const unit = canvas.height / 10;
+    ctx.font = `600 ${unit * 2.4}px system-ui, sans-serif`;
+    ctx.fillText(
+      `${round1(tvDiagonal({ widthIn, heightIn }))}″`,
+      canvas.width / 2,
+      canvas.height * 0.42,
+    );
+    ctx.font = `400 ${unit * 0.9}px system-ui, sans-serif`;
+    ctx.fillStyle = "#9aa7b6";
+    ctx.fillText(
+      `${round1(widthIn)}″ × ${round1(heightIn)}″`,
+      canvas.width / 2,
+      canvas.height * 0.66,
+    );
+    const texture = new CanvasTexture(canvas);
+    texture.colorSpace = SRGBColorSpace;
+    return texture;
+  }
+
+  function placeTv() {
+    const tv = tvSettings;
+    tvGroup.visible = !!tv?.visible;
+    if (!tv) return;
+    const [w, h, d] = [tv.widthIn / 12, tv.heightIn / 12, TV_DEPTH_IN / 12];
+    tvBody.scale.set(w, h, d);
+    tvScreen.scale.set(w - (2 * TV_BEZEL_IN) / 12, h - (2 * TV_BEZEL_IN) / 12, 1);
+    tvScreen.position.z = d / 2 + 0.002;
+    const pose = tvPose(tv, tvWallDepthFt, curtainParts.length > 0);
+    tvGroup.position.set(pose.x, pose.y, pose.z);
+    // Turned to face out of its wall, then tipped about its own horizontal axis so the top leans out.
+    tvGroup.rotation.set(tv.tiltDeg * DEG, pose.yaw * DEG, 0, "YXZ");
+  }
+
+  function setTv(tv: TvSettings) {
+    const resized = tv.widthIn !== tvSettings?.widthIn || tv.heightIn !== tvSettings?.heightIn;
+    tvSettings = tv;
+    if (resized) {
+      tvScreenMat.map?.dispose();
+      tvScreenMat.map = tvLabel(tv);
+      tvScreenMat.needsUpdate = true;
+    }
+    placeTv();
+  }
+
+  const textureLoader = new TextureLoader();
+  const textureCache = new Map<string, Promise<Texture>>();
+  const loadTexture = (url: string) => {
+    if (!textureCache.has(url)) textureCache.set(url, textureLoader.loadAsync(url));
+    return textureCache.get(url)!;
+  };
+
+  async function setFinish(surface: FinishSurface, texture: WallTexture | null) {
+    const finish = finishes[surface];
+    const version = ++finish.version;
+    const tile = texture?.texture;
+    if (!tile) {
+      finish.group.visible = false;
+      finish.setDepth(0);
+      return;
+    }
+    const [map, normalMap] = await Promise.all([
+      loadTexture(tile.map),
+      loadTexture(tile.normalMap),
+    ]);
+    if (version !== finish.version) return;
+    const copy = (source: Texture, color: boolean) => {
+      const t = source.clone();
+      t.wrapS = t.wrapT = RepeatWrapping;
+      if (color) t.colorSpace = SRGBColorSpace;
+      t.needsUpdate = true;
+      return t;
+    };
+    finish.material.map?.dispose();
+    finish.material.normalMap?.dispose();
+    finish.material.map = copy(map, true);
+    finish.material.normalMap = copy(normalMap, false);
+    finish.material.roughness = 0.75;
+    finish.material.needsUpdate = true;
+    finish.repeat = tile.repeat;
+    finish.setDepth(tile.depthIn / 12);
+    tileFinish(finish);
+    finish.group.visible = true;
+  }
+
+  const itemGroup = new Group();
+  scene.add(itemGroup);
+
+  // Carpets lie on their own layer between the floor and everything else. Rugs that overlap stack in list order.
+  const carpetGroup = new Group();
+  scene.add(carpetGroup);
+  const carpetPlan = planGeometry();
+  type CarpetView = {
+    root: Group;
+    mesh: Mesh<PlaneGeometry, MeshStandardMaterial>;
+    carpet: CarpetEntry;
+    // The last pose that cleared the walls, which a drag or a turn falls back to.
+    pose: CarpetPose;
+    map: string | null;
+  };
+  const carpetViews = new Map<string, CarpetView>();
+  const carpetGeometry = new PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
+  const placeCarpet = (root: Group, pose: CarpetPose) => {
+    root.position.set(pose.x, 0, pose.z);
+    root.rotation.set(0, pose.yaw * DEG, 0);
+  };
+
+  function setCarpets(list: CarpetEntry[]) {
+    const placed = list.filter((c) => c.placement);
+    for (const [id, view] of carpetViews) {
+      if (placed.some((c) => c.id === id)) continue;
+      view.root.removeFromParent();
+      view.mesh.material.map?.dispose();
+      view.mesh.material.dispose();
+      carpetViews.delete(id);
+      if (selected?.kind === "carpet" && selected.id === id) select(null);
+    }
+    placed.forEach((carpet, layer) => {
+      let view = carpetViews.get(carpet.id);
+      if (!view) {
+        const mesh = new Mesh(
+          carpetGeometry,
+          new MeshStandardMaterial({
+            color: 0xb7aa96,
+            roughness: 0.95,
+            alphaTest: 0.5,
+            polygonOffset: true,
+          }),
+        );
+        const root = new Group();
+        root.userData = { carpetId: carpet.id };
+        root.add(mesh);
+        carpetGroup.add(root);
+        view = { root, mesh, carpet, pose: carpet.placement!, map: null };
+        carpetViews.set(carpet.id, view);
+      }
+      view.carpet = carpet;
+      const { mesh } = view;
+      mesh.scale.set(carpet.size.widthIn / 12, 1, carpet.size.lengthIn / 12);
+      // The later of two overlapping rugs lies on top: a hair higher so clicks pick it, and pulled forward in depth
+      // because that hair alone z-fights from across the apartment.
+      mesh.position.y = CARPET_FT + layer * 0.001;
+      mesh.material.polygonOffsetFactor = -1 - layer;
+      mesh.material.polygonOffsetUnits = -4 * (layer + 1);
+      if (!isBeingMoved(view.root)) {
+        view.pose = carpet.placement!;
+        placeCarpet(view.root, view.pose);
+      }
+      const map = variantOf(carpet).texture?.map ?? null;
+      if (map !== view.map) {
+        view.map = map;
+        const target = view;
+        const { material } = mesh;
+        if (!map) {
+          material.map?.dispose();
+          material.map = null;
+          material.color.set(0xb7aa96);
+          material.needsUpdate = true;
+        } else
+          void loadTexture(map).then((source) => {
+            if (target.map !== map) return;
+            const texture = source.clone();
+            texture.colorSpace = SRGBColorSpace;
+            texture.needsUpdate = true;
+            material.map?.dispose();
+            material.map = texture;
+            material.color.set(0xffffff);
+            material.needsUpdate = true;
+          });
+      }
+    });
+    const root = selectedRoot();
+    if (root) selection.setFromObject(root);
+  }
+
+  const poseOf = (root: Group): CarpetPose => ({
+    x: root.position.x,
+    z: root.position.z,
+    yaw: Math.round((new Euler().setFromQuaternion(root.quaternion, "YXZ").y / DEG) * 10) / 10,
+  });
+
+  // Called on every drag or gizmo step: the carpet goes as far toward the pointer as the walls allow.
+  function constrainCarpet(root: Group) {
+    const view = carpetViews.get(root.userData.carpetId)!;
+    view.pose = moveCarpet(view.pose, poseOf(root), view.carpet.size, carpetPlan);
+    placeCarpet(root, view.pose);
+  }
+  const gltf = new GLTFLoader();
+  const fallbackMat = new MeshStandardMaterial({ color: 0x8a8f98, roughness: 0.6 });
+  const roots = new Map<string, Group>();
+  // Newly added items settle (floor, wall, ceiling) once their model has loaded and has a size.
+  const snapOnLoad = new Set<string>();
+  let catalogById: Record<string, CatalogItem> = {};
+  // A new mount rebuilds the item too, so it settles the new way once loaded, and so does a copy switched to another
+  // look's model.
+  const signature = (item: CatalogItem, model = item.model) =>
+    `${item.id}|${model}|${item.mount}|${item.removeNodes.join(",")}`;
+
+  async function buildItem(item: CatalogItem, model = item.model): Promise<Object3D> {
+    const dims = item.dimensions;
+    let object: Object3D;
+    if (model) {
+      object = (await gltf.loadAsync(model)).scene;
+      for (const name of item.removeNodes) object.getObjectByName(name)?.removeFromParent();
+      const size = new Box3().setFromObject(object).getSize(new Vector3());
+      // Uniform scale keeps the model's proportions; listed width wins, otherwise assume glTF meters.
+      object.scale.setScalar(dims ? dims.width / 12 / size.x : 3.28084);
+    } else {
+      const { width, height, depth } = dims ?? { width: 24, height: 24, depth: 24 };
+      object = new Mesh(new BoxGeometry(width / 12, height / 12, depth / 12), fallbackMat);
+    }
+    // Re-center so the root's origin is the footprint center at the item's bottom; rotation spins in place.
+    const box = new Box3().setFromObject(object);
+    const center = box.getCenter(new Vector3());
+    object.position.sub(new Vector3(center.x, box.min.y, center.z));
+    return object;
+  }
+
+  // Item fixtures (the bed) are built in like the TV: the model's back (-z) flush to the fixture's wall face and
+  // centered on it, with the size and the room left to either side written across the top.
+  type WallItem = {
+    group: Group;
+    label: Mesh<PlaneGeometry, MeshBasicMaterial>;
+    version: number;
+    shown: string | null;
+  };
+  const wallItems = new Map<string, WallItem>();
+  const wallItemModels = new Map<string, Promise<Object3D>>();
+
+  function wallItemLabelTexture(lines: [string, string]) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 1024;
+    canvas.height = 400;
+    const ctx = canvas.getContext("2d")!;
+    ctx.fillStyle = "rgba(15, 18, 24, 0.72)";
+    ctx.beginPath();
+    ctx.roundRect(0, 0, canvas.width, canvas.height, 48);
+    ctx.fill();
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillStyle = "#f2f5f8";
+    ctx.font = "600 150px system-ui, sans-serif";
+    ctx.fillText(lines[0], canvas.width / 2, 150);
+    ctx.fillStyle = "#b4bfcc";
+    ctx.font = "400 64px system-ui, sans-serif";
+    ctx.fillText(lines[1], canvas.width / 2, 300);
+    const texture = new CanvasTexture(canvas);
+    texture.colorSpace = SRGBColorSpace;
+    return texture;
+  }
+
+  function wallItem(key: string) {
+    let entry = wallItems.get(key);
+    if (!entry) {
+      const label = new Mesh(
+        new PlaneGeometry(1, 1),
+        new MeshBasicMaterial({ transparent: true, depthWrite: false }),
+      );
+      // Lies flat with the text's top toward the wall, so it reads from the front of the item.
+      label.rotation.x = -Math.PI / 2;
+      entry = { group: new Group(), label, version: 0, shown: null };
+      scene.add(entry.group);
+      wallItems.set(key, entry);
+    }
+    return entry;
+  }
+
+  async function setWallItem(key: string, spot: WallSpot, item: CatalogItem | null) {
+    const entry = wallItem(key);
+    const { group, label } = entry;
+    const version = ++entry.version;
+    if (!item) {
+      group.clear();
+      entry.shown = null;
+      return;
+    }
+    const shown = `${signature(item)}|${JSON.stringify(item.dimensions)}|${JSON.stringify(spot)}`;
+    if (shown === entry.shown) return;
+    const modelKey = `${signature(item)}|${JSON.stringify(item.dimensions)}`;
+    if (!wallItemModels.has(modelKey)) wallItemModels.set(modelKey, buildItem(item));
+    const model = await wallItemModels.get(modelKey)!.catch((error) => {
+      wallItemModels.delete(modelKey);
+      if (version === entry.version) {
+        group.clear();
+        entry.shown = null;
+      }
+      throw error;
+    });
+    if (version !== entry.version) return;
+    group.clear();
+    group.add(model, label);
+    entry.shown = shown;
+    // Measured unturned, so a turned spot doesn't swap width and depth.
+    group.position.set(0, 0, 0);
+    group.rotation.y = 0;
+    group.updateMatrixWorld(true);
+    const size = new Box3().setFromObject(model).getSize(new Vector3());
+    const yaw = spot.yaw * DEG;
+    group.rotation.y = yaw;
+    group.position.set(
+      spot.x + Math.sin(yaw) * (size.z / 2),
+      0,
+      spot.z + Math.cos(yaw) * (size.z / 2),
+    );
+    group.updateMatrixWorld(true);
+
+    const { width, height, depth } = item.dimensions ?? {
+      width: size.x * 12,
+      height: size.y * 12,
+      depth: size.z * 12,
+    };
+    label.material.map?.dispose();
+    label.material.map = wallItemLabelTexture([
+      `${round1(width)}″ × ${round1(depth)}″`,
+      `${round1(height)}″ high · ${round1((spot.span * 12 - size.x * 12) / 2)}″ each side`,
+    ]);
+    label.material.needsUpdate = true;
+    const labelWidth = Math.min(size.x * 0.8, size.z * 0.45 * (1024 / 400));
+    const labelDepth = (labelWidth * 400) / 1024;
+    label.scale.set(labelWidth, labelDepth, 1);
+
+    // The label rests on the highest thing under it (mattress, slats or platform); one ray down the middle can pass
+    // between slats and leave the text buried under them.
+    const ray = new Raycaster();
+    const down = new Vector3(0, -1, 0);
+    let top = 0;
+    const STEP_FT = 2 / 12;
+    for (let dx = -labelWidth / 2; dx <= labelWidth / 2; dx += STEP_FT)
+      for (let dz = -labelDepth / 2; dz <= labelDepth / 2; dz += STEP_FT) {
+        ray.set(group.localToWorld(new Vector3(dx, CEILING_FT, dz)), down);
+        top = Math.max(top, ray.intersectObject(model, true)[0]?.point.y ?? 0);
+      }
+    label.position.y = (top || size.y) + 0.03;
+  }
+
+  function placeRoot(root: Group, p: Placement) {
+    root.position.set(...p.position);
+    root.rotation.set(p.rotation[0] * DEG, p.rotation[1] * DEG, p.rotation[2] * DEG);
+  }
+
+  const isBeingMoved = (root: Group) =>
+    dragging?.root === root || gizmos.some((g) => g.dragging && g.object === root);
+  const isCarpet = (root: Object3D) => "carpetId" in root.userData;
+
+  function setPlacements(placements: Placement[], catalog: Record<string, CatalogItem>) {
+    catalogById = catalog;
+    const keys = new Set(placements.map((p) => p.key));
+    for (const [key, root] of roots) {
+      if (keys.has(key)) continue;
+      root.removeFromParent();
+      roots.delete(key);
+      if (selected?.kind === "item" && selected.key === key) select(null);
+    }
+    for (const p of placements) {
+      const item = catalog[p.itemId];
+      if (!item) continue;
+      let root = roots.get(p.key);
+      const model = placedModel(item, p.variant);
+      if (root && root.userData.signature !== signature(item, model)) {
+        root.removeFromParent();
+        root = undefined;
+      }
+      if (!root) {
+        const fresh = new Group();
+        fresh.userData = { key: p.key, itemId: item.id, signature: signature(item, model) };
+        roots.set(p.key, fresh);
+        itemGroup.add(fresh);
+        void buildItem(item, model).then((object) => {
+          // Unparented, so this is the item's own width, height and depth before it turns.
+          fresh.userData.size = new Box3().setFromObject(object).getSize(new Vector3());
+          fresh.add(object);
+          if (snapOnLoad.delete(p.key)) commit(fresh, true);
+          else if (item.mount === "wall") {
+            // Saved while it was a placeholder box, or by the AR app: flush against its wall now that its size is known.
+            const [position, yaw] = [fresh.position.clone(), fresh.rotation.y];
+            hang(fresh);
+            if (
+              fresh.position.distanceTo(position) > 0.01 ||
+              Math.abs(fresh.rotation.y - yaw) > 0.001
+            )
+              commit(fresh, true);
+          }
+          if (selectedRoot() === fresh) selection.setFromObject(fresh);
+        });
+        root = fresh;
+        if (selected?.kind === "item" && selected.key === p.key) select(selected);
+      }
+      if (!isBeingMoved(root)) placeRoot(root, p);
+    }
+  }
+
+  type WallHit = { wall: Box; shift: number; axis: "x" | "z"; normal: [x: number, z: number] };
+  // Shift that puts the item's box against the given face of a wall, measured from the box as it is now.
+  function flushShift(box: Box3, w: Box, normal: [number, number]) {
+    if (normal[0] === 1) return w.x2 - box.min.x;
+    if (normal[0] === -1) return w.x1 - box.max.x;
+    if (normal[1] === 1) return w.z2 - box.min.z;
+    return w.z1 - box.max.z;
+  }
+  function nearestWall(box: Box3, threshold: number, axis: WallHit["axis"]): WallHit | null {
+    let best: WallHit | null = null;
+    const consider = (wall: Box, normal: [number, number]) => {
+      if ((normal[0] ? "x" : "z") !== axis) return;
+      const shift = flushShift(box, wall, normal);
+      if (Math.abs(shift) < threshold && (!best || Math.abs(shift) < Math.abs(best.shift)))
+        best = { wall, shift, axis: normal[0] ? "x" : "z", normal };
+    };
+    for (const w of wallBoxes) {
+      if (box.min.z < w.z2 && box.max.z > w.z1) {
+        if (box.max.x > w.x2) consider(w, [1, 0]);
+        if (box.min.x < w.x1) consider(w, [-1, 0]);
+      }
+      if (box.min.x < w.x2 && box.max.x > w.x1) {
+        if (box.max.z > w.z2) consider(w, [0, 1]);
+        if (box.min.z < w.z1) consider(w, [0, -1]);
+      }
+    }
+    return best;
+  }
+
+  // Wall pieces always hang on the nearest wall face they fit on, flush and facing into the room, and never leave the
+  // walls: a drag or the move arrows only slide them along a wall, up and down, or over onto another one.
+  function wallSpot(root: Group) {
+    const size = root.userData.size as Vector3 | undefined;
+    if (!size) return null;
+    hangFaces ??= wallFaces(hangBoxes, indoorRooms);
+    return { size, ...hangOnWall(hangFaces, root.position.x, root.position.z, size.x) };
+  }
+  // The one move arrow that runs along the wall.
+  function showWallArrow(root: Group, axis: WallFace["axis"]) {
+    if (move.object !== root) return;
+    move.showX = axis === "z";
+    move.showZ = axis === "x";
+  }
+  function hang(root: Group) {
+    const spot = wallSpot(root);
+    if (!spot) return;
+    const { size, face } = spot;
+    const out = (face.normal * size.z) / 2;
+    root.rotation.set(0, spot.yaw * DEG, 0);
+    root.position.x = spot.x + (face.axis === "x" ? out : 0);
+    root.position.z = spot.z + (face.axis === "z" ? out : 0);
+    root.position.y = Math.min(Math.max(root.position.y, 0), CEILING_FT - size.y);
+    showWallArrow(root, face.axis);
+  }
+
+  // Pull items flush to nearby walls, once along each axis so one dropped near a corner sits square in it, then settle
+  // them onto the floor or the highest surface under their center. Wall pieces hang on a wall instead.
+  function snap(root: Group) {
+    const mount = catalogById[root.userData.itemId]?.mount ?? "floor";
+    if (mount === "wall") return hang(root);
+    root.updateMatrixWorld(true);
+    let box = new Box3().setFromObject(root);
+    if (box.isEmpty()) return;
+
+    for (const axis of ["x", "z"] as const) {
+      const wall = nearestWall(box, SNAP_FT, axis);
+      if (!wall) continue;
+      root.position[axis] += flushShift(box, wall.wall, wall.normal);
+      root.updateMatrixWorld(true);
+      box = new Box3().setFromObject(root);
+    }
+
+    if (mount === "ceiling") {
+      root.position.y += CEILING_FT - box.max.y;
+      return;
+    }
+    const center = box.getCenter(new Vector3());
+    const under = (b: Box) =>
+      center.x > b.x1 && center.x < b.x2 && center.z > b.z1 && center.z < b.z2;
+    const tops = [0, ...surfaces.filter(under).map((s) => s.top)];
+    for (const other of roots.values()) {
+      if (other === root) continue;
+      const ob = new Box3().setFromObject(other);
+      if (!ob.isEmpty() && under({ x1: ob.min.x, z1: ob.min.z, x2: ob.max.x, z2: ob.max.z }))
+        tops.push(ob.max.y);
+    }
+    const support = Math.max(0, ...tops.filter((t) => t <= box.min.y + SNAP_FT));
+    root.position.y += support - box.min.y;
+  }
+
+  function commit(root: Group, settled = false) {
+    if (isCarpet(root)) {
+      constrainCarpet(root);
+      onCarpetChange(root.userData.carpetId, carpetViews.get(root.userData.carpetId)!.pose);
+      return;
+    }
+    snap(root);
+    // Items only turn about Y. Reading yaw in YXZ order avoids the gizmo's equivalent
+    // [180, y, 180] XYZ decomposition, which would make the card's turn buttons spin backwards.
+    const yaw = new Euler().setFromQuaternion(root.quaternion, "YXZ").y;
+    const round = (n: number, step: number) => Math.round(n / step) * step;
+    onChange(
+      root.userData.key,
+      [round(root.position.x, 0.01), round(root.position.y, 0.01), round(root.position.z, 0.01)],
+      [0, round(yaw / DEG, 0.1), 0],
+      settled,
+    );
+  }
+
+  // Three move arrows and a single turn ring; plane handles and tilting are left out on purpose.
+  const move = new TransformControls(camera, renderer.domElement);
+  move.setSize(0.8);
+  move.showXY = move.showYZ = move.showXZ = false;
+  const turn = new TransformControls(camera, renderer.domElement);
+  turn.setMode("rotate");
+  turn.setSize(1.1);
+  turn.showX = turn.showZ = false;
+  turn.setRotationSnap(15 * DEG);
+  const gizmos = [move, turn];
+  for (const g of gizmos) {
+    scene.add(g.getHelper());
+    g.addEventListener("dragging-changed", (e) => {
+      orbit.enabled = !e.value && mode === "orbit";
+      if (!e.value && g.object) commit(g.object as Group);
+    });
+  }
+  const settle = (root: Group) => (isCarpet(root) ? constrainCarpet(root) : snap(root));
+  move.addEventListener("objectChange", () => {
+    if (move.object) settle(move.object as Group);
+  });
+  turn.addEventListener("objectChange", () => {
+    if (turn.object && isCarpet(turn.object)) constrainCarpet(turn.object as Group);
+  });
+
+  let selected: Selection | null = null;
+  const rootOf = (s: Selection | null) =>
+    s?.kind === "item"
+      ? roots.get(s.key)
+      : s?.kind === "carpet"
+        ? carpetViews.get(s.id)?.root
+        : undefined;
+  const selectedRoot = () => rootOf(selected);
+  const selection = new BoxHelper(new Object3D(), 0x5eead4);
+  selection.visible = false;
+  scene.add(selection);
+  function select(next: Selection | null) {
+    const root = rootOf(next);
+    selected = root ? next : null;
+    selection.visible = !!root;
+    if (root) {
+      // Measuring and a selection share Backspace and Escape, so selecting furniture ends the measuring.
+      measurer.setTool(null);
+      selection.setFromObject(root);
+      move.attach(root);
+      // The up arrow only where height sticks: snap() sets floor and ceiling items back down or up, and carpets lie
+      // on the floor. Wall items keep any height, and surface ones are lifted onto the table or shelf they sit on.
+      const mount = isCarpet(root) ? null : (catalogById[root.userData.itemId]?.mount ?? "floor");
+      move.showY = mount === "wall" || mount === "surface";
+      move.showX = move.showZ = true;
+      // Wall pieces take their facing from the wall they hang on, and slide only along it.
+      if (mount === "wall") {
+        turn.detach();
+        const spot = wallSpot(root);
+        if (spot) showWallArrow(root, spot.face.axis);
+      } else turn.attach(root);
+    } else for (const g of gizmos) g.detach();
+    onSelect(selected);
+  }
+  const selectionOf = (root: Group): Selection =>
+    isCarpet(root)
+      ? { kind: "carpet", id: root.userData.carpetId }
+      : { kind: "item", key: root.userData.key };
+
+  const raycaster = new Raycaster();
+  const pointer = new Vector2();
+  const floor = new Plane(new Vector3(0, 1, 0), 0);
+  const floorHit = new Vector3();
+  let downAt: [number, number] | null = null;
+  let dragging: { root: Group; offset: Vector3; moved: boolean } | null = null;
+
+  function setPointer(e: PointerEvent) {
+    const rect = renderer.domElement.getBoundingClientRect();
+    if (mode === "walk") pointer.set(0, 0);
+    else
+      pointer.set(
+        ((e.clientX - rect.left) / rect.width) * 2 - 1,
+        -((e.clientY - rect.top) / rect.height) * 2 + 1,
+      );
+    raycaster.setFromCamera(pointer, camera);
+  }
+
+  // The nearest thing under the pointer, so furniture standing on a carpet is picked before the carpet.
+  function pickItem(e: PointerEvent): Group | null {
+    setPointer(e);
+    const hit = raycaster.intersectObjects(
+      [...itemGroup.children, wallGroup, carpetGroup],
+      true,
+    )[0];
+    let node: Object3D | null = hit?.object ?? null;
+    while (node && node.parent !== itemGroup && node.parent !== carpetGroup) node = node.parent;
+    return node as Group | null;
+  }
+
+  const onGizmo = () => gizmos.some((g) => g.dragging || g.axis !== null);
+
+  const measurer = createMeasurer(
+    scene,
+    camera,
+    renderer.domElement,
+    (e) => {
+      setPointer(e);
+      return raycaster;
+    },
+    {
+      boxes: colliders.filter((b) => !columnBoxes.has(b)),
+      circles: columns.map((c) => ({ x: ft(c.x), z: ft(c.y), r: ft(c.r) })),
+      segments: doorObstacles,
+    },
+    onMeasure,
+  );
+  function setMeasureTool(tool: MeasureTool | null) {
+    if (tool) select(null);
+    measurer.setTool(tool);
+  }
+
+  // Dragging an item's body slides it along the floor plane; the gizmo handles precise axes.
+  renderer.domElement.addEventListener("pointerdown", (e) => {
+    downAt = [e.clientX, e.clientY];
+    if (mode !== "orbit" || e.button !== 0 || onGizmo() || measurer.active) return;
+    const root = pickItem(e);
+    if (!root) return;
+    floor.constant = -root.position.y;
+    if (!raycaster.ray.intersectPlane(floor, floorHit)) return;
+    select(selectionOf(root));
+    dragging = { root, offset: root.position.clone().sub(floorHit), moved: false };
+    orbit.enabled = false;
+    renderer.domElement.setPointerCapture(e.pointerId);
+  });
+  renderer.domElement.addEventListener("pointermove", (e) => {
+    if (measurer.active && !e.buttons) measurer.hover(e);
+    if (!dragging) return;
+    setPointer(e);
+    if (!raycaster.ray.intersectPlane(floor, floorHit)) return;
+    dragging.root.position.x = floorHit.x + dragging.offset.x;
+    dragging.root.position.z = floorHit.z + dragging.offset.z;
+    settle(dragging.root);
+    dragging.moved = true;
+  });
+  renderer.domElement.addEventListener("pointerup", (e) => {
+    if (dragging) {
+      const { root, moved } = dragging;
+      dragging = null;
+      orbit.enabled = mode === "orbit";
+      if (moved) commit(root);
+      return;
+    }
+    if (onGizmo() || !downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 4)
+      return;
+    if (measurer.active) return measurer.click(e);
+    if (mode === "walk" && !look.isLocked) return;
+    const picked = pickItem(e);
+    select(picked ? selectionOf(picked) : null);
+  });
+
+  const ceilingMat = new MeshStandardMaterial({ color: 0xffffff, roughness: 1 });
+  for (const room of rooms) {
+    if (room.floor === "concrete" && room.name === "Balcony") continue;
+    addBox(ceilingGroup, room.rect, CEILING_FT, 0.1, ceilingMat);
+  }
+
+  const curtainGroup = new Group();
+  scene.add(curtainGroup);
+  let curtainsShown = "";
+  let curtainsVersion = 0;
+  // `swatch` is the look's color; without one the curtains take the color of `image`.
+  async function setCurtains(
+    curtains: { state: CurtainState; swatch: string | null; image: string | null } | null,
+  ) {
+    const shown = JSON.stringify(curtains?.state === "off" ? null : curtains);
+    if (shown === curtainsShown) return;
+    curtainsShown = shown;
+    const version = ++curtainsVersion;
+    const color =
+      curtains && curtains.state !== "off"
+        ? (curtains.swatch ??
+          (curtains.image && (await photoColor(curtains.image).catch(() => null))) ??
+          "#d9d3c7")
+        : null;
+    if (version !== curtainsVersion) return;
+    for (const { mesh } of curtainParts) mesh.geometry.dispose();
+    curtainGroup.clear();
+    curtainParts = [];
+    if (curtains && curtains.state !== "off" && color) {
+      const built = buildCurtains(curtainTracks, curtains.state, color);
+      curtainGroup.add(built.group);
+      curtainParts = built.parts;
+      applyHeights();
+    }
+    placeTv();
+  }
+
+  let mode: Mode = "orbit";
+  let cutaway = true;
+
+  function applyHeights() {
+    const low = mode === "orbit" && cutaway;
+    const parts: (CurtainPart & { onHeight?: (height: number) => void })[] = [
+      ...cutawayWalls,
+      ...curtainParts,
+    ];
+    for (const w of parts) {
+      const target = low ? Math.min(w.fullHeight, CUTAWAY_FT) : w.fullHeight;
+      w.mesh.visible = !(low && w.y >= CUTAWAY_FT);
+      const scale = target / w.fullHeight;
+      w.mesh.scale.y = scale;
+      w.mesh.position.y = w.y + (w.fullHeight * scale) / 2;
+      w.onHeight?.(target);
+    }
+    ceilingGroup.visible = mode === "walk";
+  }
+
+  function setMode(next: Mode) {
+    mode = next;
+    orbit.enabled = next === "orbit";
+    if (next === "walk") {
+      select(null);
+      measurer.setTool(null);
+      camera.position.set(ft(380), EYE_FT, ft(780));
+      camera.lookAt(ft(380), EYE_FT, ft(400));
+      look.lock();
+    } else {
+      if (look.isLocked) look.unlock();
+      camera.position.set(cx, 36, cz + 22);
+      orbit.target.set(cx, 0, cz);
+    }
+    applyHeights();
+    onMode(next);
+  }
+
+  function setCutaway(value: boolean) {
+    cutaway = value;
+    applyHeights();
+  }
+
+  look.addEventListener("unlock", () => {
+    if (mode === "walk") setMode("orbit");
+  });
+
+  const keys = new Set<string>();
+  const onKeyDown = (e: KeyboardEvent) => keys.add(e.code);
+  const onKeyUp = (e: KeyboardEvent) => keys.delete(e.code);
+  addEventListener("keydown", onKeyDown);
+  addEventListener("keyup", onKeyUp);
+
+  function collides(x: number, z: number) {
+    return colliders.some(
+      (b) =>
+        x > b.x1 - PLAYER_RADIUS_FT &&
+        x < b.x2 + PLAYER_RADIUS_FT &&
+        z > b.z1 - PLAYER_RADIUS_FT &&
+        z < b.z2 + PLAYER_RADIUS_FT,
+    );
+  }
+
+  const forward = new Vector3();
+  const right = new Vector3();
+  function step(dt: number) {
+    const run = keys.has("ShiftLeft") || keys.has("ShiftRight") ? 2 : 1;
+    const f =
+      Number(keys.has("KeyW") || keys.has("ArrowUp")) -
+      Number(keys.has("KeyS") || keys.has("ArrowDown"));
+    const r =
+      Number(keys.has("KeyD") || keys.has("ArrowRight")) -
+      Number(keys.has("KeyA") || keys.has("ArrowLeft"));
+    if (!f && !r) return;
+    camera.getWorldDirection(forward);
+    forward.y = 0;
+    forward.normalize();
+    right.crossVectors(forward, camera.up).normalize();
+    const dist = WALK_FT_PER_S * run * dt;
+    const dx = (forward.x * f + right.x * r) * dist;
+    const dz = (forward.z * f + right.z * r) * dist;
+    if (!collides(camera.position.x + dx, camera.position.z)) camera.position.x += dx;
+    if (!collides(camera.position.x, camera.position.z + dz)) camera.position.z += dz;
+  }
+
+  function resize() {
+    const { clientWidth: w, clientHeight: h } = container;
+    renderer.setSize(w, h);
+    labelRenderer.setSize(w, h);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  const observer = new ResizeObserver(resize);
+  observer.observe(container);
+  resize();
+  applyHeights();
+
+  // The page's element that floats just above the selected thing, kept on screen: its configuration choices.
+  let overlay: HTMLElement | null = null;
+  const overlayBox = new Box3();
+  const corner = new Vector3();
+  function placeOverlay() {
+    if (!overlay) return;
+    const root = selectedRoot();
+    if (!root || mode !== "orbit" || !overlay.offsetWidth) {
+      overlay.style.visibility = "hidden";
+      return;
+    }
+    overlayBox.setFromObject(root);
+    const { clientWidth: w, clientHeight: h } = container;
+    let top = Infinity;
+    let left = Infinity;
+    let right = -Infinity;
+    for (let i = 0; i < 8; i++) {
+      corner
+        .set(
+          i & 1 ? overlayBox.max.x : overlayBox.min.x,
+          i & 2 ? overlayBox.max.y : overlayBox.min.y,
+          i & 4 ? overlayBox.max.z : overlayBox.min.z,
+        )
+        .project(camera);
+      top = Math.min(top, ((1 - corner.y) / 2) * h);
+      left = Math.min(left, ((corner.x + 1) / 2) * w);
+      right = Math.max(right, ((corner.x + 1) / 2) * w);
+    }
+    const margin = 8;
+    const x = Math.min(
+      Math.max((left + right) / 2 - overlay.offsetWidth / 2, margin),
+      w - overlay.offsetWidth - margin,
+    );
+    const y = Math.min(
+      Math.max(top - overlay.offsetHeight - 12, margin),
+      h - overlay.offsetHeight - margin,
+    );
+    overlay.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+    overlay.style.visibility = "visible";
+  }
+
+  let last = performance.now();
+  renderer.setAnimationLoop((now) => {
+    const dt = Math.min((now - last) / 1000, 0.1);
+    last = now;
+    if (mode === "walk") step(dt);
+    else orbit.update();
+    const root = selectedRoot();
+    if (root) selection.setFromObject(root);
+    renderer.render(scene, camera);
+    labelRenderer.render(scene, camera);
+    placeOverlay();
+  });
+
+  return {
+    setMode,
+    setCutaway,
+    setDoors,
+    setPlacements,
+    setCarpets,
+    setTv,
+    setCurtains: (curtains: Parameters<typeof setCurtains>[0]) =>
+      setCurtains(curtains).catch((error) => console.error("curtain color failed to load", error)),
+    setWallItem: (key: string, spot: WallSpot, item: CatalogItem | null) =>
+      setWallItem(key, spot, item).catch((error) =>
+        console.error(`${key} model failed to load`, error),
+      ),
+    // One texture dresses both the TV wall and the column.
+    setWallTexture: (texture: WallTexture | null) => {
+      void setFinish("tvWall", texture);
+      void setFinish("column", texture);
+    },
+    select,
+    setOverlay: (el: HTMLElement) => (overlay = el),
+    setMeasureTool,
+    finishMeasurement: () => measurer.finish(),
+    removeMeasurement: (id: number) => measurer.remove(id),
+    clearMeasurements: () => measurer.clear(),
+    snapWhenLoaded: (key: string) => snapOnLoad.add(key),
+    dispose() {
+      woodTexture.dispose();
+      renderer.setAnimationLoop(null);
+      observer.disconnect();
+      removeEventListener("keydown", onKeyDown);
+      removeEventListener("keyup", onKeyUp);
+      measurer.dispose();
+      look.dispose();
+      orbit.dispose();
+      renderer.dispose();
+      // The container also holds the page's overlay, which outlives this viewer.
+      renderer.domElement.remove();
+      labelRenderer.domElement.remove();
+    },
+  };
 }

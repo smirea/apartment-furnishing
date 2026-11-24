@@ -5,19 +5,29 @@
 //                                            rerun it to ship runner changes
 //   bun scripts/runner-service.ts teardown   stops and removes the agent and its checkout
 //   bun scripts/runner-service.ts status     the agent's state and the end of its log
-import { spawnSync } from 'node:child_process';
+import { spawnSync } from "node:child_process";
 
-const HOST = 'mini';
-const LABEL = 'lol.stf.apartment-runner';
-const REPO = 'git@github.com:smirea/apartment-furnishing.git';
+const HOST = "mini";
+const LABEL = "lol.stf.apartment-runner";
+const REPO = "git@github.com:smirea/apartment-furnishing.git";
 // A checkout of its own on master, so the runner never picks up a branch someone is working on.
-const CHECKOUT = '$HOME/code/apartment-furnishing';
+const CHECKOUT = "$HOME/code/apartment-furnishing";
 const PLIST = `$HOME/Library/LaunchAgents/${LABEL}.plist`;
-const LOG = '$HOME/Library/Logs/apartment-runner.log';
+const LOG = "$HOME/Library/Logs/apartment-runner.log";
 // launchd gives the agent only this PATH. codex is a node script, and the import and build jobs shell out to uv,
 // pdftotext and Apple's USD tools.
-const PATH = '$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin';
-const TOOLS = ['bun', 'node', 'codex', 'uv', 'pdftotext', 'usdextract', 'usdzip', 'env-manager', 'git'];
+const PATH = "$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
+const TOOLS = [
+  "bun",
+  "node",
+  "codex",
+  "uv",
+  "pdftotext",
+  "usdextract",
+  "usdzip",
+  "env-manager",
+  "git",
+];
 
 const PRELUDE = `set -euo pipefail
 export PATH="${PATH}"
@@ -35,7 +45,7 @@ const SETUP = `${PRELUDE}
 launchctl print "$domain" >/dev/null 2>&1 || fail "nobody is logged in to ${HOST}'s desktop, which a LaunchAgent needs"
 
 command -v pdftotext >/dev/null || brew install poppler
-for bin in ${TOOLS.join(' ')}; do command -v "$bin" >/dev/null || fail "$bin is not on the agent's PATH ($PATH)"; done
+for bin in ${TOOLS.join(" ")}; do command -v "$bin" >/dev/null || fail "$bin is not on the agent's PATH ($PATH)"; done
 codex login status >/dev/null 2>&1 || fail "codex is signed out on ${HOST}: ssh ${HOST}, then run codex login --device-auth"
 
 if [ -d "${CHECKOUT}/.git" ]; then
@@ -98,18 +108,22 @@ if [ -e "${LOG}" ]; then tail -n 15 "${LOG}"; fi
 `;
 
 function remote(script: string) {
-	// The mini's ssh config entry opens an interactive login shell, which a script piped to bash can't use.
-	const result = spawnSync('ssh', ['-o', 'RemoteCommand=none', '-o', 'RequestTTY=no', HOST, 'bash', '-s'], {
-		input: script,
-		stdio: ['pipe', 'inherit', 'inherit'],
-	});
-	if (result.status !== 0) process.exit(result.status ?? 1);
+  // The mini's ssh config entry opens an interactive login shell, which a script piped to bash can't use.
+  const result = spawnSync(
+    "ssh",
+    ["-o", "RemoteCommand=none", "-o", "RequestTTY=no", HOST, "bash", "-s"],
+    {
+      input: script,
+      stdio: ["pipe", "inherit", "inherit"],
+    },
+  );
+  if (result.status !== 0) process.exit(result.status ?? 1);
 }
 
 const commands: Record<string, string> = { setup: SETUP, teardown: TEARDOWN, status: STATUS };
-const script = commands[process.argv[2] ?? ''];
+const script = commands[process.argv[2] ?? ""];
 if (!script) {
-	console.error(`Usage: bun scripts/runner-service.ts <${Object.keys(commands).join('|')}>`);
-	process.exit(1);
+  console.error(`Usage: bun scripts/runner-service.ts <${Object.keys(commands).join("|")}>`);
+  process.exit(1);
 }
 remote(script);
